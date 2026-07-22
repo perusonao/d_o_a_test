@@ -30,6 +30,39 @@ void main() {
         expect(count(LifeDeathEffect.keep), greaterThanOrEqualTo(2));
       }
     });
+
+    test('A: 両プレイヤーの手札は効果・数字が同一（引き運の排除）', () {
+      final setup = GameSetupService(random: Random(1));
+      final p = setup.buildLifeDeathHand(TurnOwner.player);
+      final c = setup.buildLifeDeathHand(TurnOwner.cpu);
+      expect(p.length, c.length);
+      for (var i = 0; i < p.length; i++) {
+        expect(p[i].effect, c[i].effect);
+        expect(p[i].number, c[i].number);
+      }
+    });
+
+    test('B: 各プレイヤーの盤面は善人/悪人/中立が均等（配り運の排除）', () {
+      for (var seed = 0; seed < 20; seed++) {
+        final setup = GameSetupService(random: Random(seed));
+        final dealt = setup.dealPersonCards();
+        for (final board in [dealt.player, dealt.cpu]) {
+          int count(PersonType t) => board.where((p) => p.type == t).length;
+          expect(count(PersonType.good), GameConstants.personTypeCountPerPlayer);
+          expect(count(PersonType.evil), GameConstants.personTypeCountPerPlayer);
+          expect(
+              count(PersonType.neutral), GameConstants.personTypeCountPerPlayer);
+        }
+      }
+    });
+
+    test('C: 開始時に数字が公開される（種類は伏せる）', () {
+      final setup = GameSetupService(random: Random(1));
+      final dealt = setup.dealPersonCards();
+      final all = [...dealt.player, ...dealt.cpu];
+      // numberOnly = 数字は見えるが種類は不明。
+      expect(all.every((p) => p.reveal == RevealLevel.numberOnly), isTrue);
+    });
   });
 
   group('エンジンのターン進行と終了', () {
