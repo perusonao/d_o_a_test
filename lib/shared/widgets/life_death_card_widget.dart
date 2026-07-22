@@ -56,25 +56,34 @@ class LifeDeathCardWidget extends StatelessWidget {
                   ],
                 ),
               ),
-              padding: const EdgeInsets.all(4),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Icon(CardVisuals.effectIcon(card.effect),
-                      color: color, size: width * 0.4),
-                  Text(
-                    '${card.number}',
-                    style: TextStyle(
-                      fontSize: width * 0.36,
-                      fontWeight: FontWeight.bold,
-                      color: const Color(0xFFEDE6D4),
-                    ),
+              padding: const EdgeInsets.all(3),
+              // 小さいサイズでも溢れないよう内容を縮小して収める。
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: SizedBox(
+                  width: width,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(CardVisuals.effectIcon(card.effect),
+                          color: color, size: width * 0.4),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${card.number}',
+                        style: TextStyle(
+                          fontSize: width * 0.36,
+                          fontWeight: FontWeight.bold,
+                          color: const Color(0xFFEDE6D4),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        CardVisuals.effectLabel(card.effect),
+                        style: TextStyle(fontSize: width * 0.17, color: color),
+                      ),
+                    ],
                   ),
-                  Text(
-                    CardVisuals.effectLabel(card.effect),
-                    style: TextStyle(fontSize: width * 0.17, color: color),
-                  ),
-                ],
+                ),
               ),
             ),
           ),

@@ -39,7 +39,6 @@ void main() {
 
     // ターン表示が出る（プレイヤー先攻）。
     expect(find.text('あなたのターン'), findsOneWidget);
-    expect(find.text('あなたの場'), findsOneWidget);
     // 決定ボタンが存在する。
     expect(find.text('決定'), findsOneWidget);
   });

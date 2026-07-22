@@ -18,7 +18,7 @@ class GameLogView extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
         color: Colors.black.withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(8),
@@ -26,24 +26,24 @@ class GameLogView extends StatelessWidget {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           for (final entry in recent)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 1),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('› ',
-                      style: TextStyle(color: AppTheme.accent, fontSize: 12)),
-                  Expanded(
-                    child: Text(
-                      entry.message,
-                      style: const TextStyle(
-                          fontSize: 12, color: Color(0xFFCFC7B5)),
-                    ),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('› ',
+                    style: TextStyle(color: AppTheme.accent, fontSize: 11)),
+                Expanded(
+                  child: Text(
+                    entry.message,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontSize: 11, color: Color(0xFFCFC7B5), height: 1.25),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
         ],
       ),

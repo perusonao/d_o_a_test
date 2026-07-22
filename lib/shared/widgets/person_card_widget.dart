@@ -198,34 +198,45 @@ class _PersonCardWidgetState extends State<PersonCardWidget>
               colors: const [AppTheme.parchmentLight, AppTheme.parchment],
             ),
           ),
-          padding: const EdgeInsets.all(4),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              // 種類アイコン or ？
-              Icon(
-                showType ? CardVisuals.personTypeIcon(card.type) : Icons.help,
-                color: typeColor,
-                size: widget.size * 0.34,
+          padding: const EdgeInsets.all(3),
+          // 小さいサイズでも溢れないよう内容を縮小して収める。
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: SizedBox(
+              width: widget.size,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // 種類アイコン or ？
+                  Icon(
+                    showType
+                        ? CardVisuals.personTypeIcon(card.type)
+                        : Icons.help,
+                    color: typeColor,
+                    size: widget.size * 0.34,
+                  ),
+                  const SizedBox(height: 2),
+                  // 数字
+                  Text(
+                    showNumber ? '${card.number}' : '？',
+                    style: TextStyle(
+                      fontSize: widget.size * 0.34,
+                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFFEDE6D4),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  // 種類ラベル
+                  Text(
+                    showType ? CardVisuals.personTypeLabel(card.type) : '？',
+                    style: TextStyle(
+                      fontSize: widget.size * 0.16,
+                      color: typeColor,
+                    ),
+                  ),
+                ],
               ),
-              // 数字
-              Text(
-                showNumber ? '${card.number}' : '？',
-                style: TextStyle(
-                  fontSize: widget.size * 0.34,
-                  fontWeight: FontWeight.bold,
-                  color: const Color(0xFFEDE6D4),
-                ),
-              ),
-              // 種類ラベル
-              Text(
-                showType ? CardVisuals.personTypeLabel(card.type) : '？',
-                style: TextStyle(
-                  fontSize: widget.size * 0.16,
-                  color: typeColor,
-                ),
-              ),
-            ],
+            ),
           ),
         ),
 
