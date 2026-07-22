@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../app/theme.dart';
 
-/// ルール説明画面。基本ルールを簡潔に表示する。
+/// ルール説明画面（Ver.0.3）。
 class RulesScreen extends StatelessWidget {
   const RulesScreen({super.key});
 
@@ -18,52 +18,48 @@ class RulesScreen extends StatelessWidget {
               padding: const EdgeInsets.all(20),
               children: const [
                 _Section(
-                  icon: Icons.flag,
-                  title: '目的',
+                  icon: Icons.remove_red_eye,
+                  title: '核',
                   body:
-                      '善人陣営は終了時に「生存している善人」を多く、悪人陣営は「生存している悪人」を多く残すことを目指します。',
+                      '中央に伏せた9枚を巡り、「自分だけが一部の正体を知っている」情報差を武器に、'
+                      '善人を生かすか殺すかを争う心理戦です。',
                 ),
                 _Section(
-                  icon: Icons.style,
-                  title: 'カード',
+                  icon: Icons.grid_view,
+                  title: '場と情報',
                   body:
-                      '場には人カード（善人・悪人・中立）が各プレイヤーに善人3・悪人3・中立3の計9枚並びます（配り運を排除）。手札の生死カード（デッド・アライブ・キープ）は両者共通の固定構成で、各効果に数字3・6・9を1枚ずつ持ちます（引き運を排除）。',
+                      '善人3・悪人3・中立3の計9枚を中央に3×3で伏せます。開始時、'
+                      'あなたと CPU はそれぞれ異なる3枚の正体だけを知り、3枚は誰も知りません。'
+                      '正体（種類・数字）は終了時まで非公開。状態（生存/死亡/封印）だけが見えます。',
                 ),
                 _Section(
-                  icon: Icons.visibility,
-                  title: '見えている情報',
+                  icon: Icons.groups,
+                  title: '役割',
                   body:
-                      '相手カードの「数字」は最初から公開されています。伏せられているのは「種類（善人／悪人／中立）」です。数字を手がかりに、相手の種類を推理して立ち回ります。',
+                      '救済者は善人を生存させ、執行者は善人を死亡させることを目指します。',
                 ),
                 _Section(
                   icon: Icons.bolt,
-                  title: 'パワー判定',
+                  title: '行動とパワー判定',
                   body:
-                      '生死カードの数字 ≧ 人カードの数字 なら成功。数字は公開されているため成否は事前に分かります。成功すると種類も公開され、失敗すると種類は伏せたままです。',
+                      '手番ごとに手札（デッド/アライブ/シール）を1枚選び、中央の1枚に使います。'
+                      '生死カードの数字 ≧ 相手の数字 なら成功。'
+                      '失敗しても正体は公開されず、「そのパワーでは倒せなかった」事実だけが手がかりになります。',
                 ),
                 _Section(
-                  icon: Icons.dangerous,
-                  title: 'デッド / アライブ',
+                  icon: Icons.lock,
+                  title: '効果',
                   body:
-                      'デッド成功で対象を死亡、アライブ成功で対象を生存（復活）させます。失敗すると状態は変化しません。',
-                ),
-                _Section(
-                  icon: Icons.shield,
-                  title: 'キープ',
-                  body:
-                      'キープ成功で対象に1回分の防御を付与。防御中のカードが次にデッド/アライブを受けると効果を無効化し、防御は解除されます。',
-                ),
-                _Section(
-                  icon: Icons.theater_comedy,
-                  title: '中立ペナルティ',
-                  body:
-                      '善人陣営が中立を死亡、悪人陣営が中立を生存させると、自分の未使用生死カードを最大3枚ランダムに失います。キープでは発生しません。',
+                      'デッド＝死亡、アライブ＝生存（復活）、シール＝封印（終了まで状態固定）。'
+                      'シールは各プレイヤー1回のみ。終盤の決め手になります。',
                 ),
                 _Section(
                   icon: Icons.emoji_events,
-                  title: '勝敗',
+                  title: '得点と勝敗',
                   body:
-                      '両者の手札が尽きたら終了。善人陣営は生存善人 > 生存悪人で勝利、悪人陣営は生存悪人 ≧ 生存善人で勝利（引き分けは悪人の勝ち）。中立は人数に含みません。',
+                      '全手番終了で正体を一斉公開し集計します。'
+                      '救済者＝生存善人2点・死亡悪人/中立1点。執行者＝死亡善人2点・生存悪人/中立1点。'
+                      '中立は「自分の本能どおり」に扱うと相手の得点になるので注意。合計点が高い方の勝ち。',
                 ),
               ],
             ),
@@ -76,7 +72,6 @@ class RulesScreen extends StatelessWidget {
 
 class _Section extends StatelessWidget {
   const _Section({required this.icon, required this.title, required this.body});
-
   final IconData icon;
   final String title;
   final String body;
@@ -92,14 +87,11 @@ class _Section extends StatelessWidget {
             children: [
               Icon(icon, color: AppTheme.accent, size: 22),
               const SizedBox(width: 8),
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.good,
-                ),
-              ),
+              Text(title,
+                  style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.good)),
             ],
           ),
           const SizedBox(height: 6),

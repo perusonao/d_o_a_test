@@ -10,16 +10,13 @@ import '../../../shared/utils/card_visuals.dart';
 import '../../../shared/widgets/life_death_card_widget.dart';
 import '../../../shared/widgets/person_card_widget.dart';
 import '../application/game_controller.dart';
-import '../application/game_engine.dart';
 import '../domain/enums.dart';
 import '../domain/game_state.dart';
 import '../domain/life_death_card.dart';
 import '../domain/person_card.dart';
-import '../domain/player_state.dart';
 import 'widgets/game_log_view.dart';
-import 'widgets/neutral_penalty_dialog.dart';
 
-/// ゲーム本編画面。
+/// ゲーム本編画面（Ver.0.3・中央共有の場）。
 class GameScreen extends ConsumerStatefulWidget {
   const GameScreen({super.key});
 
@@ -28,16 +25,12 @@ class GameScreen extends ConsumerStatefulWidget {
 }
 
 class _GameScreenState extends ConsumerState<GameScreen> {
-  String? _shownPenaltyOutcomeKey;
-
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(gameControllerProvider);
 
-    // 終了したらリザルトへ遷移。
     ref.listen<GameState?>(gameControllerProvider, (prev, next) {
       if (next == null) return;
-      _maybeShowPenalty(next);
       if (next.phase == GamePhase.finished) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) context.go(AppRoutes.result);
@@ -46,7 +39,6 @@ class _GameScreenState extends ConsumerState<GameScreen> {
     });
 
     if (state == null) {
-      // 直接 URL でアクセスした等。タイトルへ。
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) context.go(AppRoutes.title);
       });
@@ -56,88 +48,69 @@ class _GameScreenState extends ConsumerState<GameScreen> {
     return Scaffold(
       body: SafeArea(
         child: LayoutBuilder(
-          builder: (context, constraints) {
-            final w = constraints.maxWidth;
-            final h = constraints.maxHeight;
-            const pad = 6.0;
-            const gap = 5.0;
-            final screenW = math.min(w, 560.0);
+          builder: (context, c) {
+            final w = c.maxWidth;
+            final h = c.maxHeight;
+            const pad = 8.0;
+            const gap = 6.0;
+            final screenW = math.min(w, 520.0);
             final contentW = screenW - pad * 2;
-            final selectable =
-                state.phase == GamePhase.playerTurn && !state.isBusy;
 
-            // 生死カード手札：横スクロールせず、5枚×2段で収める。
-            const perRow = 5;
-            const handRows = 2;
+            // 手札：5枚×最大2段。
             final lifeW =
-                ((contentW - gap * (perRow - 1)) / perRow).clamp(34.0, 46.0);
-            final handH = handRows * (lifeW * 1.35) + (handRows - 1) * gap;
+                ((contentW - gap * 4) / 5).clamp(40.0, 58.0);
+            final handH = 2 * (lifeW * 1.35) + gap;
 
-            // 固定要素の高さ見積り（この合計を差し引いた残りを人カードへ）。
-            const infoH = 30.0;
+            // 固定要素見積り。
+            const headerH = 56.0;
             const turnH = 26.0;
-            const logH = 48.0;
+            const logH = 54.0;
             const selInfoH = 18.0;
             const msgH = 14.0;
             const btnH = 44.0;
-            const chromePad = 22.0; // 各種 padding / 余白の合算。
-            final gapsH = gap * 8;
-            final fixed = infoH +
+            const chromePad = 26.0;
+            final fixed = headerH +
                 turnH +
                 logH +
                 selInfoH +
                 msgH +
                 btnH +
                 handH +
-                gapsH +
+                gap * 8 +
                 chromePad;
 
-            // 残り高さを人カード6段（CPU3段＋自分3段）で分け合う。
-            final availPersons = h - fixed;
+            // 3×3の1盤面（3段）。
+            final avail = h - fixed;
             final pByWidth = (contentW - gap * 2) / 3;
-            final pByHeight = (availPersons / 6) / 1.28;
+            final pByHeight = (avail / 3) / 1.28;
             final personSize =
-                math.min(pByWidth, pByHeight).clamp(34.0, 112.0);
+                math.min(pByWidth, pByHeight).clamp(52.0, 128.0);
 
-            final board = Padding(
-              padding: const EdgeInsets.symmetric(horizontal: pad),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _CpuInfoBar(cpu: state.cpu),
-                  const SizedBox(height: gap),
-                  _personGrid(
-                    cards: state.cpu.persons,
-                    ownerView: false,
-                    state: state,
-                    size: personSize,
-                    gap: gap,
-                    selectable: selectable,
-                  ),
-                  const SizedBox(height: gap),
-                  _TurnIndicator(state: state),
-                  const SizedBox(height: gap),
-                  GameLogView(state: state),
-                  const SizedBox(height: gap),
-                  _personGrid(
-                    cards: state.player.persons,
-                    ownerView: true,
-                    state: state,
-                    size: personSize,
-                    gap: gap,
-                    selectable: false,
-                  ),
-                ],
-              ),
-            );
+            final finished = state.phase == GamePhase.finished;
+            final selectable =
+                state.phase == GamePhase.playerTurn && !state.isBusy;
 
             return Center(
               child: SizedBox(
                 width: screenW,
                 child: Column(
                   children: [
-                    // 通常は1画面に収まる。極端に低い画面のみ内部スクロールで救済。
-                    Expanded(child: SingleChildScrollView(child: board)),
+                    Expanded(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.fromLTRB(pad, 6, pad, 0),
+                        child: Column(
+                          children: [
+                            _Header(state: state),
+                            const SizedBox(height: gap),
+                            _TurnIndicator(state: state),
+                            const SizedBox(height: gap),
+                            _board(state, personSize, gap, selectable, finished),
+                            const SizedBox(height: gap),
+                            GameLogView(state: state),
+                          ],
+                        ),
+                      ),
+                    ),
                     _HandArea(state: state, lifeWidth: lifeW),
                   ],
                 ),
@@ -149,29 +122,10 @@ class _GameScreenState extends ConsumerState<GameScreen> {
     );
   }
 
-  void _maybeShowPenalty(GameState state) {
-    final o = state.lastOutcome;
-    if (o == null || !o.neutralPenalty) return;
-    final key = '${o.lifeDeathCardId}_${o.targetPersonId}';
-    if (_shownPenaltyOutcomeKey == key) return;
-    _shownPenaltyOutcomeKey = key;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        showNeutralPenaltyDialog(context, o);
-      }
-    });
-  }
-
-  Widget _personGrid({
-    required List<PersonCard> cards,
-    required bool ownerView,
-    required GameState state,
-    required double size,
-    required double gap,
-    required bool selectable,
-  }) {
-    // 3列固定にするため、カード幅×3＋間隔ぶんに横幅を制限する。
-    // （Wrap は横幅が許す限り詰め込むため、明示的に3列へ収める。）
+  Widget _board(GameState state, double size, double gap, bool selectable,
+      bool finished) {
+    // position 順に3×3。
+    final persons = [...state.persons]..sort((a, b) => a.position.compareTo(b.position));
     return Center(
       child: SizedBox(
         width: size * 3 + gap * 2,
@@ -179,17 +133,18 @@ class _GameScreenState extends ConsumerState<GameScreen> {
           spacing: gap,
           runSpacing: gap,
           alignment: WrapAlignment.center,
-          children: cards.map((c) {
-            final selected = !ownerView && state.selectedPersonId == c.id;
+          children: persons.map((p) {
+            final revealed = finished || p.knownBy == Knower.player;
             return PersonCardWidget(
-              card: c,
-              ownerView: ownerView,
+              card: p,
+              revealed: revealed,
               size: size,
-              selected: selected,
-              selectable: selectable,
-              highlight: _highlightFor(state, c, ownerView),
-              onTap: () =>
-                  ref.read(gameControllerProvider.notifier).selectPerson(c.id),
+              selected: state.selectedPosition == p.position,
+              selectable: selectable && !p.sealed,
+              highlight: _highlightFor(state, p),
+              onTap: () => ref
+                  .read(gameControllerProvider.notifier)
+                  .selectPosition(p.position),
             );
           }).toList(),
         ),
@@ -197,66 +152,67 @@ class _GameScreenState extends ConsumerState<GameScreen> {
     );
   }
 
-  CardHighlight _highlightFor(GameState state, PersonCard card, bool ownerView) {
+  CardHighlight _highlightFor(GameState state, PersonCard card) {
     final o = state.lastOutcome;
-    if (o == null) return CardHighlight.none;
-    final owner = ownerView ? TurnOwner.player : TurnOwner.cpu;
-    if (o.targetPersonId != card.id || o.targetOwner != owner) {
-      return CardHighlight.none;
-    }
-    if (o.guardBlocked) return CardHighlight.guard;
+    if (o == null || o.position != card.position) return CardHighlight.none;
     return o.success ? CardHighlight.success : CardHighlight.fail;
   }
 }
 
-/// CPU 情報バー。
-class _CpuInfoBar extends StatelessWidget {
-  const _CpuInfoBar({required this.cpu});
-  final PlayerState cpu;
+/// ヘッダー：自分の役割・目的・相手・秘密情報の枚数。
+class _Header extends StatelessWidget {
+  const _Header({required this.state});
+  final GameState state;
 
   @override
   Widget build(BuildContext context) {
-    final isGood = cpu.faction == Faction.good;
+    final myRole = state.player.role;
+    final cpuRole = state.cpu.role;
+    final myColor = CardVisuals.roleColor(myRole);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: AppTheme.surface,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppTheme.accent.withValues(alpha: 0.3)),
+        border: Border.all(color: myColor.withValues(alpha: 0.4)),
       ),
       child: Row(
         children: [
-          Icon(isGood ? Icons.balance : Icons.local_fire_department,
-              color: AppTheme.factionColor(isGood), size: 18),
-          const SizedBox(width: 6),
-          Text('CPU：${GameLabels.faction(cpu.faction)}',
-              style: TextStyle(
-                  color: AppTheme.factionColor(isGood),
-                  fontWeight: FontWeight.bold,
-                  fontSize: 13)),
-          const Spacer(),
-          _pill(Icons.style, '手札 ${cpu.usableCards.length}'),
-          const SizedBox(width: 6),
-          _pill(Icons.delete_outline, '破棄 ${cpu.discardedCount}'),
+          Icon(CardVisuals.roleIcon(myRole), color: myColor, size: 24),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('あなた：${CardVisuals.roleLabel(myRole)}',
+                    style: TextStyle(
+                        color: myColor,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14)),
+                Text('目的 ${CardVisuals.roleGoal(myRole)}',
+                    style: const TextStyle(
+                        color: Color(0xFFB9B2A2), fontSize: 11)),
+              ],
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text('CPU：${CardVisuals.roleLabel(cpuRole)}',
+                  style: const TextStyle(
+                      color: Color(0xFFB9B2A2), fontSize: 12)),
+              Text(
+                  '手札 あなた${state.player.usableCards.length} / CPU${state.cpu.usableCards.length}',
+                  style: const TextStyle(
+                      color: Color(0xFF9A9384), fontSize: 11)),
+            ],
+          ),
         ],
       ),
     );
   }
-
-  Widget _pill(IconData icon, String text) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 14, color: const Color(0xFFB9B2A2)),
-        const SizedBox(width: 3),
-        Text(text,
-            style: const TextStyle(fontSize: 12, color: Color(0xFFB9B2A2))),
-      ],
-    );
-  }
 }
 
-/// ターン表示。
 class _TurnIndicator extends StatelessWidget {
   const _TurnIndicator({required this.state});
   final GameState state;
@@ -267,7 +223,7 @@ class _TurnIndicator extends StatelessWidget {
     final Color color;
     switch (state.phase) {
       case GamePhase.playerTurn:
-        text = 'あなたのターン';
+        text = 'あなたのターン（正体を知る3枚は表向き）';
         color = AppTheme.good;
         break;
       case GamePhase.cpuTurn:
@@ -294,13 +250,11 @@ class _TurnIndicator extends StatelessWidget {
       child: Text(text,
           textAlign: TextAlign.center,
           style: TextStyle(
-              color: color, fontWeight: FontWeight.bold, fontSize: 13)),
+              color: color, fontWeight: FontWeight.bold, fontSize: 12)),
     );
   }
 }
 
-/// 画面下部：選択中カード情報＋手札＋決定ボタン。
-/// 縦スクロールを避けるため、手札幅は上位で算出した [lifeWidth] を用いる。
 class _HandArea extends ConsumerWidget {
   const _HandArea({required this.state, required this.lifeWidth});
   final GameState state;
@@ -323,7 +277,7 @@ class _HandArea extends ConsumerWidget {
     final canConfirm = state.phase == GamePhase.playerTurn &&
         !state.isBusy &&
         state.selectedLifeDeathCardId != null &&
-        state.selectedPersonId != null;
+        state.selectedPosition != null;
 
     return Container(
       decoration: const BoxDecoration(
@@ -336,7 +290,6 @@ class _HandArea extends ConsumerWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // メッセージ行（無効操作の理由など）。高さは常に確保しレイアウトを安定させる。
             SizedBox(
               height: 15,
               child: state.message == null
@@ -357,25 +310,22 @@ class _HandArea extends ConsumerWidget {
                       ],
                     ),
             ),
-            // 選択中の生死カード情報。
             _SelectedInfo(
-              selected: selectedCard,
-              hasTarget: state.selectedPersonId != null,
-            ),
+                selected: selectedCard,
+                hasTarget: state.selectedPosition != null),
             const SizedBox(height: 4),
-            // 手札（横スクロールせず、幅を算出して2段に折り返し）。
             Wrap(
               spacing: 5,
               runSpacing: 5,
               alignment: WrapAlignment.center,
-              children: state.player.hand.map((c) {
+              children: state.player.hand.map((card) {
                 return LifeDeathCardWidget(
-                  card: c,
+                  card: card,
                   width: lifeWidth,
-                  selected: state.selectedLifeDeathCardId == c.id,
+                  selected: state.selectedLifeDeathCardId == card.id,
                   enabled:
                       state.phase == GamePhase.playerTurn && !state.isBusy,
-                  onTap: () => controller.selectLifeDeathCard(c.id),
+                  onTap: () => controller.selectLifeDeathCard(card.id),
                 );
               }).toList(),
             ),
@@ -408,24 +358,22 @@ class _SelectedInfo extends StatelessWidget {
   Widget build(BuildContext context) {
     final card = selected;
     if (card == null) {
-      return const Text('生死カードを選択してください',
+      return const Text('生死カードを選択 → 対象を選択 → 決定',
           style: TextStyle(fontSize: 12, color: Color(0xFF9A9384)));
     }
-    final effect = card.effect;
-    final number = card.number;
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Icon(CardVisuals.effectIcon(effect),
-            size: 16, color: CardVisuals.effectColor(effect)),
+        Icon(CardVisuals.effectIcon(card.effect),
+            size: 16, color: CardVisuals.effectColor(card.effect)),
         const SizedBox(width: 4),
-        Text('${CardVisuals.effectLabel(effect)} $number を選択中',
+        Text('${CardVisuals.effectLabel(card.effect)} ${card.number}',
             style: TextStyle(
                 fontSize: 13,
-                color: CardVisuals.effectColor(effect),
+                color: CardVisuals.effectColor(card.effect),
                 fontWeight: FontWeight.bold)),
         const SizedBox(width: 8),
-        Text(hasTarget ? '→ 対象選択済み' : '→ 対象を選んでください',
+        Text(hasTarget ? '→ 対象選択済み' : '→ 対象を選択',
             style: const TextStyle(fontSize: 12, color: Color(0xFF9A9384))),
       ],
     );

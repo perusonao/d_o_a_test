@@ -1,25 +1,18 @@
 import 'enums.dart';
 
-/// 1ターンで実行される行動。
+/// 1ターンで実行される行動（Ver.0.3）。
 ///
-/// 「どの生死カードを、誰のどの人カードに使うか」を表す。
+/// 「どの生死カードを、中央のどの位置の人カードに使うか」。
 class GameAction {
   const GameAction({
     required this.actor,
     required this.lifeDeathCardId,
-    required this.targetPersonId,
-    required this.targetOwner,
+    required this.targetPosition,
   });
 
-  /// 行動主体。
   final TurnOwner actor;
-
-  /// 使用する生死カードの ID。
   final String lifeDeathCardId;
 
-  /// 対象の人カードの ID。
-  final String targetPersonId;
-
-  /// 対象の人カードの所有者。
-  final TurnOwner targetOwner;
+  /// 対象の人カードの配置インデックス（0〜8）。
+  final int targetPosition;
 }

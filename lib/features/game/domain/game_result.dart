@@ -1,43 +1,39 @@
 import 'enums.dart';
 
-/// ゲーム終了時の集計結果。
+/// ゲーム終了時の集計結果（Ver.0.3・得点方式）。
 class GameResult {
   const GameResult({
-    required this.winner,
-    required this.playerFaction,
+    required this.saviorScore,
+    required this.executionerScore,
+    required this.winnerRole, // null なら引き分け
+    required this.playerRole,
+    required this.playerScore,
+    required this.cpuScore,
     required this.aliveGood,
     required this.aliveEvil,
     required this.aliveNeutral,
     required this.deadGood,
     required this.deadEvil,
     required this.deadNeutral,
-    required this.usedCardsTotal,
-    required this.discardedTotal,
-    required this.playerWon,
   });
 
-  /// 勝者陣営。
-  final Faction winner;
+  final int saviorScore;
+  final int executionerScore;
 
-  /// プレイヤーの陣営。
-  final Faction playerFaction;
+  /// 勝者の役割。引き分けは null。
+  final Role? winnerRole;
 
-  /// 生存している善人・悪人・中立の人数。
+  final Role playerRole;
+  final int playerScore;
+  final int cpuScore;
+
   final int aliveGood;
   final int aliveEvil;
   final int aliveNeutral;
-
-  /// 死亡している善人・悪人・中立の人数。
   final int deadGood;
   final int deadEvil;
   final int deadNeutral;
 
-  /// 両者が使用した生死カードの合計枚数。
-  final int usedCardsTotal;
-
-  /// 両者がペナルティで破棄した合計枚数。
-  final int discardedTotal;
-
-  /// プレイヤーが勝利したか。
-  final bool playerWon;
+  bool get isDraw => winnerRole == null;
+  bool get playerWon => !isDraw && winnerRole == playerRole;
 }

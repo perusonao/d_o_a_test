@@ -1,59 +1,63 @@
 import 'action_outcome.dart';
 import 'enums.dart';
 import 'game_log_entry.dart';
+import 'person_card.dart';
 import 'player_state.dart';
+import 'public_action.dart';
 
-/// ゲーム全体の状態。イミュータブルに扱い、エンジンが新しい状態を返す。
+/// ゲーム全体の状態（Ver.0.3）。イミュータブルに扱う。
 class GameState {
   const GameState({
+    required this.persons,
     required this.player,
     required this.cpu,
     required this.phase,
     required this.logs,
+    required this.history,
     this.selectedLifeDeathCardId,
-    this.selectedPersonId,
+    this.selectedPosition,
     this.message,
     this.lastOutcome,
     this.isBusy = false,
   });
 
-  /// プレイヤーの状態。
-  final PlayerState player;
+  /// 中央共有の人カード9枚（position 順）。
+  final List<PersonCard> persons;
 
-  /// CPU の状態。
-  final PlayerState cpu;
+  final PlayerSideState player;
+  final PlayerSideState cpu;
 
-  /// 現在のフェーズ。
   final GamePhase phase;
 
-  /// 試合中の全ログ（新しいものを末尾に追加）。
+  /// 表示用ログ（新しいものを末尾に）。
   final List<GameLogEntry> logs;
 
-  /// 現在選択中の生死カード ID（プレイヤー操作用）。
+  /// 公開行動履歴（CPU の推理・UI の履歴表示に使う）。
+  final List<PublicAction> history;
+
   final String? selectedLifeDeathCardId;
-
-  /// 現在選択中の対象人カード ID（プレイヤー操作用）。
-  final String? selectedPersonId;
-
-  /// 画面下部に表示するメッセージ（無効操作の理由など）。
+  final int? selectedPosition;
   final String? message;
-
-  /// 直近の効果判定結果（アニメーション用）。
   final ActionOutcome? lastOutcome;
-
-  /// アニメーション等で入力を止めるフラグ。
   final bool isBusy;
 
-  /// 両者とも使用可能カードが無くなったか。
   bool get isGameOver => !player.hasUsableCards && !cpu.hasUsableCards;
 
+  PlayerSideState stateOf(TurnOwner owner) =>
+      owner == TurnOwner.player ? player : cpu;
+
+  PersonCard personAt(int position) =>
+      persons.firstWhere((p) => p.position == position);
+
   GameState copyWith({
-    PlayerState? player,
-    PlayerState? cpu,
+    List<PersonCard>? persons,
+    PlayerSideState? player,
+    PlayerSideState? cpu,
     GamePhase? phase,
     List<GameLogEntry>? logs,
+    List<PublicAction>? history,
     String? selectedLifeDeathCardId,
-    String? selectedPersonId,
+    int? selectedPosition,
     String? message,
     ActionOutcome? lastOutcome,
     bool? isBusy,
@@ -62,23 +66,20 @@ class GameState {
     bool clearOutcome = false,
   }) {
     return GameState(
+      persons: persons ?? this.persons,
       player: player ?? this.player,
       cpu: cpu ?? this.cpu,
       phase: phase ?? this.phase,
       logs: logs ?? this.logs,
+      history: history ?? this.history,
       selectedLifeDeathCardId: clearSelection
           ? null
           : (selectedLifeDeathCardId ?? this.selectedLifeDeathCardId),
-      selectedPersonId: clearSelection
-          ? null
-          : (selectedPersonId ?? this.selectedPersonId),
+      selectedPosition:
+          clearSelection ? null : (selectedPosition ?? this.selectedPosition),
       message: clearMessage ? null : (message ?? this.message),
       lastOutcome: clearOutcome ? null : (lastOutcome ?? this.lastOutcome),
       isBusy: isBusy ?? this.isBusy,
     );
   }
-
-  /// 指定した所有者の状態を返す。
-  PlayerState stateOf(TurnOwner owner) =>
-      owner == TurnOwner.player ? player : cpu;
 }

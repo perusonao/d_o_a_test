@@ -10,14 +10,11 @@ import 'game_engine.dart';
 /// アニメーション演出のための待ち時間。
 class GameTiming {
   static const Duration resolveFlash = Duration(milliseconds: 700);
-  static const Duration betweenTurns = Duration(milliseconds: 450);
+  static const Duration betweenTurns = Duration(milliseconds: 400);
   static const Duration cpuThinking = Duration(milliseconds: 650);
 }
 
-/// ゲーム進行の状態管理を行う Riverpod コントローラ。
-///
-/// UI からの入力を受け取り、[GameEngine] と [CpuStrategy] を用いて状態を更新する。
-/// アニメーション中は入力を無効化する（isBusy）。
+/// ゲーム進行の状態管理（Ver.0.3）。
 class GameController extends Notifier<GameState?> {
   late final GameEngine _engine;
   late final CpuStrategy _cpu;
@@ -29,46 +26,38 @@ class GameController extends Notifier<GameState?> {
     return null;
   }
 
-  /// 陣営を選んで新しい対戦を開始する。
-  void startGame(Faction playerFaction) {
-    state = _engine.startGame(playerFaction);
+  /// 役割を選んで新しい対戦を開始する。
+  Future<void> startGame(Role playerRole) async {
+    state = _engine.startGame(playerRole);
+    // CPU が先手（弱い役）の場合はまず CPU に行動させる。
+    await _runCpuTurnsIfNeeded();
   }
 
-  /// もう一度同じ陣営で遊ぶ。
-  void restartSameFaction() {
-    final faction = state?.player.faction ?? Faction.good;
-    state = _engine.startGame(faction);
+  Future<void> restartSameRole() async {
+    final role = state?.player.role ?? Role.savior;
+    await startGame(role);
   }
 
-  /// 生死カードの選択をトグルする。
   void selectLifeDeathCard(String id) {
     final s = state;
     if (s == null || s.isBusy || s.phase != GamePhase.playerTurn) return;
-    if (s.selectedLifeDeathCardId == id) {
-      // 同じカードを再タップ -> 選択解除。
-      state = _withSelection(s, cardId: null, personId: s.selectedPersonId);
-    } else {
-      state = _withSelection(s, cardId: id, personId: s.selectedPersonId);
-    }
+    final next = s.selectedLifeDeathCardId == id ? null : id;
+    state = _withSelection(s, cardId: next, position: s.selectedPosition);
   }
 
-  /// 対象人カードの選択をトグルする（CPU側のみ選択可能）。
-  void selectPerson(String id) {
+  void selectPosition(int position) {
     final s = state;
     if (s == null || s.isBusy || s.phase != GamePhase.playerTurn) return;
-    final isCpuCard = s.cpu.persons.any((p) => p.id == id);
-    if (!isCpuCard) {
-      state = _withMessage(s, '対象はCPU側のカードから選んでください。');
+    final person = s.persons.where((p) => p.position == position);
+    if (person.isEmpty) return;
+    if (person.first.sealed) {
+      state = _withMessage(s, 'そのカードは封印済みで変更できません。');
       return;
     }
-    if (s.selectedPersonId == id) {
-      state = _withSelection(s, cardId: s.selectedLifeDeathCardId, personId: null);
-    } else {
-      state = _withSelection(s, cardId: s.selectedLifeDeathCardId, personId: id);
-    }
+    final next = s.selectedPosition == position ? null : position;
+    state = _withSelection(s, cardId: s.selectedLifeDeathCardId, position: next);
   }
 
-  /// 決定ボタン。選択内容を検証し、行動を実行する。
   Future<void> confirm() async {
     final s = state;
     if (s == null || s.isBusy || s.phase != GamePhase.playerTurn) return;
@@ -76,7 +65,7 @@ class GameController extends Notifier<GameState?> {
     final error = _engine.validatePlayerAction(
       s,
       cardId: s.selectedLifeDeathCardId,
-      personId: s.selectedPersonId,
+      position: s.selectedPosition,
     );
     if (error != null) {
       state = _withMessage(s, error);
@@ -86,14 +75,11 @@ class GameController extends Notifier<GameState?> {
     final action = GameAction(
       actor: TurnOwner.player,
       lifeDeathCardId: s.selectedLifeDeathCardId!,
-      targetPersonId: s.selectedPersonId!,
-      targetOwner: TurnOwner.cpu,
+      targetPosition: s.selectedPosition!,
     );
-
     await _resolveAndAdvance(action, TurnOwner.player);
   }
 
-  /// 行動を適用し、演出を挟んでターンを進める。必要なら CPU ターンを回す。
   Future<void> _resolveAndAdvance(GameAction action, TurnOwner actor) async {
     var s = _engine.performAction(state!, action);
     state = s.copyWith(isBusy: true);
@@ -106,70 +92,65 @@ class GameController extends Notifier<GameState?> {
     await _runCpuTurnsIfNeeded();
   }
 
-  /// CPU のターンが続く限り自動で行動させる。
   Future<void> _runCpuTurnsIfNeeded() async {
     while (state != null && state!.phase == GamePhase.cpuTurn) {
       state = state!.copyWith(isBusy: true);
       await Future.delayed(GameTiming.cpuThinking);
 
-      final decision = _cpu.decide(state!);
+      final decision = _cpu.decide(state!, TurnOwner.cpu);
       if (decision == null) {
-        // 有効な行動が無い（手札切れ）。ターンを進める。
         state = _engine.advanceTurn(state!, TurnOwner.cpu);
         continue;
       }
-
       var s = _engine.performAction(state!, decision.action);
       state = s.copyWith(isBusy: true);
       await Future.delayed(GameTiming.resolveFlash);
 
       s = _engine.advanceTurn(state!, TurnOwner.cpu);
-      final busy = s.phase == GamePhase.cpuTurn;
-      state = s.copyWith(isBusy: busy);
+      state = s.copyWith(isBusy: s.phase == GamePhase.cpuTurn);
       await Future.delayed(GameTiming.betweenTurns);
     }
-    // プレイヤーのターンに戻ったら入力を解放。
     if (state != null && state!.phase == GamePhase.playerTurn) {
       state = state!.copyWith(isBusy: false);
     }
   }
 
-  /// ゲーム終了時の集計結果を返す。
   GameResult? result() {
     final s = state;
     if (s == null || s.phase != GamePhase.finished) return null;
-    return _engine.rules.judgeResult(s.player, s.cpu);
+    return _engine.rules.score(s.persons, s.player.role);
   }
 
-  // --- 内部ヘルパ ---
-
   GameState _withSelection(GameState s,
-      {required String? cardId, required String? personId}) {
+      {required String? cardId, required int? position}) {
     return GameState(
+      persons: s.persons,
       player: s.player,
       cpu: s.cpu,
       phase: s.phase,
       logs: s.logs,
+      history: s.history,
       selectedLifeDeathCardId: cardId,
-      selectedPersonId: personId,
+      selectedPosition: position,
       lastOutcome: s.lastOutcome,
     );
   }
 
   GameState _withMessage(GameState s, String message) {
     return GameState(
+      persons: s.persons,
       player: s.player,
       cpu: s.cpu,
       phase: s.phase,
       logs: s.logs,
+      history: s.history,
       selectedLifeDeathCardId: s.selectedLifeDeathCardId,
-      selectedPersonId: s.selectedPersonId,
+      selectedPosition: s.selectedPosition,
       message: message,
       lastOutcome: s.lastOutcome,
     );
   }
 }
 
-/// ゲーム状態プロバイダ。
 final gameControllerProvider =
     NotifierProvider<GameController, GameState?>(GameController.new);

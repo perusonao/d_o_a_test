@@ -5,38 +5,38 @@ import 'package:flutter_test/flutter_test.dart';
 
 /// コントローラを直接駆動し、1試合が最後まで進行できることを確認する。
 void main() {
-  test('プレイヤーとCPUが交互に行動し、最後まで進行して finished になる', () async {
+  test('救済者で開始し、最後まで進行して finished・集計できる', () async {
     final container = ProviderContainer();
     addTearDown(container.dispose);
-
     final controller = container.read(gameControllerProvider.notifier);
-    controller.startGame(Faction.good);
+
+    // 救済者=弱い役=先手なので、プレイヤーから始まる。
+    await controller.startGame(Role.savior);
 
     var guard = 0;
-    while (guard < 200) {
-      final state = container.read(gameControllerProvider)!;
-      if (state.phase == GamePhase.finished) break;
-
-      if (state.phase == GamePhase.playerTurn && !state.isBusy) {
-        // 未使用カードとCPUの人カードを1つずつ選んで決定。
-        final card = state.player.usableCards.first;
-        final target = state.cpu.persons.first;
+    while (guard < 100) {
+      final s = container.read(gameControllerProvider)!;
+      if (s.phase == GamePhase.finished) break;
+      if (s.phase == GamePhase.playerTurn && !s.isBusy) {
+        final card = s.player.usableCards.first;
+        // 封印されていない対象を選ぶ。
+        final target = s.persons.firstWhere((p) => !p.sealed);
         controller.selectLifeDeathCard(card.id);
-        controller.selectPerson(target.id);
-        await controller.confirm(); // 内部で CPU ターンまで回る。
+        controller.selectPosition(target.position);
+        await controller.confirm();
       }
       guard++;
     }
 
-    final finalState = container.read(gameControllerProvider)!;
-    expect(finalState.phase, GamePhase.finished);
-    // 両者の手札が尽きている。
-    expect(finalState.player.hasUsableCards, isFalse);
-    expect(finalState.cpu.hasUsableCards, isFalse);
+    final s = container.read(gameControllerProvider)!;
+    expect(s.phase, GamePhase.finished);
+    expect(s.player.hasUsableCards, isFalse);
+    expect(s.cpu.hasUsableCards, isFalse);
 
-    // 結果が集計できる。
     final result = controller.result();
     expect(result, isNotNull);
-    expect(result!.usedCardsTotal, greaterThan(0));
+    // 得点は 0 以上、勝者は救済者/執行者/引き分けのいずれか。
+    expect(result!.saviorScore, greaterThanOrEqualTo(0));
+    expect(result.executionerScore, greaterThanOrEqualTo(0));
   });
 }

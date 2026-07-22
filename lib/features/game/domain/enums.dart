@@ -1,4 +1,4 @@
-// ゲーム全体で使用する列挙型をまとめたファイル。
+// Ver.0.3 で使用する列挙型をまとめたファイル。
 // ルール変更をしやすくするため、状態や種類は全て enum で表現する。
 
 /// 人カードの種類。
@@ -10,29 +10,28 @@ enum PersonType {
 
 /// 人カードの現在状態。
 enum PersonStatus {
-  hidden, // 未確定（本プロトタイプでは初期状態を alive にするため実質未使用だが将来用に保持）
   alive, // 生存
   dead, // 死亡
 }
 
-/// 情報公開レベル。
-enum RevealLevel {
-  none, // 完全非公開
-  numberOnly, // 数字のみ公開
-  full, // 種類と数字を公開
+/// そのカードの正体を誰が知っているか（重複しないので単一）。
+enum Knower {
+  none, // 誰も知らない
+  player, // プレイヤーだけが知る
+  cpu, // CPU だけが知る
 }
 
 /// 生死カードの効果。
 enum LifeDeathEffect {
   dead, // デッド
   alive, // アライブ
-  keep, // キープ
+  seal, // シール（恒久固定）
 }
 
-/// 陣営。
-enum Faction {
-  good, // 善人陣営
-  evil, // 悪人陣営
+/// 陣営＝役割。
+enum Role {
+  savior, // 救済者：善人を生存させる
+  executioner, // 執行者：善人を死亡させる
 }
 
 /// カードの所有者 / ターンの担当者。
@@ -45,6 +44,6 @@ enum TurnOwner {
 enum GamePhase {
   playerTurn, // プレイヤーのターン
   cpuTurn, // CPU のターン
-  resolving, // 効果判定中（アニメーション等で入力を止める）
+  resolving, // 効果判定中（入力を止める）
   finished, // ゲーム終了
 }

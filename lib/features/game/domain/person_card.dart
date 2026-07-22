@@ -1,61 +1,53 @@
 import 'enums.dart';
 
-/// 場に並ぶ「人カード」。
+/// 中央の共有場に伏せて並ぶ「人カード」（Ver.0.3）。
 ///
-/// 種類・数字・状態・情報公開状態・防御状態・所有者を保持する。
-/// 状態変更は copyWith で新しいインスタンスを生成する（イミュータブル）。
+/// 正体（種類・数字）は原則ゲーム終了まで非公開。状態と封印だけが公開される。
 class PersonCard {
   const PersonCard({
     required this.id,
+    required this.position,
     required this.type,
     required this.number,
     this.status = PersonStatus.alive,
-    this.reveal = RevealLevel.none,
-    this.isGuarded = false,
-    required this.owner,
+    this.sealed = false,
+    this.knownBy = Knower.none,
   });
 
   /// 一意な ID。
   final String id;
 
-  /// 種類（善人 / 悪人 / 中立）。
+  /// 3×3 の配置インデックス（0〜8）。
+  final int position;
+
+  /// 種類（善人 / 悪人 / 中立）。非公開。
   final PersonType type;
 
-  /// 数字（1〜9）。
+  /// 数字（1〜9・一意）。非公開。
   final int number;
 
-  /// 現在状態（hidden / alive / dead）。
+  /// 現在状態（alive / dead）。マーカーとして公開。
   final PersonStatus status;
 
-  /// 情報公開状態。
-  final RevealLevel reveal;
+  /// 封印状態。true なら終了まで状態変更不可。マーカーとして公開。
+  final bool sealed;
 
-  /// キープによる防御状態（true の場合、次の dead/alive を1回無効化）。
-  final bool isGuarded;
-
-  /// 所有者（player / cpu）。
-  final TurnOwner owner;
+  /// この正体を誰が知っているか（none / player / cpu）。
+  final Knower knownBy;
 
   PersonCard copyWith({
     PersonStatus? status,
-    RevealLevel? reveal,
-    bool? isGuarded,
+    bool? sealed,
   }) {
     return PersonCard(
       id: id,
+      position: position,
       type: type,
       number: number,
       status: status ?? this.status,
-      reveal: reveal ?? this.reveal,
-      isGuarded: isGuarded ?? this.isGuarded,
-      owner: owner,
+      sealed: sealed ?? this.sealed,
+      knownBy: knownBy,
     );
-  }
-
-  /// 情報公開レベルを引き上げる（下げることはしない）。
-  PersonCard revealAtLeast(RevealLevel level) {
-    if (level.index <= reveal.index) return this;
-    return copyWith(reveal: level);
   }
 
   bool get isAlive => status == PersonStatus.alive;

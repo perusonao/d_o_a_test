@@ -9,6 +9,7 @@ import '../domain/game_state.dart';
 import '../domain/life_death_card.dart';
 import '../domain/person_card.dart';
 import '../domain/player_state.dart';
+import '../domain/public_action.dart';
 import 'game_rule_service.dart';
 import 'game_setup_service.dart';
 
@@ -20,8 +21,8 @@ class GameLabels {
         return 'デッド';
       case LifeDeathEffect.alive:
         return 'アライブ';
-      case LifeDeathEffect.keep:
-        return 'キープ';
+      case LifeDeathEffect.seal:
+        return 'シール';
     }
   }
 
@@ -36,201 +37,161 @@ class GameLabels {
     }
   }
 
-  static String faction(Faction f) =>
-      f == Faction.good ? '善人陣営' : '悪人陣営';
+  static String role(Role r) => r == Role.savior ? '救済者' : '執行者';
 
-  static String owner(TurnOwner o) => o == TurnOwner.player ? 'プレイヤー' : 'CPU';
+  static String owner(TurnOwner o) => o == TurnOwner.player ? 'あなた' : 'CPU';
 }
 
-/// ゲーム進行を統括するエンジン。
-///
-/// セットアップ・行動適用・ターン進行・終了処理を担当し、
-/// ルールの純粋計算は [GameRuleService] に委譲する。
+/// ゲーム進行を統括するエンジン（Ver.0.3）。
 class GameEngine {
   GameEngine({
     Random? random,
     GameRuleService? rules,
     GameSetupService? setup,
-  })  : _random = random ?? Random(),
-        _rules = rules ?? const GameRuleService(),
+  })  : _rules = rules ?? const GameRuleService(),
         _setup = setup ?? GameSetupService(random: random);
 
-  final Random _random;
   final GameRuleService _rules;
   final GameSetupService _setup;
 
   GameRuleService get rules => _rules;
 
-  /// 対戦を初期化する。プレイヤーが陣営を選択し、CPU は反対陣営になる。
-  GameState startGame(Faction playerFaction) {
-    final persons = _setup.dealPersonCards();
-    final cpuFaction =
-        playerFaction == Faction.good ? Faction.evil : Faction.good;
+  /// 対戦を初期化する。プレイヤーが役割を選び、CPU は反対役になる。
+  GameState startGame(Role playerRole) {
+    final persons = _setup.buildPersons();
+    final cpuRole =
+        playerRole == Role.savior ? Role.executioner : Role.savior;
 
-    final player = PlayerState(
+    final player = PlayerSideState(
       owner: TurnOwner.player,
-      faction: playerFaction,
-      persons: persons.player,
-      hand: _setup.buildLifeDeathHand(TurnOwner.player),
+      role: playerRole,
+      hand: _setup.buildLifeDeathHand(TurnOwner.player, playerRole),
     );
-    final cpu = PlayerState(
+    final cpu = PlayerSideState(
       owner: TurnOwner.cpu,
-      faction: cpuFaction,
-      persons: persons.cpu,
-      hand: _setup.buildLifeDeathHand(TurnOwner.cpu),
+      role: cpuRole,
+      hand: _setup.buildLifeDeathHand(TurnOwner.cpu, cpuRole),
     );
+
+    // 弱い役が先手（＝最終手番）。
+    final firstOwner =
+        playerRole == GameConstants.weakRole ? TurnOwner.player : TurnOwner.cpu;
 
     return GameState(
+      persons: persons,
       player: player,
       cpu: cpu,
-      phase: GamePhase.playerTurn,
-      logs: const [
-        GameLogEntry(message: 'ゲーム開始。', actor: null),
+      phase: firstOwner == TurnOwner.player
+          ? GamePhase.playerTurn
+          : GamePhase.cpuTurn,
+      logs: [
+        GameLogEntry(
+          message:
+              'ゲーム開始。あなたは${GameLabels.role(playerRole)}、CPUは${GameLabels.role(cpuRole)}。',
+          actor: null,
+        ),
       ],
+      history: const [],
     );
   }
 
-  /// プレイヤーの選択を検証する。問題があれば理由文字列、無ければ null を返す。
+  /// プレイヤーの選択を検証する。問題があれば理由文字列、無ければ null。
   String? validatePlayerAction(
     GameState state, {
     String? cardId,
-    String? personId,
+    int? position,
   }) {
-    if (cardId == null) {
-      return '生死カードを選択してください。';
-    }
+    if (cardId == null) return '生死カードを選択してください。';
     final card = state.player.hand
         .where((c) => c.id == cardId && !c.isUsed)
         .cast<LifeDeathCard?>()
         .firstWhere((c) => c != null, orElse: () => null);
-    if (card == null) {
-      return 'そのカードは使用できません。';
-    }
-    if (personId == null) {
-      return '対象のCPUカードを選択してください。';
-    }
-    final target = state.cpu.persons
-        .where((p) => p.id == personId)
+    if (card == null) return 'そのカードは使用できません。';
+    if (position == null) return '対象の人カードを選択してください。';
+    final target = state.persons
+        .where((p) => p.position == position)
         .cast<PersonCard?>()
         .firstWhere((p) => p != null, orElse: () => null);
-    if (target == null) {
-      return '対象はCPU側のカードから選んでください。';
-    }
+    if (target == null) return '対象を選び直してください。';
+    if (target.sealed) return 'そのカードは封印済みで変更できません。';
     return null;
   }
 
-  /// 行動を適用し、効果判定・情報公開・中立ペナルティを反映した新しい状態を返す。
-  /// フェーズは resolving に設定する（アニメーション後に [advanceTurn] を呼ぶ）。
+  /// 行動を適用し、公開情報・ログ・結果を反映した新しい状態を返す。
+  /// フェーズは resolving に設定する。
   GameState performAction(GameState state, GameAction action) {
     final actorState = state.stateOf(action.actor);
-    final targetState = state.stateOf(action.targetOwner);
+    final card =
+        actorState.hand.firstWhere((c) => c.id == action.lifeDeathCardId);
+    final index =
+        state.persons.indexWhere((p) => p.position == action.targetPosition);
+    final target = state.persons[index];
 
-    final card = actorState.hand.firstWhere(
-      (c) => c.id == action.lifeDeathCardId,
-    );
-    final targetIndex =
-        targetState.persons.indexWhere((p) => p.id == action.targetPersonId);
-    final target = targetState.persons[targetIndex];
+    final res = _rules.applyEffect(target, card);
 
-    final resolution = _rules.applyEffect(target, card);
+    final newPersons = List<PersonCard>.from(state.persons);
+    newPersons[index] = res.updatedCard;
 
-    // 対象人カードを更新。
-    final newTargetPersons = List<PersonCard>.from(targetState.persons);
-    newTargetPersons[targetIndex] = resolution.updatedCard;
-
-    // 中立ペナルティ判定。
-    final penalty = _rules.isNeutralPenalty(
-      actorFaction: actorState.faction,
-      target: target,
-      becameDead: resolution.becameDead,
-      becameAlive: resolution.becameAlive,
-    );
-
-    // 使用したカードを used に。
-    var newHand = actorState.hand
+    final newHand = actorState.hand
         .map((c) => c.id == card.id ? c.copyWith(isUsed: true) : c)
         .toList();
-    var discardedNow = 0;
-    if (penalty) {
-      final result = _discardRandom(newHand, GameConstants.neutralPenaltyDiscardMax);
-      newHand = result.hand;
-      discardedNow = result.discarded;
-    }
+    final newActor =
+        actorState.copyWith(hand: newHand, usedCount: actorState.usedCount + 1);
 
-    // actor / target が同一人物（自分の場を対象）でも整合するよう組み立てる。
+    final newPlayer = action.actor == TurnOwner.player ? newActor : state.player;
+    final newCpu = action.actor == TurnOwner.cpu ? newActor : state.cpu;
+
+    final publicAction = PublicAction(
+      actor: action.actor,
+      position: action.targetPosition,
+      effect: card.effect,
+      number: card.number,
+      success: res.success,
+      changed: res.changed,
+      targetSealed: res.wasSealed,
+    );
+    final newHistory = List<PublicAction>.from(state.history)..add(publicAction);
+
     final logs = List<GameLogEntry>.from(state.logs);
+    final pos = action.targetPosition + 1; // 表示は1始まり
     logs.add(GameLogEntry(
       message:
-          '${GameLabels.owner(action.actor)}が「${GameLabels.effect(card.effect)}${card.number}」を使用',
+          '${GameLabels.owner(action.actor)}が[$pos]に「${GameLabels.effect(card.effect)}${card.number}」',
       actor: action.actor,
     ));
-    if (resolution.success) {
-      if (resolution.guardBlocked) {
-        logs.add(const GameLogEntry(message: 'キープの防御で無効化された', actor: null));
-      } else {
-        logs.add(const GameLogEntry(message: 'パワー判定成功', actor: null));
-      }
+    if (res.wasSealed) {
+      logs.add(const GameLogEntry(message: '対象は封印済み。変化なし。', actor: null));
+    } else if (!res.success) {
       logs.add(GameLogEntry(
-        message:
-            '対象は「${GameLabels.personType(target.type)}${target.number}」だった',
-        actor: null,
-      ));
+          message: 'パワー不足で失敗（対象は ${card.number + 1} 以上）', actor: null));
+    } else if (card.effect == LifeDeathEffect.seal) {
+      logs.add(const GameLogEntry(message: '成功。対象を封印した。', actor: null));
+    } else if (res.changed) {
+      logs.add(GameLogEntry(
+          message:
+              '成功。対象を${card.effect == LifeDeathEffect.dead ? "死亡" : "生存"}にした。',
+          actor: null));
     } else {
-      logs.add(GameLogEntry(
-        message: 'パワー判定失敗（対象の数字は ${target.number}）',
-        actor: null,
-      ));
-    }
-    if (penalty) {
-      logs.add(GameLogEntry(
-        message:
-            '中立ペナルティ発生！${GameLabels.owner(action.actor)}が生死カードを$discardedNow枚破棄',
-        actor: null,
-      ));
+      logs.add(const GameLogEntry(message: '成功したが状態は変わらなかった。', actor: null));
     }
 
     final outcome = ActionOutcome(
       actor: action.actor,
       effect: card.effect,
-      success: resolution.success,
-      targetPersonId: action.targetPersonId,
-      targetOwner: action.targetOwner,
-      guardBlocked: resolution.guardBlocked,
-      neutralPenalty: penalty,
-      discardedByPenalty: discardedNow,
-      lifeDeathCardId: card.id,
-      lifeDeathNumber: card.number,
+      number: card.number,
+      position: action.targetPosition,
+      success: res.success,
+      changed: res.changed,
+      wasSealed: res.wasSealed,
     );
 
-    // actor と target それぞれの状態を「差分」として管理し、最後に player/cpu へ反映する。
-    // 同一人物が actor かつ target になるケース（自分の場を対象）にも対応する。
-    var newPlayer = state.player;
-    var newCpu = state.cpu;
-
-    PlayerState applyActor(PlayerState base) => base.copyWith(
-          hand: newHand,
-          usedCount: base.usedCount + 1,
-          discardedCount: base.discardedCount + discardedNow,
-        );
-
-    // まず actor の手札・カウンタを反映。
-    if (action.actor == TurnOwner.player) {
-      newPlayer = applyActor(newPlayer);
-    } else {
-      newCpu = applyActor(newCpu);
-    }
-    // 次に target の人カードを反映（actor と同一なら上の結果に上書き）。
-    if (action.targetOwner == TurnOwner.player) {
-      newPlayer = newPlayer.copyWith(persons: newTargetPersons);
-    } else {
-      newCpu = newCpu.copyWith(persons: newTargetPersons);
-    }
-
     return state.copyWith(
+      persons: newPersons,
       player: newPlayer,
       cpu: newCpu,
       phase: GamePhase.resolving,
       logs: logs,
+      history: newHistory,
       lastOutcome: outcome,
       clearSelection: true,
       clearMessage: true,
@@ -238,10 +199,8 @@ class GameEngine {
   }
 
   /// 効果判定後にターンを進める。
-  ///
-  /// 終了していれば全公開して finished に、そうでなければ次の担当へ。
   GameState advanceTurn(GameState state, TurnOwner lastActor) {
-    if (_rules.isGameOver(state.player, state.cpu)) {
+    if (_rules.isGameOver(state.player.hasUsableCards, state.cpu.hasUsableCards)) {
       return _finalize(state);
     }
     final other =
@@ -254,13 +213,11 @@ class GameEngine {
         clearOutcome: true,
       );
     }
-    // 相手はパス。自分にまだカードがあれば継続。
+    // 相手は手札切れ。自分に残りがあれば継続。
     if (state.stateOf(lastActor).hasUsableCards) {
       final logs = List<GameLogEntry>.from(state.logs)
         ..add(GameLogEntry(
-          message: '${GameLabels.owner(other)}は手札切れのためパス',
-          actor: null,
-        ));
+            message: '${GameLabels.owner(other)}は手札切れのためパス', actor: null));
       return state.copyWith(
         phase: lastActor == TurnOwner.player
             ? GamePhase.playerTurn
@@ -274,32 +231,11 @@ class GameEngine {
 
   GameState _finalize(GameState state) {
     final logs = List<GameLogEntry>.from(state.logs)
-      ..add(const GameLogEntry(message: '両者手札切れ。全カードを公開します。', actor: null));
+      ..add(const GameLogEntry(message: '全手番終了。正体を一斉公開します。', actor: null));
     return state.copyWith(
-      player: state.player
-          .copyWith(persons: _rules.revealAll(state.player.persons)),
-      cpu: state.cpu.copyWith(persons: _rules.revealAll(state.cpu.persons)),
       phase: GamePhase.finished,
       logs: logs,
       clearOutcome: true,
     );
-  }
-
-  ({List<LifeDeathCard> hand, int discarded}) _discardRandom(
-    List<LifeDeathCard> hand,
-    int max,
-  ) {
-    final unusedIndexes = <int>[];
-    for (var i = 0; i < hand.length; i++) {
-      if (!hand[i].isUsed) unusedIndexes.add(i);
-    }
-    unusedIndexes.shuffle(_random);
-    final discardCount = unusedIndexes.length < max ? unusedIndexes.length : max;
-    final toDiscard = unusedIndexes.take(discardCount).toSet();
-    final newHand = <LifeDeathCard>[];
-    for (var i = 0; i < hand.length; i++) {
-      newHand.add(toDiscard.contains(i) ? hand[i].copyWith(isUsed: true) : hand[i]);
-    }
-    return (hand: newHand, discarded: discardCount);
   }
 }

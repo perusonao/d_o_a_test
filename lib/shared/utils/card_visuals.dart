@@ -3,13 +3,12 @@ import 'package:flutter/material.dart';
 import '../../app/theme.dart';
 import '../../features/game/domain/enums.dart';
 
-/// 人カード・生死カードの見た目（アイコン・色・ラベル）をまとめたヘルパ。
-///
+/// カードの見た目（アイコン・色・ラベル）をまとめたヘルパ（Ver.0.3）。
 /// 色だけに依存せず、アイコン＋文字でも状態が分かるようにする。
 class CardVisuals {
   CardVisuals._();
 
-  /// 種類のアイコン。善人=天秤/光、悪人=刃/炎、中立=仮面。
+  // --- 人カードの種類 ---
   static IconData personTypeIcon(PersonType type) {
     switch (type) {
       case PersonType.good:
@@ -43,15 +42,15 @@ class CardVisuals {
     }
   }
 
-  /// 生死カードのアイコン。
+  // --- 生死カードの効果 ---
   static IconData effectIcon(LifeDeathEffect effect) {
     switch (effect) {
       case LifeDeathEffect.dead:
-        return Icons.dangerous; // 骸骨代わり
+        return Icons.dangerous;
       case LifeDeathEffect.alive:
-        return Icons.favorite; // 心臓
-      case LifeDeathEffect.keep:
-        return Icons.shield; // 盾
+        return Icons.favorite;
+      case LifeDeathEffect.seal:
+        return Icons.lock; // 封印
     }
   }
 
@@ -61,7 +60,7 @@ class CardVisuals {
         return AppTheme.evil;
       case LifeDeathEffect.alive:
         return AppTheme.alive;
-      case LifeDeathEffect.keep:
+      case LifeDeathEffect.seal:
         return AppTheme.keep;
     }
   }
@@ -72,20 +71,31 @@ class CardVisuals {
         return 'デッド';
       case LifeDeathEffect.alive:
         return 'アライブ';
-      case LifeDeathEffect.keep:
-        return 'キープ';
+      case LifeDeathEffect.seal:
+        return 'シール';
     }
   }
 
-  /// 状態のアイコン（alive/dead）。dead は墓標代わりのアイコン。
+  // --- 状態 ---
   static IconData statusIcon(PersonStatus status) {
     switch (status) {
       case PersonStatus.dead:
         return Icons.heart_broken; // 死（墓標/骸骨の代替）
       case PersonStatus.alive:
-        return Icons.favorite; // 生命
-      case PersonStatus.hidden:
-        return Icons.help_outline;
+        return Icons.favorite;
     }
   }
+
+  // --- 役割 ---
+  static IconData roleIcon(Role role) =>
+      role == Role.savior ? Icons.shield_moon : Icons.gavel;
+
+  static Color roleColor(Role role) =>
+      role == Role.savior ? AppTheme.alive : AppTheme.evil;
+
+  static String roleLabel(Role role) => role == Role.savior ? '救済者' : '執行者';
+
+  static String roleGoal(Role role) => role == Role.savior
+      ? '善人を生存させる'
+      : '善人を死亡させる';
 }
