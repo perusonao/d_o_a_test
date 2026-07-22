@@ -1,6 +1,5 @@
 import 'package:dead_or_alive/app/app.dart';
 import 'package:dead_or_alive/app/router.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
