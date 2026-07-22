@@ -1,8 +1,10 @@
 name: Deploy to GitHub Pages
 
-# Flutter Web をビルドして GitHub Pages に公開するワークフロー。
-# プロジェクトページ（https://<user>.github.io/d_o_a_test/）で配信するため
-# base-href に /d_o_a_test/ を指定する。
+# Flutter Web をビルドし、成果物を gh-pages ブランチへ公開するワークフロー。
+# GitHub Actions 環境（github-pages environment）の権限に依存しないよう、
+# ビルド成果物を gh-pages ブランチへ push する方式を採用している。
+# 初回のみ、リポジトリの Settings > Pages で
+# 「Deploy from a branch」→ ブランチ「gh-pages」/(root) を選択して有効化する。
 
 on:
   push:
@@ -11,17 +13,14 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
-# 同時実行を抑止（最新のデプロイのみ有効に）。
 concurrency:
-  group: pages
+  group: pages-deploy
   cancel-in-progress: true
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -31,9 +30,6 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: stable
-
-      - name: Flutter version
-        run: flutter --version
 
       - name: Install dependencies
         run: flutter pub get
@@ -47,23 +43,16 @@ jobs:
       - name: Build web
         run: flutter build web --release --base-href /d_o_a_test/ --no-web-resources-cdn
 
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
-        with:
-          enablement: true
-
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: build/web
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Publish to gh-pages branch
+        run: |
+          cd build/web
+          touch .nojekyll
+          git init -q
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Deploy ${GITHUB_SHA}"
+          git branch -M gh-pages
+          git push -f "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" gh-pages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
