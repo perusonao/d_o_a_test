@@ -10,6 +10,7 @@ import '../../../shared/utils/card_visuals.dart';
 import '../../../shared/widgets/action_card_widget.dart';
 import '../../../shared/widgets/human_card_widget.dart';
 import '../application/game_controller.dart';
+import '../application/game_engine.dart';
 import '../domain/action_card.dart';
 import '../domain/enums.dart';
 import '../domain/game_state.dart';
@@ -53,14 +54,18 @@ class GameScreen extends ConsumerWidget {
 
             final lifeW = ((contentW - gap * 4) / 5).clamp(42.0, 60.0);
             final handH = 2 * (lifeW * 1.35) + gap;
+            // 相手の残り手札ストリップ（コンパクト・1段）。
+            final oppW = ((contentW - gap * 8) / 9).clamp(24.0, 34.0);
+            final oppStripH = peeking ? 0.0 : (oppW * 1.35 + 20);
 
             const headerH = 52.0;
             const bottomChrome = 120.0;
             final reservedBottom = peeking ? 96.0 : (handH + bottomChrome);
-            final avail = h - headerH - reservedBottom - gap * 4;
+            final avail =
+                h - headerH - oppStripH - reservedBottom - gap * 5;
             final pByWidth = (contentW - gap * 2) / 3;
             final pByHeight = (avail / 3) / 1.28;
-            final size = math.min(pByWidth, pByHeight).clamp(56.0, 132.0);
+            final size = math.min(pByWidth, pByHeight).clamp(52.0, 132.0);
 
             return Center(
               child: SizedBox(
@@ -73,6 +78,10 @@ class GameScreen extends ConsumerWidget {
                         child: Column(
                           children: [
                             _Header(state: state),
+                            if (!peeking) ...[
+                              const SizedBox(height: gap),
+                              _OpponentHand(state: state, width: oppW),
+                            ],
                             const SizedBox(height: gap),
                             _board(ref, state, size, gap),
                           ],
@@ -97,6 +106,19 @@ class GameScreen extends ConsumerWidget {
       ..sort((a, b) => a.position.compareTo(b.position));
     final playing = state.phase == GamePhase.playing;
     final interactive = playing && !state.isBusy && !state.currentPlayer.isCpu;
+
+    // 選択中のアクション種別（あれば、無変化な対象を無効化する）。
+    ActionType? selType;
+    final selId = state.selectedActionCardId;
+    if (selId != null) {
+      for (final c in state.currentPlayer.hand) {
+        if (c.id == selId) {
+          selType = c.type;
+          break;
+        }
+      }
+    }
+
     return Center(
       child: SizedBox(
         width: size * 3 + gap * 2,
@@ -105,22 +127,27 @@ class GameScreen extends ConsumerWidget {
           runSpacing: gap,
           alignment: WrapAlignment.center,
           children: humans.map((hcard) {
+            // アクション選択中で、そのカードへの手が禁止（無変化・二重保護）なら対象外。
+            final blocked =
+                selType != null && GameEngine.isNoOpBlocked(selType, hcard);
             final canPeek = interactive &&
+                selType == null &&
                 state.isKnownBy(state.current, hcard.position) &&
                 !hcard.revealed &&
                 !state.peeked.contains(hcard.position);
-            return HumanCardWidget(
+            final widget = HumanCardWidget(
               card: hcard,
               faceUp: _faceUp(state, hcard),
               size: size,
               selected: state.selectedPosition == hcard.position,
-              selectable: interactive,
+              selectable: interactive && !blocked,
               peekable: canPeek,
               highlight: _highlight(state, hcard),
               onTap: () => ref
                   .read(gameControllerProvider.notifier)
                   .selectPosition(hcard.position),
             );
+            return blocked ? Opacity(opacity: 0.35, child: widget) : widget;
           }).toList(),
         ),
       ),
@@ -132,9 +159,9 @@ class GameScreen extends ConsumerWidget {
       case GamePhase.finished:
         return true;
       case GamePhase.peekA:
-        return card.column == 0; // 左列
+        return card.row == GameState.knownRowOf(PlayerId.a); // 下段
       case GamePhase.peekB:
-        return card.column == 2; // 右列
+        return card.row == GameState.knownRowOf(PlayerId.b); // 上段
       case GamePhase.playing:
         return card.revealed || state.peeked.contains(card.position);
     }
@@ -240,6 +267,43 @@ class _Header extends StatelessWidget {
   }
 }
 
+/// 相手の残り手札（コンパクト・1段・スクロールなし）。
+class _OpponentHand extends StatelessWidget {
+  const _OpponentHand({required this.state, required this.width});
+  final GameState state;
+  final double width;
+
+  @override
+  Widget build(BuildContext context) {
+    // 相手＝現在の手番でない側。
+    final opp = state.player(
+        state.current == PlayerId.a ? PlayerId.b : PlayerId.a);
+    final oppLabel = opp.id == PlayerId.a ? 'プレイヤーA' : 'プレイヤーB';
+    return Column(
+      children: [
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Text('相手（$oppLabel${opp.isCpu ? "・CPU" : ""}）の残り手札',
+              style: const TextStyle(fontSize: 10, color: Color(0xFF9A9384))),
+        ),
+        const SizedBox(height: 2),
+        Wrap(
+          spacing: 3,
+          runSpacing: 3,
+          alignment: WrapAlignment.center,
+          children: opp.hand
+              .map((c) => ActionCardWidget(
+                    card: c,
+                    width: width,
+                    enabled: false,
+                  ))
+              .toList(),
+        ),
+      ],
+    );
+  }
+}
+
 /// 確認フェーズの下部バー。
 class _PeekBar extends ConsumerWidget {
   const _PeekBar({required this.state});
@@ -249,7 +313,7 @@ class _PeekBar extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final isA = state.phase == GamePhase.peekA;
     final who = isA ? 'プレイヤーA' : 'プレイヤーB';
-    final side = isA ? '左列' : '右列';
+    final side = isA ? '下段' : '上段';
     // CPU 対戦では A の確認後すぐ対戦開始（B の確認は無い）。
     final nextIsStart = !isA || state.playerB.isCpu;
     return Container(

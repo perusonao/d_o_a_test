@@ -56,9 +56,21 @@ void main() {
         final s = container.read(gameControllerProvider)!;
         if (s.phase == GamePhase.finished) break;
         if (!s.isBusy && !s.currentPlayer.isCpu) {
-          final card = s.currentPlayer.usableCards.first;
-          controller.selectActionCard(card.id);
-          controller.selectPosition(0);
+          // 禁止手を避けて有効な手を選ぶ。
+          String? cardId;
+          int? pos;
+          outer:
+          for (final card in s.currentPlayer.usableCards) {
+            for (final hu in s.humans) {
+              if (!GameEngine.isNoOpBlocked(card.type, hu)) {
+                cardId = card.id;
+                pos = hu.position;
+                break outer;
+              }
+            }
+          }
+          controller.selectActionCard(cardId!);
+          controller.selectPosition(pos!);
           await controller.confirm(); // 内部で CPU の手番も回る
         }
         guard++;
@@ -78,12 +90,12 @@ void main() {
       controller.startGame(Faction.savior, vsCpu: true);
       controller.confirmPeek();
 
-      // プレイヤーA の既知列は左列（位置0,3,6）。
-      controller.selectPosition(0);
-      expect(container.read(gameControllerProvider)!.peeked.contains(0), isTrue);
-      controller.selectPosition(0);
+      // プレイヤーA の既知は下段（位置6,7,8）。
+      controller.selectPosition(6);
+      expect(container.read(gameControllerProvider)!.peeked.contains(6), isTrue);
+      controller.selectPosition(6);
       expect(
-          container.read(gameControllerProvider)!.peeked.contains(0), isFalse);
+          container.read(gameControllerProvider)!.peeked.contains(6), isFalse);
     });
 
     test('アクション選択中はタップが対象選択になる（peek しない）', () {

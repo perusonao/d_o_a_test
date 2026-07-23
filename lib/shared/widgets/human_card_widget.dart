@@ -91,16 +91,17 @@ class _HumanCardWidgetState extends State<HumanCardWidget>
       alignment: Alignment.center,
       children: [
         face,
-        // 位置番号バッジ。
-        Positioned(
-          top: 2,
-          left: 4,
-          child: Text('${card.position + 1}',
-              style: TextStyle(
-                  fontSize: s * 0.17,
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.accent.withValues(alpha: 0.85))),
-        ),
+        // 左上の数字：表向きのときだけカードの得点（数字）を表示。
+        if (widget.faceUp)
+          Positioned(
+            top: 2,
+            left: 4,
+            child: Text('${card.points}',
+                style: TextStyle(
+                    fontSize: s * 0.2,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.accent.withValues(alpha: 0.95))),
+          ),
         // 保護バッジ。
         if (card.protected)
           Positioned(

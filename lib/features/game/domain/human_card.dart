@@ -54,4 +54,7 @@ class HumanCard {
 
   /// この位置が属する列（0=左, 1=中央, 2=右）。
   int get column => position % 3;
+
+  /// この位置が属する行（0=上段, 1=中段, 2=下段）。
+  int get row => position ~/ 3;
 }

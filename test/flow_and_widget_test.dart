@@ -1,9 +1,23 @@
 import 'package:dead_or_alive/app/app.dart';
 import 'package:dead_or_alive/app/router.dart';
 import 'package:dead_or_alive/features/game/application/game_controller.dart';
+import 'package:dead_or_alive/features/game/application/game_engine.dart';
 import 'package:dead_or_alive/features/game/domain/enums.dart';
+import 'package:dead_or_alive/features/game/domain/game_state.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+/// 現在の手番プレイヤーが打てる「有効な手」を1つ探す（禁止手を避ける）。
+({String cardId, int pos})? findValidMove(GameState s) {
+  for (final card in s.currentPlayer.usableCards) {
+    for (final h in s.humans) {
+      if (!GameEngine.isNoOpBlocked(card.type, h)) {
+        return (cardId: card.id, pos: h.position);
+      }
+    }
+  }
+  return null;
+}
 
 void main() {
   test('確認→対戦→終了まで通しで進み、得点合計は18', () {
@@ -20,9 +34,9 @@ void main() {
     while (guard < 60) {
       final s = container.read(gameControllerProvider)!;
       if (s.phase == GamePhase.finished) break;
-      final card = s.currentPlayer.usableCards.first;
-      controller.selectActionCard(card.id);
-      controller.selectPosition(0); // 位置0に使い続ける
+      final move = findValidMove(s)!;
+      controller.selectActionCard(move.cardId);
+      controller.selectPosition(move.pos);
       controller.confirm();
       guard++;
     }

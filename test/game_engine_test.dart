@@ -173,6 +173,39 @@ void main() {
     });
   });
 
+  group('表向き無変化アクションの禁止', () {
+    test('公開済み生存カードへの生は禁止、死は許可', () {
+      final alive = human(0, HumanType.good, 3)
+          .copyWith(revealed: true); // 公開・生存
+      expect(GameEngine.isNoOpBlocked(ActionType.life, alive), isTrue);
+      expect(GameEngine.isNoOpBlocked(ActionType.death, alive), isFalse);
+    });
+    test('公開済み死亡カードへの死は禁止、生は許可', () {
+      final dead = human(0, HumanType.good, 3,
+          state: CardState.dead).copyWith(revealed: true);
+      expect(GameEngine.isNoOpBlocked(ActionType.death, dead), isTrue);
+      expect(GameEngine.isNoOpBlocked(ActionType.life, dead), isFalse);
+    });
+    test('保護済みへの保は禁止（表裏問わず）', () {
+      final prot = human(0, HumanType.good, 3, protected: true);
+      expect(GameEngine.isNoOpBlocked(ActionType.protect, prot), isTrue);
+    });
+    test('伏せた生存カードへの生は許可（公開のため）', () {
+      final hidden = human(0, HumanType.good, 3); // 未公開・生存
+      expect(GameEngine.isNoOpBlocked(ActionType.life, hidden), isFalse);
+    });
+    test('validate も禁止手を弾く', () {
+      final s = buildState(humans: [
+        human(0, HumanType.good, 3).copyWith(revealed: true),
+        ...filler(),
+      ]);
+      final lifeCard =
+          s.currentPlayer.hand.firstWhere((c) => c.type == ActionType.life);
+      final err = engine.validate(s, actionCardId: lifeCard.id, position: 0);
+      expect(err, isNotNull);
+    });
+  });
+
   group('セットアップ', () {
     test('9枚・善中悪3枚ずつ・各種類の得点は1,2,3', () {
       final s = engine.setup(Faction.savior);

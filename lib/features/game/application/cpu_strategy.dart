@@ -5,6 +5,7 @@ import '../domain/enums.dart';
 import '../domain/game_action.dart';
 import '../domain/game_state.dart';
 import '../domain/human_card.dart';
+import 'game_engine.dart';
 
 /// CPU の意思決定（Ver.0.4）。
 ///
@@ -21,7 +22,7 @@ class CpuStrategy {
     final usable = me.usableCards;
     if (usable.isEmpty) return null;
 
-    final myColumn = GameState.knownColumnOf(owner);
+    final myRow = GameState.knownRowOf(owner);
     final saviorSide = me.faction == Faction.savior;
 
     GameAction? best;
@@ -29,7 +30,9 @@ class CpuStrategy {
 
     for (final card in usable) {
       for (final human in state.humans) {
-        final score = _score(card, human, myColumn, saviorSide);
+        // 禁止手（表向きカードへの無変化・二重保護）は選ばない。
+        if (GameEngine.isNoOpBlocked(card.type, human)) continue;
+        final score = _score(card, human, myRow, saviorSide);
         // 同点はランダムに揺らして単調な手を避ける。
         final jittered = score + _random.nextDouble() * 0.01;
         if (jittered > bestScore) {
@@ -42,7 +45,21 @@ class CpuStrategy {
         }
       }
     }
-    return best;
+    if (best != null) return best;
+
+    // 全ての手が禁止（表向き無変化等）の稀なケース：有効な手を1つ探す。
+    for (final card in usable) {
+      for (final human in state.humans) {
+        if (!GameEngine.isNoOpBlocked(card.type, human)) {
+          return GameAction(
+            player: owner,
+            actionCardId: card.id,
+            targetPosition: human.position,
+          );
+        }
+      }
+    }
+    return null;
   }
 
   /// この陣営がそのカードを「生存させたい」か。
@@ -57,8 +74,8 @@ class CpuStrategy {
   }
 
   double _score(
-      ActionCard card, HumanCard human, int myColumn, bool saviorSide) {
-    final known = human.column == myColumn || human.revealed;
+      ActionCard card, HumanCard human, int myRow, bool saviorSide) {
+    final known = human.row == myRow || human.revealed;
     final points = human.points.toDouble();
 
     if (!known) {

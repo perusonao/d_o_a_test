@@ -121,6 +121,28 @@ class GameEngine {
     }
   }
 
+  /// そのアクションが対象の状態（生死・保護）を変化させるか。
+  static bool changesState(ActionType type, HumanCard target) {
+    switch (type) {
+      case ActionType.protect:
+        return !target.protected; // 未保護なら保護が付く
+      case ActionType.life:
+        // 保護中は保護が壊れる＝変化。未保護なら死→生で変化。
+        return target.protected || target.isDead;
+      case ActionType.death:
+        return target.protected || target.isAlive;
+    }
+  }
+
+  /// 「表向きカードへの、状態が変化しないアクション」など禁止手か。
+  static bool isNoOpBlocked(ActionType type, HumanCard target) {
+    // 二重保護は常に禁止（保護は表裏問わず見える）。
+    if (type == ActionType.protect && target.protected) return true;
+    // 表向き（公開済み）カードへの無変化アクションは禁止。
+    if (target.revealed && !changesState(type, target)) return true;
+    return false;
+  }
+
   /// 行動の妥当性を検証する。問題があれば理由、無ければ null。
   String? validate(GameState state, {String? actionCardId, int? position}) {
     if (actionCardId == null) return 'アクションカードを選んでください。';
@@ -132,6 +154,13 @@ class GameEngine {
     if (position == null) return '対象の人間カードを選んでください。';
     if (position < 0 || position >= GameConstants.humanCardCount) {
       return '対象を選び直してください。';
+    }
+    final target = state.humanAt(position);
+    if (isNoOpBlocked(card.type, target)) {
+      if (card.type == ActionType.protect) {
+        return 'すでに保護されています。';
+      }
+      return '表向きのカードに状態の変わらないアクションは使えません。';
     }
     return null;
   }
