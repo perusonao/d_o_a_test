@@ -1,21 +1,21 @@
 import 'package:flutter/material.dart';
 
 import '../../app/theme.dart';
-import '../../features/game/domain/life_death_card.dart';
+import '../../features/game/domain/action_card.dart';
 import '../utils/card_visuals.dart';
 
-/// 手札の生死カード1枚を描画する Widget。
-class LifeDeathCardWidget extends StatelessWidget {
-  const LifeDeathCardWidget({
+/// 手札のアクションカード1枚（生 / 死 / 保）。数字は持たない。
+class ActionCardWidget extends StatelessWidget {
+  const ActionCardWidget({
     super.key,
     required this.card,
     this.selected = false,
     this.enabled = true,
     this.onTap,
-    this.width = 72,
+    this.width = 64,
   });
 
-  final LifeDeathCard card;
+  final ActionCard card;
   final bool selected;
   final bool enabled;
   final VoidCallback? onTap;
@@ -23,14 +23,13 @@ class LifeDeathCardWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = CardVisuals.effectColor(card.effect);
-    final used = card.isUsed;
+    final color = CardVisuals.actionColor(card.type);
+    final used = card.used;
 
     return Semantics(
       button: true,
       selected: selected,
-      label:
-          '${CardVisuals.effectLabel(card.effect)} ${card.number}${used ? " 使用済み" : ""}',
+      label: '${CardVisuals.actionLabel(card.type)}カード${used ? " 使用済み" : ""}',
       child: GestureDetector(
         onTap: (enabled && !used) ? onTap : null,
         child: AnimatedScale(
@@ -50,14 +49,10 @@ class LifeDeathCardWidget extends StatelessWidget {
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  colors: [
-                    color.withValues(alpha: 0.28),
-                    AppTheme.surface,
-                  ],
+                  colors: [color.withValues(alpha: 0.28), AppTheme.surface],
                 ),
               ),
               padding: const EdgeInsets.all(3),
-              // 小さいサイズでも溢れないよう内容を縮小して収める。
               child: FittedBox(
                 fit: BoxFit.scaleDown,
                 child: SizedBox(
@@ -65,22 +60,14 @@ class LifeDeathCardWidget extends StatelessWidget {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(CardVisuals.effectIcon(card.effect),
-                          color: color, size: width * 0.4),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${card.number}',
-                        style: TextStyle(
-                          fontSize: width * 0.36,
-                          fontWeight: FontWeight.bold,
-                          color: const Color(0xFFEDE6D4),
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        CardVisuals.effectLabel(card.effect),
-                        style: TextStyle(fontSize: width * 0.17, color: color),
-                      ),
+                      Icon(CardVisuals.actionIcon(card.type),
+                          color: color, size: width * 0.42),
+                      const SizedBox(height: 3),
+                      Text(CardVisuals.actionLabel(card.type),
+                          style: TextStyle(
+                              fontSize: width * 0.34,
+                              fontWeight: FontWeight.bold,
+                              color: const Color(0xFFEDE6D4))),
                     ],
                   ),
                 ),

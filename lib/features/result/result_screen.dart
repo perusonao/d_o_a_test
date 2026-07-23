@@ -9,7 +9,7 @@ import '../game/application/game_controller.dart';
 import '../game/domain/enums.dart';
 import '../game/domain/game_result.dart';
 
-/// リザルト画面（Ver.0.3・得点方式）。
+/// リザルト画面（Ver.0.4）。
 class ResultScreen extends ConsumerWidget {
   const ResultScreen({super.key});
 
@@ -20,7 +20,7 @@ class ResultScreen extends ConsumerWidget {
 
     if (result == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        context.go(AppRoutes.title);
+        if (context.mounted) context.go(AppRoutes.title);
       });
       return const Scaffold(body: SizedBox.shrink());
     }
@@ -30,12 +30,11 @@ class ResultScreen extends ConsumerWidget {
     if (result.isDraw) {
       color = AppTheme.neutral;
       title = '引き分け';
-    } else if (result.playerWon) {
-      color = AppTheme.alive;
-      title = 'あなたの勝利';
     } else {
-      color = AppTheme.evil;
-      title = 'あなたの敗北';
+      color = CardVisuals.factionColor(result.winner!);
+      final winnerPlayer =
+          result.playerAFaction == result.winner ? 'プレイヤーA' : 'プレイヤーB';
+      title = '$winnerPlayer の勝利';
     }
 
     return Scaffold(
@@ -44,44 +43,30 @@ class ResultScreen extends ConsumerWidget {
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(20),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 480),
+              constraints: const BoxConstraints(maxWidth: 460),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
-                    result.isDraw
-                        ? Icons.balance
-                        : result.playerWon
-                            ? Icons.emoji_events
-                            : Icons.sentiment_dissatisfied,
-                    size: 60,
-                    color: color,
-                  ),
+                  Icon(result.isDraw ? Icons.balance : Icons.emoji_events,
+                      size: 60, color: color),
                   const SizedBox(height: 8),
                   Text(title,
                       style: TextStyle(
                           fontSize: 30,
                           fontWeight: FontWeight.bold,
                           color: color)),
-                  const SizedBox(height: 4),
-                  Text(
-                    result.isDraw
-                        ? '同点'
-                        : '勝者：${CardVisuals.roleLabel(result.winnerRole!)}',
-                    style: const TextStyle(
-                        fontSize: 15, color: Color(0xFFCFC7B5)),
-                  ),
-                  Text('あなたの役割：${CardVisuals.roleLabel(result.playerRole)}',
-                      style: const TextStyle(
-                          fontSize: 13, color: Color(0xFF9A9384))),
-                  const SizedBox(height: 18),
+                  if (!result.isDraw)
+                    Text('勝利陣営：${CardVisuals.factionLabel(result.winner!)}',
+                        style: const TextStyle(
+                            fontSize: 14, color: Color(0xFFCFC7B5))),
+                  const SizedBox(height: 20),
                   _ScorePanel(result: result),
                   const SizedBox(height: 22),
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
                       onPressed: () {
-                        controller.restartSameRole();
+                        controller.restart();
                         context.go(AppRoutes.game);
                       },
                       icon: const Icon(Icons.replay),
@@ -125,35 +110,37 @@ class _ScorePanel extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: _scoreTile('救済者', result.saviorScore, AppTheme.alive,
-                    result.winnerRole == Role.savior),
+                child: _tile(
+                    '救済者',
+                    result.saviorScore,
+                    AppTheme.alive,
+                    result.winner == Faction.savior,
+                    result.playerAFaction == Faction.savior ? 'A' : 'B'),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: _scoreTile('執行者', result.executionerScore,
-                    AppTheme.evil, result.winnerRole == Role.executioner),
+                child: _tile(
+                    '執行者',
+                    result.executionerScore,
+                    AppTheme.evil,
+                    result.winner == Faction.executioner,
+                    result.playerAFaction == Faction.executioner ? 'A' : 'B'),
               ),
             ],
           ),
-          const Divider(height: 22),
-          _header('最終状態（全カード公開）'),
-          _row(Icons.balance, AppTheme.good, '善人', result.aliveGood,
-              result.deadGood),
-          _row(Icons.local_fire_department, AppTheme.evil, '悪人',
-              result.aliveEvil, result.deadEvil),
-          _row(Icons.theater_comedy, AppTheme.neutral, '中立',
-              result.aliveNeutral, result.deadNeutral),
-          const SizedBox(height: 4),
-          const Text('（生存 / 死亡）',
+          const SizedBox(height: 10),
+          const Text('得点は各カード（善人/中立=生存で救済者・死亡で執行者、悪人=逆）の合計。',
+              textAlign: TextAlign.center,
               style: TextStyle(fontSize: 11, color: Color(0xFF9A9384))),
         ],
       ),
     );
   }
 
-  Widget _scoreTile(String label, int score, Color color, bool winner) {
+  Widget _tile(
+      String label, int score, Color color, bool winner, String playerTag) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 10),
+      padding: const EdgeInsets.symmetric(vertical: 12),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(10),
         color: winner ? color.withValues(alpha: 0.18) : Colors.transparent,
@@ -163,45 +150,14 @@ class _ScorePanel extends StatelessWidget {
       ),
       child: Column(
         children: [
-          Text(label, style: TextStyle(fontSize: 13, color: color)),
+          Text('$label（$playerTag）',
+              style: TextStyle(fontSize: 13, color: color)),
           const SizedBox(height: 2),
           Text('$score',
               style: TextStyle(
-                  fontSize: 28, fontWeight: FontWeight.bold, color: color)),
+                  fontSize: 30, fontWeight: FontWeight.bold, color: color)),
         ],
       ),
     );
   }
-
-  Widget _header(String t) => Padding(
-        padding: const EdgeInsets.only(bottom: 6),
-        child: Align(
-          alignment: Alignment.centerLeft,
-          child: Text(t,
-              style: const TextStyle(
-                  fontSize: 12,
-                  color: AppTheme.accent,
-                  fontWeight: FontWeight.bold)),
-        ),
-      );
-
-  Widget _row(IconData icon, Color color, String label, int alive, int dead) =>
-      Padding(
-        padding: const EdgeInsets.symmetric(vertical: 3),
-        child: Row(
-          children: [
-            Icon(icon, color: color, size: 18),
-            const SizedBox(width: 8),
-            Text(label,
-                style:
-                    const TextStyle(fontSize: 14, color: Color(0xFFCFC7B5))),
-            const Spacer(),
-            Text('$alive / $dead',
-                style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    color: color)),
-          ],
-        ),
-      );
 }

@@ -1,241 +1,222 @@
 import 'dart:math';
 
-import '../domain/action_outcome.dart';
+import '../domain/action_card.dart';
 import '../domain/enums.dart';
 import '../domain/game_action.dart';
 import '../domain/game_constants.dart';
-import '../domain/game_log_entry.dart';
+import '../domain/game_result.dart';
 import '../domain/game_state.dart';
-import '../domain/life_death_card.dart';
-import '../domain/person_card.dart';
-import '../domain/player_state.dart';
-import '../domain/public_action.dart';
-import 'game_rule_service.dart';
-import 'game_setup_service.dart';
+import '../domain/human_card.dart';
+import '../domain/player.dart';
 
-/// 表示用のラベル変換ヘルパ。
+/// 表示用ラベル。
 class GameLabels {
-  static String effect(LifeDeathEffect e) {
-    switch (e) {
-      case LifeDeathEffect.dead:
-        return 'デッド';
-      case LifeDeathEffect.alive:
-        return 'アライブ';
-      case LifeDeathEffect.seal:
-        return 'シール';
-    }
-  }
-
-  static String personType(PersonType t) {
+  static String actionType(ActionType t) {
     switch (t) {
-      case PersonType.good:
-        return '善人';
-      case PersonType.evil:
-        return '悪人';
-      case PersonType.neutral:
-        return '中立';
+      case ActionType.life:
+        return '生';
+      case ActionType.death:
+        return '死';
+      case ActionType.protect:
+        return '保';
     }
   }
 
-  static String role(Role r) => r == Role.savior ? '救済者' : '執行者';
+  static String humanType(HumanType t) {
+    switch (t) {
+      case HumanType.good:
+        return '善人';
+      case HumanType.neutral:
+        return '中立';
+      case HumanType.evil:
+        return '悪人';
+    }
+  }
 
-  static String owner(TurnOwner o) => o == TurnOwner.player ? 'あなた' : 'CPU';
+  static String faction(Faction f) =>
+      f == Faction.savior ? '救済者' : '執行者';
+
+  static String player(PlayerId id) =>
+      id == PlayerId.a ? 'プレイヤーA' : 'プレイヤーB';
 }
 
-/// ゲーム進行を統括するエンジン（Ver.0.3）。
+/// ゲームロジックを集約するエンジン（Widget にロジックを書かない）。
 class GameEngine {
-  GameEngine({
-    Random? random,
-    GameRuleService? rules,
-    GameSetupService? setup,
-  })  : _rules = rules ?? const GameRuleService(),
-        _setup = setup ?? GameSetupService(random: random);
+  GameEngine({Random? random}) : _random = random ?? Random();
 
-  final GameRuleService _rules;
-  final GameSetupService _setup;
+  final Random _random;
 
-  GameRuleService get rules => _rules;
+  /// 対戦を初期化する。プレイヤーAの陣営を指定し、Bは反対陣営になる。
+  GameState setup(Faction playerAFaction) {
+    // 9枚の人間カード（善人/中立/悪人 × 得点1/2/3）を生成しシャッフル配置。
+    final cards = <HumanCard>[];
+    var seq = 0;
+    for (final type in HumanType.values) {
+      for (final pt in GameConstants.pointValues) {
+        cards.add(HumanCard(
+          id: 'h${seq++}',
+          position: 0, // 後で確定
+          type: type,
+          points: pt,
+        ));
+      }
+    }
+    cards.shuffle(_random);
+    final humans = <HumanCard>[
+      for (var i = 0; i < cards.length; i++)
+        HumanCard(
+          id: cards[i].id,
+          position: i,
+          type: cards[i].type,
+          points: cards[i].points,
+        ),
+    ];
 
-  /// 対戦を初期化する。プレイヤーが役割を選び、CPU は反対役になる。
-  GameState startGame(Role playerRole) {
-    final persons = _setup.buildPersons();
-    final cpuRole =
-        playerRole == Role.savior ? Role.executioner : Role.savior;
-
-    final player = PlayerSideState(
-      owner: TurnOwner.player,
-      role: playerRole,
-      hand: _setup.buildLifeDeathHand(TurnOwner.player, playerRole),
-    );
-    final cpu = PlayerSideState(
-      owner: TurnOwner.cpu,
-      role: cpuRole,
-      hand: _setup.buildLifeDeathHand(TurnOwner.cpu, cpuRole),
-    );
-
-    // 弱い役が先手（＝最終手番）。
-    final firstOwner =
-        playerRole == GameConstants.weakRole ? TurnOwner.player : TurnOwner.cpu;
+    final playerBFaction =
+        playerAFaction == Faction.savior ? Faction.executioner : Faction.savior;
 
     return GameState(
-      persons: persons,
-      player: player,
-      cpu: cpu,
-      phase: firstOwner == TurnOwner.player
-          ? GamePhase.playerTurn
-          : GamePhase.cpuTurn,
-      logs: [
-        GameLogEntry(
-          message:
-              'ゲーム開始。あなたは${GameLabels.role(playerRole)}、CPUは${GameLabels.role(cpuRole)}。',
-          actor: null,
-        ),
-      ],
-      history: const [],
+      humans: humans,
+      playerA: Player(
+        id: PlayerId.a,
+        faction: playerAFaction,
+        hand: _buildHand(PlayerId.a),
+      ),
+      playerB: Player(
+        id: PlayerId.b,
+        faction: playerBFaction,
+        hand: _buildHand(PlayerId.b),
+      ),
+      current: PlayerId.a,
+      phase: GamePhase.peekA,
     );
   }
 
-  /// プレイヤーの選択を検証する。問題があれば理由文字列、無ければ null。
-  String? validatePlayerAction(
-    GameState state, {
-    String? cardId,
-    int? position,
-  }) {
-    if (cardId == null) return '生死カードを選択してください。';
-    final card = state.player.hand
-        .where((c) => c.id == cardId && !c.isUsed)
-        .cast<LifeDeathCard?>()
+  List<ActionCard> _buildHand(PlayerId owner) {
+    final hand = <ActionCard>[];
+    for (var i = 0; i < GameConstants.handComposition.length; i++) {
+      hand.add(ActionCard(
+        id: 'ac_${owner.name}_$i',
+        type: GameConstants.handComposition[i],
+        owner: owner,
+      ));
+    }
+    return hand;
+  }
+
+  /// 確認フェーズを進める（peekA → peekB → playing）。
+  GameState confirmPeek(GameState state) {
+    switch (state.phase) {
+      case GamePhase.peekA:
+        return state.copyWith(phase: GamePhase.peekB);
+      case GamePhase.peekB:
+        return state.copyWith(phase: GamePhase.playing);
+      default:
+        return state;
+    }
+  }
+
+  /// 行動の妥当性を検証する。問題があれば理由、無ければ null。
+  String? validate(GameState state, {String? actionCardId, int? position}) {
+    if (actionCardId == null) return 'アクションカードを選んでください。';
+    final card = state.currentPlayer.hand
+        .where((c) => c.id == actionCardId && !c.used)
+        .cast<ActionCard?>()
         .firstWhere((c) => c != null, orElse: () => null);
     if (card == null) return 'そのカードは使用できません。';
-    if (position == null) return '対象の人カードを選択してください。';
-    final target = state.persons
-        .where((p) => p.position == position)
-        .cast<PersonCard?>()
-        .firstWhere((p) => p != null, orElse: () => null);
-    if (target == null) return '対象を選び直してください。';
-    if (target.sealed) return 'そのカードは封印済みで変更できません。';
+    if (position == null) return '対象の人間カードを選んでください。';
+    if (position < 0 || position >= GameConstants.humanCardCount) {
+      return '対象を選び直してください。';
+    }
     return null;
   }
 
-  /// 行動を適用し、公開情報・ログ・結果を反映した新しい状態を返す。
-  /// フェーズは resolving に設定する。
-  GameState performAction(GameState state, GameAction action) {
-    final actorState = state.stateOf(action.actor);
-    final card =
-        actorState.hand.firstWhere((c) => c.id == action.lifeDeathCardId);
+  /// 行動を適用し、手番を交代した新しい状態を返す。
+  GameState applyAction(GameState state, GameAction action) {
+    final actor = state.player(action.player);
+    final card = actor.hand.firstWhere((c) => c.id == action.actionCardId);
     final index =
-        state.persons.indexWhere((p) => p.position == action.targetPosition);
-    final target = state.persons[index];
+        state.humans.indexWhere((h) => h.position == action.targetPosition);
+    final target = state.humans[index];
 
-    final res = _rules.applyEffect(target, card);
+    HumanCard updated;
+    var protectAbsorbed = false;
 
-    final newPersons = List<PersonCard>.from(state.persons);
-    newPersons[index] = res.updatedCard;
-
-    final newHand = actorState.hand
-        .map((c) => c.id == card.id ? c.copyWith(isUsed: true) : c)
-        .toList();
-    final newActor =
-        actorState.copyWith(hand: newHand, usedCount: actorState.usedCount + 1);
-
-    final newPlayer = action.actor == TurnOwner.player ? newActor : state.player;
-    final newCpu = action.actor == TurnOwner.cpu ? newActor : state.cpu;
-
-    final publicAction = PublicAction(
-      actor: action.actor,
-      position: action.targetPosition,
-      effect: card.effect,
-      number: card.number,
-      success: res.success,
-      changed: res.changed,
-      targetSealed: res.wasSealed,
-    );
-    final newHistory = List<PublicAction>.from(state.history)..add(publicAction);
-
-    final logs = List<GameLogEntry>.from(state.logs);
-    final pos = action.targetPosition + 1; // 表示は1始まり
-    logs.add(GameLogEntry(
-      message:
-          '${GameLabels.owner(action.actor)}が[$pos]に「${GameLabels.effect(card.effect)}${card.number}」',
-      actor: action.actor,
-    ));
-    if (res.wasSealed) {
-      logs.add(const GameLogEntry(message: '対象は封印済み。変化なし。', actor: null));
-    } else if (!res.success) {
-      logs.add(GameLogEntry(
-          message: 'パワー不足で失敗（対象は ${card.number + 1} 以上）', actor: null));
-    } else if (card.effect == LifeDeathEffect.seal) {
-      logs.add(const GameLogEntry(message: '成功。対象を封印した。', actor: null));
-    } else if (res.changed) {
-      logs.add(GameLogEntry(
-          message:
-              '成功。対象を${card.effect == LifeDeathEffect.dead ? "死亡" : "生存"}にした。',
-          actor: null));
-    } else {
-      logs.add(const GameLogEntry(message: '成功したが状態は変わらなかった。', actor: null));
+    switch (card.type) {
+      case ActionType.protect:
+        // 保護を付与。公開しない。
+        updated = target.copyWith(protected: true);
+        break;
+      case ActionType.life:
+      case ActionType.death:
+        // 生/死は対象を公開する。
+        if (target.protected) {
+          // 保護中：保護のみ破壊、生死は変化なし。
+          protectAbsorbed = true;
+          updated = target.copyWith(protected: false, revealed: true);
+        } else {
+          final newState =
+              card.type == ActionType.life ? CardState.alive : CardState.dead;
+          updated = target.copyWith(state: newState, revealed: true);
+        }
+        break;
     }
 
-    final outcome = ActionOutcome(
-      actor: action.actor,
-      effect: card.effect,
-      number: card.number,
-      position: action.targetPosition,
-      success: res.success,
-      changed: res.changed,
-      wasSealed: res.wasSealed,
-    );
+    final newHumans = List<HumanCard>.from(state.humans);
+    newHumans[index] = updated;
+
+    final newHand = actor.hand
+        .map((c) => c.id == card.id ? c.copyWith(used: true) : c)
+        .toList();
+    final newActor = actor.copyWith(hand: newHand);
+    final newA = action.player == PlayerId.a ? newActor : state.playerA;
+    final newB = action.player == PlayerId.b ? newActor : state.playerB;
+
+    final next = action.player == PlayerId.a ? PlayerId.b : PlayerId.a;
+    final bothEmpty = !newA.hasUsableCards && !newB.hasUsableCards;
 
     return state.copyWith(
-      persons: newPersons,
-      player: newPlayer,
-      cpu: newCpu,
-      phase: GamePhase.resolving,
-      logs: logs,
-      history: newHistory,
-      lastOutcome: outcome,
+      humans: newHumans,
+      playerA: newA,
+      playerB: newB,
+      current: next,
+      phase: bothEmpty ? GamePhase.finished : GamePhase.playing,
+      lastActionPosition: action.targetPosition,
+      lastActionType: card.type,
+      lastProtectAbsorbed: protectAbsorbed,
       clearSelection: true,
       clearMessage: true,
     );
   }
 
-  /// 効果判定後にターンを進める。
-  GameState advanceTurn(GameState state, TurnOwner lastActor) {
-    if (_rules.isGameOver(state.player.hasUsableCards, state.cpu.hasUsableCards)) {
-      return _finalize(state);
+  /// 得点を集計する。各カードの得点は最終状態に応じてどちらか一方に入る。
+  GameResult score(GameState state) {
+    var savior = 0;
+    var executioner = 0;
+    for (final h in state.humans) {
+      final toSavior = switch (h.type) {
+        // 善人・中立は「生存」で救済者、「死亡」で執行者。
+        HumanType.good || HumanType.neutral => h.isAlive,
+        // 悪人は「死亡」で救済者、「生存」で執行者。
+        HumanType.evil => h.isDead,
+      };
+      if (toSavior) {
+        savior += h.points;
+      } else {
+        executioner += h.points;
+      }
     }
-    final other =
-        lastActor == TurnOwner.player ? TurnOwner.cpu : TurnOwner.player;
-    if (state.stateOf(other).hasUsableCards) {
-      return state.copyWith(
-        phase: other == TurnOwner.player
-            ? GamePhase.playerTurn
-            : GamePhase.cpuTurn,
-        clearOutcome: true,
-      );
-    }
-    // 相手は手札切れ。自分に残りがあれば継続。
-    if (state.stateOf(lastActor).hasUsableCards) {
-      final logs = List<GameLogEntry>.from(state.logs)
-        ..add(GameLogEntry(
-            message: '${GameLabels.owner(other)}は手札切れのためパス', actor: null));
-      return state.copyWith(
-        phase: lastActor == TurnOwner.player
-            ? GamePhase.playerTurn
-            : GamePhase.cpuTurn,
-        logs: logs,
-        clearOutcome: true,
-      );
-    }
-    return _finalize(state);
-  }
-
-  GameState _finalize(GameState state) {
-    final logs = List<GameLogEntry>.from(state.logs)
-      ..add(const GameLogEntry(message: '全手番終了。正体を一斉公開します。', actor: null));
-    return state.copyWith(
-      phase: GamePhase.finished,
-      logs: logs,
-      clearOutcome: true,
+    final Faction? winner = savior > executioner
+        ? Faction.savior
+        : executioner > savior
+            ? Faction.executioner
+            : null;
+    return GameResult(
+      saviorScore: savior,
+      executionerScore: executioner,
+      winner: winner,
+      playerAFaction: state.playerA.faction,
+      playerBFaction: state.playerB.faction,
     );
   }
 }

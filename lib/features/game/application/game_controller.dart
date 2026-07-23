@@ -4,150 +4,104 @@ import '../domain/enums.dart';
 import '../domain/game_action.dart';
 import '../domain/game_result.dart';
 import '../domain/game_state.dart';
-import 'cpu_strategy.dart';
 import 'game_engine.dart';
 
-/// アニメーション演出のための待ち時間。
-class GameTiming {
-  static const Duration resolveFlash = Duration(milliseconds: 700);
-  static const Duration betweenTurns = Duration(milliseconds: 400);
-  static const Duration cpuThinking = Duration(milliseconds: 650);
-}
-
-/// ゲーム進行の状態管理（Ver.0.3）。
+/// ゲーム進行の状態管理（Ver.0.4・ローカル2人対戦）。
 class GameController extends Notifier<GameState?> {
   late final GameEngine _engine;
-  late final CpuStrategy _cpu;
 
   @override
   GameState? build() {
     _engine = GameEngine();
-    _cpu = DefaultCpuStrategy();
     return null;
   }
 
-  /// 役割を選んで新しい対戦を開始する。
-  Future<void> startGame(Role playerRole) async {
-    state = _engine.startGame(playerRole);
-    // CPU が先手（弱い役）の場合はまず CPU に行動させる。
-    await _runCpuTurnsIfNeeded();
+  /// プレイヤーAの陣営を指定して開始（Bは反対陣営）。
+  void startGame(Faction playerAFaction) {
+    state = _engine.setup(playerAFaction);
   }
 
-  Future<void> restartSameRole() async {
-    final role = state?.player.role ?? Role.savior;
-    await startGame(role);
+  void restart() {
+    final aFaction = state?.playerA.faction ?? Faction.savior;
+    startGame(aFaction);
   }
 
-  void selectLifeDeathCard(String id) {
+  /// 確認フェーズを進める。
+  void confirmPeek() {
     final s = state;
-    if (s == null || s.isBusy || s.phase != GamePhase.playerTurn) return;
-    final next = s.selectedLifeDeathCardId == id ? null : id;
+    if (s == null) return;
+    state = _engine.confirmPeek(s);
+  }
+
+  void selectActionCard(String id) {
+    final s = state;
+    if (s == null || s.phase != GamePhase.playing) return;
+    final next = s.selectedActionCardId == id ? null : id;
     state = _withSelection(s, cardId: next, position: s.selectedPosition);
   }
 
   void selectPosition(int position) {
     final s = state;
-    if (s == null || s.isBusy || s.phase != GamePhase.playerTurn) return;
-    final person = s.persons.where((p) => p.position == position);
-    if (person.isEmpty) return;
-    if (person.first.sealed) {
-      state = _withMessage(s, 'そのカードは封印済みで変更できません。');
-      return;
-    }
+    if (s == null || s.phase != GamePhase.playing) return;
     final next = s.selectedPosition == position ? null : position;
-    state = _withSelection(s, cardId: s.selectedLifeDeathCardId, position: next);
+    state = _withSelection(s, cardId: s.selectedActionCardId, position: next);
   }
 
-  Future<void> confirm() async {
+  void confirm() {
     final s = state;
-    if (s == null || s.isBusy || s.phase != GamePhase.playerTurn) return;
-
-    final error = _engine.validatePlayerAction(
+    if (s == null || s.phase != GamePhase.playing) return;
+    final error = _engine.validate(
       s,
-      cardId: s.selectedLifeDeathCardId,
+      actionCardId: s.selectedActionCardId,
       position: s.selectedPosition,
     );
     if (error != null) {
       state = _withMessage(s, error);
       return;
     }
-
-    final action = GameAction(
-      actor: TurnOwner.player,
-      lifeDeathCardId: s.selectedLifeDeathCardId!,
-      targetPosition: s.selectedPosition!,
+    state = _engine.applyAction(
+      s,
+      GameAction(
+        player: s.current,
+        actionCardId: s.selectedActionCardId!,
+        targetPosition: s.selectedPosition!,
+      ),
     );
-    await _resolveAndAdvance(action, TurnOwner.player);
-  }
-
-  Future<void> _resolveAndAdvance(GameAction action, TurnOwner actor) async {
-    var s = _engine.performAction(state!, action);
-    state = s.copyWith(isBusy: true);
-    await Future.delayed(GameTiming.resolveFlash);
-
-    s = _engine.advanceTurn(state!, actor);
-    state = s.copyWith(isBusy: s.phase == GamePhase.cpuTurn);
-    await Future.delayed(GameTiming.betweenTurns);
-
-    await _runCpuTurnsIfNeeded();
-  }
-
-  Future<void> _runCpuTurnsIfNeeded() async {
-    while (state != null && state!.phase == GamePhase.cpuTurn) {
-      state = state!.copyWith(isBusy: true);
-      await Future.delayed(GameTiming.cpuThinking);
-
-      final decision = _cpu.decide(state!, TurnOwner.cpu);
-      if (decision == null) {
-        state = _engine.advanceTurn(state!, TurnOwner.cpu);
-        continue;
-      }
-      var s = _engine.performAction(state!, decision.action);
-      state = s.copyWith(isBusy: true);
-      await Future.delayed(GameTiming.resolveFlash);
-
-      s = _engine.advanceTurn(state!, TurnOwner.cpu);
-      state = s.copyWith(isBusy: s.phase == GamePhase.cpuTurn);
-      await Future.delayed(GameTiming.betweenTurns);
-    }
-    if (state != null && state!.phase == GamePhase.playerTurn) {
-      state = state!.copyWith(isBusy: false);
-    }
   }
 
   GameResult? result() {
     final s = state;
     if (s == null || s.phase != GamePhase.finished) return null;
-    return _engine.rules.score(s.persons, s.player.role);
+    return _engine.score(s);
   }
 
   GameState _withSelection(GameState s,
       {required String? cardId, required int? position}) {
     return GameState(
-      persons: s.persons,
-      player: s.player,
-      cpu: s.cpu,
+      humans: s.humans,
+      playerA: s.playerA,
+      playerB: s.playerB,
+      current: s.current,
       phase: s.phase,
-      logs: s.logs,
-      history: s.history,
-      selectedLifeDeathCardId: cardId,
+      selectedActionCardId: cardId,
       selectedPosition: position,
-      lastOutcome: s.lastOutcome,
+      lastActionPosition: s.lastActionPosition,
+      lastProtectAbsorbed: s.lastProtectAbsorbed,
     );
   }
 
   GameState _withMessage(GameState s, String message) {
     return GameState(
-      persons: s.persons,
-      player: s.player,
-      cpu: s.cpu,
+      humans: s.humans,
+      playerA: s.playerA,
+      playerB: s.playerB,
+      current: s.current,
       phase: s.phase,
-      logs: s.logs,
-      history: s.history,
-      selectedLifeDeathCardId: s.selectedLifeDeathCardId,
+      selectedActionCardId: s.selectedActionCardId,
       selectedPosition: s.selectedPosition,
       message: message,
-      lastOutcome: s.lastOutcome,
+      lastActionPosition: s.lastActionPosition,
+      lastProtectAbsorbed: s.lastProtectAbsorbed,
     );
   }
 }
