@@ -62,7 +62,10 @@ void main() {
           outer:
           for (final card in s.currentPlayer.usableCards) {
             for (final hu in s.humans) {
-              if (!GameEngine.isNoOpBlocked(card.type, hu)) {
+              final ok = card.type == ActionType.diagnose
+                  ? !s.canSeeFace(s.current, hu.position)
+                  : !GameEngine.isNoOpBlocked(card.type, hu);
+              if (ok) {
                 cardId = card.id;
                 pos = hu.position;
                 break outer;

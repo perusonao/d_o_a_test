@@ -56,9 +56,15 @@ class GameState {
   /// そのプレイヤーが初期に確認できる行（A=下段2 / B=上段0）。
   static int knownRowOf(PlayerId id) => id == PlayerId.a ? 2 : 0;
 
-  /// 位置 [position] が [id] の既知カードか。
+  /// 位置 [position] が [id] の初期既知カード（列＝行）か。
   bool isKnownBy(PlayerId id, int position) =>
       position ~/ 3 == knownRowOf(id);
+
+  /// [id] がその位置の正体を（公開・初期既知・診のいずれかで）見えるか。
+  bool canSeeFace(PlayerId id, int position) {
+    final c = humanAt(position);
+    return c.revealed || isKnownBy(id, position) || c.diagnosedBy(id);
+  }
 
   HumanCard humanAt(int position) =>
       humans.firstWhere((h) => h.position == position);

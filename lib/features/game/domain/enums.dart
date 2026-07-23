@@ -18,6 +18,7 @@ enum ActionType {
   life, // 生カード
   death, // 死カード
   protect, // 保カード
+  diagnose, // 診カード（自分だけ対象の正体を確認）
 }
 
 /// 陣営。

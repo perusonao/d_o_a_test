@@ -106,8 +106,10 @@ class GameScreen extends ConsumerWidget {
       ..sort((a, b) => a.position.compareTo(b.position));
     final playing = state.phase == GamePhase.playing;
     final interactive = playing && !state.isBusy && !state.currentPlayer.isCpu;
+    // 盤面を見る人：CPU対戦では常に人間(A)、2人対戦では手番プレイヤー。
+    final viewer = state.playerB.isCpu ? PlayerId.a : state.current;
 
-    // 選択中のアクション種別（あれば、無変化な対象を無効化する）。
+    // 選択中のアクション種別（あれば、無効な対象を無効化する）。
     ActionType? selType;
     final selId = state.selectedActionCardId;
     if (selId != null) {
@@ -127,9 +129,15 @@ class GameScreen extends ConsumerWidget {
           runSpacing: gap,
           alignment: WrapAlignment.center,
           children: humans.map((hcard) {
-            // アクション選択中で、そのカードへの手が禁止（無変化・二重保護）なら対象外。
-            final blocked =
-                selType != null && GameEngine.isNoOpBlocked(selType, hcard);
+            // アクション選択中で、そのカードへの手が禁止なら対象外。
+            final bool blocked;
+            if (selType == ActionType.diagnose) {
+              blocked = state.canSeeFace(state.current, hcard.position);
+            } else if (selType != null) {
+              blocked = GameEngine.isNoOpBlocked(selType, hcard);
+            } else {
+              blocked = false;
+            }
             final canPeek = interactive &&
                 selType == null &&
                 state.isKnownBy(state.current, hcard.position) &&
@@ -137,7 +145,7 @@ class GameScreen extends ConsumerWidget {
                 !state.peeked.contains(hcard.position);
             final widget = HumanCardWidget(
               card: hcard,
-              faceUp: _faceUp(state, hcard),
+              faceUp: _faceUp(state, hcard, viewer),
               size: size,
               selected: state.selectedPosition == hcard.position,
               selectable: interactive && !blocked,
@@ -154,7 +162,7 @@ class GameScreen extends ConsumerWidget {
     );
   }
 
-  bool _faceUp(GameState state, HumanCard card) {
+  bool _faceUp(GameState state, HumanCard card, PlayerId viewer) {
     switch (state.phase) {
       case GamePhase.finished:
         return true;
@@ -163,7 +171,10 @@ class GameScreen extends ConsumerWidget {
       case GamePhase.peekB:
         return card.row == GameState.knownRowOf(PlayerId.b); // 上段
       case GamePhase.playing:
-        return card.revealed || state.peeked.contains(card.position);
+        // 公開・のぞき見中・自分が診済み のいずれかで表向き。
+        return card.revealed ||
+            state.peeked.contains(card.position) ||
+            card.diagnosedBy(viewer);
     }
   }
 
@@ -178,6 +189,8 @@ class GameScreen extends ConsumerWidget {
         return HumanHighlight.death;
       case ActionType.protect:
         return HumanHighlight.protect;
+      case ActionType.diagnose:
+        return HumanHighlight.diagnose;
       case null:
         return HumanHighlight.none;
     }

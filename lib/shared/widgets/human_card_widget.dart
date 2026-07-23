@@ -5,7 +5,7 @@ import '../../features/game/domain/human_card.dart';
 import '../utils/card_visuals.dart';
 
 /// 直近アクションのハイライト種別。
-enum HumanHighlight { none, life, death, protect }
+enum HumanHighlight { none, life, death, protect, diagnose }
 
 /// 中央3×3に並ぶ人間カード1枚（Ver.0.4）。
 ///
@@ -72,6 +72,8 @@ class _HumanCardWidgetState extends State<HumanCardWidget>
         return AppTheme.evil;
       case HumanHighlight.protect:
         return AppTheme.keep;
+      case HumanHighlight.diagnose:
+        return CardVisuals.diagnoseColor;
       case HumanHighlight.none:
         return AppTheme.good;
     }
@@ -91,17 +93,16 @@ class _HumanCardWidgetState extends State<HumanCardWidget>
       alignment: Alignment.center,
       children: [
         face,
-        // 左上の数字：表向きのときだけカードの得点（数字）を表示。
-        if (widget.faceUp)
-          Positioned(
-            top: 2,
-            left: 4,
-            child: Text('${card.points}',
-                style: TextStyle(
-                    fontSize: s * 0.2,
-                    fontWeight: FontWeight.bold,
-                    color: AppTheme.accent.withValues(alpha: 0.95))),
-          ),
+        // 左上の数字：得点は表裏を問わず常に表示（種類だけが伏せられる）。
+        Positioned(
+          top: 2,
+          left: 4,
+          child: Text('${card.points}',
+              style: TextStyle(
+                  fontSize: s * 0.2,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.accent.withValues(alpha: 0.95))),
+        ),
         // 保護バッジ。
         if (card.protected)
           Positioned(

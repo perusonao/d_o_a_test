@@ -42,6 +42,8 @@ class CardVisuals {
   }
 
   // --- アクションカード ---
+  static const Color diagnoseColor = Color(0xFF9B7EDE); // 紫（診）
+
   static IconData actionIcon(ActionType type) {
     switch (type) {
       case ActionType.life:
@@ -50,6 +52,8 @@ class CardVisuals {
         return Icons.dangerous;
       case ActionType.protect:
         return Icons.shield;
+      case ActionType.diagnose:
+        return Icons.search;
     }
   }
 
@@ -61,6 +65,8 @@ class CardVisuals {
         return AppTheme.evil;
       case ActionType.protect:
         return AppTheme.keep;
+      case ActionType.diagnose:
+        return diagnoseColor;
     }
   }
 
@@ -72,6 +78,8 @@ class CardVisuals {
         return '死';
       case ActionType.protect:
         return '保';
+      case ActionType.diagnose:
+        return '診';
     }
   }
 

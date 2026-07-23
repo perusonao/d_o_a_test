@@ -19,6 +19,8 @@ class GameLabels {
         return '死';
       case ActionType.protect:
         return '保';
+      case ActionType.diagnose:
+        return '診';
     }
   }
 
@@ -81,12 +83,12 @@ class GameEngine {
       playerA: Player(
         id: PlayerId.a,
         faction: playerAFaction,
-        hand: _buildHand(PlayerId.a),
+        hand: _buildHand(PlayerId.a, playerAFaction),
       ),
       playerB: Player(
         id: PlayerId.b,
         faction: playerBFaction,
-        hand: _buildHand(PlayerId.b),
+        hand: _buildHand(PlayerId.b, playerBFaction),
         isCpu: vsCpu,
       ),
       current: PlayerId.a,
@@ -94,12 +96,13 @@ class GameEngine {
     );
   }
 
-  List<ActionCard> _buildHand(PlayerId owner) {
+  List<ActionCard> _buildHand(PlayerId owner, Faction faction) {
+    final comp = GameConstants.handFor(faction);
     final hand = <ActionCard>[];
-    for (var i = 0; i < GameConstants.handComposition.length; i++) {
+    for (var i = 0; i < comp.length; i++) {
       hand.add(ActionCard(
         id: 'ac_${owner.name}_$i',
-        type: GameConstants.handComposition[i],
+        type: comp[i],
         owner: owner,
       ));
     }
@@ -124,6 +127,8 @@ class GameEngine {
   /// そのアクションが対象の状態（生死・保護）を変化させるか。
   static bool changesState(ActionType type, HumanCard target) {
     switch (type) {
+      case ActionType.diagnose:
+        return false; // 状態は変えない（情報アクション）
       case ActionType.protect:
         return !target.protected; // 未保護なら保護が付く
       case ActionType.life:
@@ -135,7 +140,9 @@ class GameEngine {
   }
 
   /// 「表向きカードへの、状態が変化しないアクション」など禁止手か。
+  /// 診（情報アクション）は状態ルールの対象外（別途プレイヤー視点で判定）。
   static bool isNoOpBlocked(ActionType type, HumanCard target) {
+    if (type == ActionType.diagnose) return false;
     // 二重保護は常に禁止（保護は表裏問わず見える）。
     if (type == ActionType.protect && target.protected) return true;
     // 表向き（公開済み）カードへの無変化アクションは禁止。
@@ -154,6 +161,12 @@ class GameEngine {
     if (position == null) return '対象の人間カードを選んでください。';
     if (position < 0 || position >= GameConstants.humanCardCount) {
       return '対象を選び直してください。';
+    }
+    if (card.type == ActionType.diagnose) {
+      if (state.canSeeFace(state.current, position)) {
+        return 'そのカードの正体はすでに分かっています。';
+      }
+      return null;
     }
     final target = state.humanAt(position);
     if (isNoOpBlocked(card.type, target)) {
@@ -177,6 +190,14 @@ class GameEngine {
     var protectAbsorbed = false;
 
     switch (card.type) {
+      case ActionType.diagnose:
+        // 現在プレイヤーだけが正体を知る（公開しない・状態変化なし）。
+        final isA = action.player == PlayerId.a;
+        updated = target.copyWith(
+          diagnosedByA: isA ? true : target.diagnosedByA,
+          diagnosedByB: !isA ? true : target.diagnosedByB,
+        );
+        break;
       case ActionType.protect:
         // 保護を付与。公開しない。
         updated = target.copyWith(protected: true);

@@ -10,6 +10,8 @@ class HumanCard {
     this.state = CardState.alive,
     this.protected = false,
     this.revealed = false,
+    this.diagnosedByA = false,
+    this.diagnosedByB = false,
   });
 
   /// 一意な ID。
@@ -33,10 +35,16 @@ class HumanCard {
   /// 公開状態（生/死を受けると公開、以後は戻らない）。
   final bool revealed;
 
+  /// 「診」で正体を確認したプレイヤー（自分だけに見える・非公開）。
+  final bool diagnosedByA;
+  final bool diagnosedByB;
+
   HumanCard copyWith({
     CardState? state,
     bool? protected,
     bool? revealed,
+    bool? diagnosedByA,
+    bool? diagnosedByB,
   }) {
     return HumanCard(
       id: id,
@@ -46,8 +54,14 @@ class HumanCard {
       state: state ?? this.state,
       protected: protected ?? this.protected,
       revealed: revealed ?? this.revealed,
+      diagnosedByA: diagnosedByA ?? this.diagnosedByA,
+      diagnosedByB: diagnosedByB ?? this.diagnosedByB,
     );
   }
+
+  /// 指定プレイヤーが「診」済みか。
+  bool diagnosedBy(PlayerId id) =>
+      id == PlayerId.a ? diagnosedByA : diagnosedByB;
 
   bool get isAlive => state == CardState.alive;
   bool get isDead => state == CardState.dead;

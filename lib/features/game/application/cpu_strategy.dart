@@ -22,7 +22,6 @@ class CpuStrategy {
     final usable = me.usableCards;
     if (usable.isEmpty) return null;
 
-    final myRow = GameState.knownRowOf(owner);
     final saviorSide = me.faction == Faction.savior;
 
     GameAction? best;
@@ -32,7 +31,13 @@ class CpuStrategy {
       for (final human in state.humans) {
         // 禁止手（表向きカードへの無変化・二重保護）は選ばない。
         if (GameEngine.isNoOpBlocked(card.type, human)) continue;
-        final score = _score(card, human, myRow, saviorSide);
+        // 診：既に正体が分かっているカードには使わない。
+        if (card.type == ActionType.diagnose &&
+            state.canSeeFace(owner, human.position)) {
+          continue;
+        }
+        final known = state.canSeeFace(owner, human.position);
+        final score = _score(card, human, known, saviorSide);
         // 同点はランダムに揺らして単調な手を避ける。
         final jittered = score + _random.nextDouble() * 0.01;
         if (jittered > bestScore) {
@@ -74,18 +79,19 @@ class CpuStrategy {
   }
 
   double _score(
-      ActionCard card, HumanCard human, int myRow, bool saviorSide) {
-    final known = human.row == myRow || human.revealed;
+      ActionCard card, HumanCard human, bool known, bool saviorSide) {
+    // 得点は常に見えるので、未知でも points は使える（正体＝種類だけが不明）。
     final points = human.points.toDouble();
 
     if (!known) {
-      // 未知カード：正体・得点とも不明。無駄・危険を避ける。
+      // 正体不明：無駄・危険を避けつつ、高得点カードは診で確認する価値。
       switch (card.type) {
+        case ActionType.diagnose:
+          return points * 0.35; // 高得点の未知を優先して確認
         case ActionType.life:
-          // 生存中のカードに生＝無変化（安全な消化先）。死んでいれば復活は不明。
           return human.isAlive ? -0.2 : -0.6;
         case ActionType.death:
-          return -0.7; // 未知を殺すのは危険（自陣の可能性）。
+          return -0.7; // 未知を殺すのは危険（自陣の可能性）
         case ActionType.protect:
           return -0.4;
       }
@@ -94,6 +100,8 @@ class CpuStrategy {
     final wantAlive = _wantAlive(human.type, saviorSide);
 
     switch (card.type) {
+      case ActionType.diagnose:
+        return -0.5; // 既知への診は無駄
       case ActionType.life:
         if (wantAlive && human.isDead) return points; // 望む生存へ復活
         if (!wantAlive && human.isDead) return -points; // 復活は損
@@ -103,9 +111,8 @@ class CpuStrategy {
         if (wantAlive && human.isAlive) return -points; // 味方を殺すのは損
         return -0.1; // 死亡中に死＝無変化
       case ActionType.protect:
-        if (human.protected) return -1.0; // 二重保護は無駄
+        if (human.protected) return -1.0;
         final inDesired = wantAlive == human.isAlive;
-        // 望ましい状態のカードを封じる（相手の反転を防ぐ）。得点が高いほど有効。
         return inDesired ? points * 0.5 : -points * 0.3;
     }
   }

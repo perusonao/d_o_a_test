@@ -11,9 +11,10 @@ import 'package:flutter_test/flutter_test.dart';
 ({String cardId, int pos})? findValidMove(GameState s) {
   for (final card in s.currentPlayer.usableCards) {
     for (final h in s.humans) {
-      if (!GameEngine.isNoOpBlocked(card.type, h)) {
-        return (cardId: card.id, pos: h.position);
-      }
+      final ok = card.type == ActionType.diagnose
+          ? !s.canSeeFace(s.current, h.position)
+          : !GameEngine.isNoOpBlocked(card.type, h);
+      if (ok) return (cardId: card.id, pos: h.position);
     }
   }
   return null;

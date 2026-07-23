@@ -206,6 +206,52 @@ void main() {
     });
   });
 
+  group('診カード', () {
+    ActionCard diagCard(GameState s) =>
+        s.currentPlayer.hand.firstWhere((c) => c.type == ActionType.diagnose,
+            orElse: () => ActionCard(
+                id: 'diag', type: ActionType.diagnose, owner: s.current));
+
+    test('診は自分だけ正体を確認でき、公開・状態変化しない', () {
+      // 位置4(中段=誰も知らない)を対象にする。
+      final humans = [
+        for (var i = 0; i < 9; i++)
+          human(i, i == 4 ? HumanType.evil : HumanType.neutral, i == 4 ? 3 : 1)
+      ];
+      var s = buildState(humans: humans);
+      s = GameState(
+        humans: s.humans,
+        playerA: s.playerA.copyWith(hand: const [
+          ActionCard(
+              id: 'A_diag', type: ActionType.diagnose, owner: PlayerId.a),
+        ]),
+        playerB: s.playerB,
+        current: PlayerId.a,
+        phase: GamePhase.playing,
+      );
+      final before = s.humanAt(4);
+      expect(s.canSeeFace(PlayerId.a, 4), isFalse);
+      s = engine.applyAction(
+          s,
+          GameAction(
+              player: PlayerId.a, actionCardId: 'A_diag', targetPosition: 4));
+      final after = s.humanAt(4);
+      expect(after.revealed, isFalse); // 公開されない
+      expect(after.state, before.state); // 状態不変
+      expect(s.canSeeFace(PlayerId.a, 4), isTrue); // A は見える
+      expect(s.canSeeFace(PlayerId.b, 4), isFalse); // B は見えない
+    });
+
+    test('validate: 既に見えているカードへの診は禁止', () {
+      var s = engine.setup(Faction.savior);
+      s = engine.confirmPeek(s); // playing
+      // A の既知は下段(6,7,8)。位置6は既知なので診は無駄→禁止。
+      final diag = diagCard(s);
+      final err = engine.validate(s, actionCardId: diag.id, position: 6);
+      expect(err, isNotNull);
+    });
+  });
+
   group('セットアップ', () {
     test('9枚・善中悪3枚ずつ・各種類の得点は1,2,3', () {
       final s = engine.setup(Faction.savior);
