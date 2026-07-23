@@ -7,11 +7,15 @@ class Player {
     required this.id,
     required this.faction,
     required this.hand,
+    this.isCpu = false,
   });
 
   final PlayerId id;
   final Faction faction;
   final List<ActionCard> hand;
+
+  /// この席が CPU 操作かどうか。
+  final bool isCpu;
 
   List<ActionCard> get usableCards =>
       hand.where((c) => !c.used).toList(growable: false);
@@ -26,6 +30,7 @@ class Player {
       id: id,
       faction: faction,
       hand: hand ?? this.hand,
+      isCpu: isCpu,
     );
   }
 }

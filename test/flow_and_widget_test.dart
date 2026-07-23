@@ -43,7 +43,7 @@ void main() {
     await tester.tap(find.text('Aが救済者で開始'));
     await tester.pumpAndSettle();
 
-    // 確認フェーズのボタンが出る。
-    expect(find.text('確認した → プレイヤーBへ'), findsOneWidget);
+    // 確認フェーズのボタンが出る（既定は CPU 対戦なので確認後すぐ開始）。
+    expect(find.text('確認した → ゲーム開始'), findsOneWidget);
   });
 }

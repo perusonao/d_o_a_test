@@ -16,6 +16,8 @@ class GameState {
     this.lastActionPosition,
     this.lastActionType,
     this.lastProtectAbsorbed = false,
+    this.peeked = const <int>{},
+    this.isBusy = false,
   });
 
   /// 中央の人間カード9枚（position 順）。
@@ -42,8 +44,21 @@ class GameState {
   /// 直近の行動が保護で吸収されたか（アニメーション用）。
   final bool lastProtectAbsorbed;
 
+  /// 現在の手番プレイヤーが「のぞき見」して表向きにしている位置（自分の既知カード）。
+  final Set<int> peeked;
+
+  /// CPU の思考・演出中など、入力を止めるフラグ。
+  final bool isBusy;
+
   Player player(PlayerId id) => id == PlayerId.a ? playerA : playerB;
   Player get currentPlayer => player(current);
+
+  /// そのプレイヤーが初期に確認できる列（A=左0 / B=右2）。
+  static int knownColumnOf(PlayerId id) => id == PlayerId.a ? 0 : 2;
+
+  /// 位置 [position] が [id] の既知カードか。
+  bool isKnownBy(PlayerId id, int position) =>
+      position % 3 == knownColumnOf(id);
 
   HumanCard humanAt(int position) =>
       humans.firstWhere((h) => h.position == position);
@@ -63,6 +78,8 @@ class GameState {
     int? lastActionPosition,
     ActionType? lastActionType,
     bool? lastProtectAbsorbed,
+    Set<int>? peeked,
+    bool? isBusy,
     bool clearSelection = false,
     bool clearMessage = false,
   }) {
@@ -81,6 +98,8 @@ class GameState {
       lastActionPosition: lastActionPosition ?? this.lastActionPosition,
       lastActionType: lastActionType ?? this.lastActionType,
       lastProtectAbsorbed: lastProtectAbsorbed ?? this.lastProtectAbsorbed,
+      peeked: peeked ?? this.peeked,
+      isBusy: isBusy ?? this.isBusy,
     );
   }
 }

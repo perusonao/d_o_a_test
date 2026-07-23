@@ -20,6 +20,7 @@ class HumanCardWidget extends StatefulWidget {
     this.onTap,
     this.highlight = HumanHighlight.none,
     this.size = 96,
+    this.peekable = false,
   });
 
   final HumanCard card;
@@ -29,6 +30,9 @@ class HumanCardWidget extends StatefulWidget {
   final VoidCallback? onTap;
   final HumanHighlight highlight;
   final double size;
+
+  /// 「タップでのぞき見できる」ヒント（目アイコン）を表示するか。
+  final bool peekable;
 
   @override
   State<HumanCardWidget> createState() => _HumanCardWidgetState();
@@ -103,6 +107,14 @@ class _HumanCardWidgetState extends State<HumanCardWidget>
             top: 2,
             right: 2,
             child: Icon(Icons.shield, color: AppTheme.keep, size: s * 0.26),
+          ),
+        // のぞき見ヒント（自分の既知カード）。
+        if (widget.peekable)
+          Positioned(
+            bottom: 2,
+            right: 3,
+            child: Icon(Icons.visibility,
+                color: AppTheme.good.withValues(alpha: 0.85), size: s * 0.22),
           ),
         // フラッシュ。
         IgnorePointer(

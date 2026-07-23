@@ -7,12 +7,19 @@ import '../../app/theme.dart';
 import '../game/application/game_controller.dart';
 import '../game/domain/enums.dart';
 
-/// タイトル画面（Ver.0.4）。プレイヤーAの陣営を選んで開始する。
-class TitleScreen extends ConsumerWidget {
+/// タイトル画面（Ver.0.4）。対戦モードとプレイヤーAの陣営を選んで開始する。
+class TitleScreen extends ConsumerStatefulWidget {
   const TitleScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<TitleScreen> createState() => _TitleScreenState();
+}
+
+class _TitleScreenState extends ConsumerState<TitleScreen> {
+  bool _vsCpu = true;
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
         child: Center(
@@ -24,30 +31,32 @@ class TitleScreen extends ConsumerWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(Icons.balance,
-                      size: 60, color: AppTheme.accent.withValues(alpha: 0.9)),
-                  const SizedBox(height: 14),
+                      size: 56, color: AppTheme.accent.withValues(alpha: 0.9)),
+                  const SizedBox(height: 12),
                   const Text('DEAD OR ALIVE',
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                          fontSize: 38,
+                          fontSize: 36,
                           fontWeight: FontWeight.bold,
                           letterSpacing: 3,
                           color: AppTheme.good)),
                   const SizedBox(height: 2),
                   const Text('（仮）',
                       style: TextStyle(fontSize: 15, color: AppTheme.neutral)),
-                  const SizedBox(height: 8),
-                  const Text('2人対戦 心理戦カードゲーム（同じ端末で交互に）',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 13, color: Color(0xFFB9B2A2))),
-                  const SizedBox(height: 36),
-                  const Text('プレイヤーAの陣営を選んで開始',
-                      style:
-                          TextStyle(fontSize: 13, color: Color(0xFFCFC7B5))),
+                  const SizedBox(height: 24),
+
+                  // モード選択。
+                  _modeToggle(),
+                  const SizedBox(height: 20),
+
+                  Text(
+                      _vsCpu
+                          ? 'あなた（プレイヤーA）の陣営を選んで開始'
+                          : 'プレイヤーAの陣営を選んで開始',
+                      style: const TextStyle(
+                          fontSize: 13, color: Color(0xFFCFC7B5))),
                   const SizedBox(height: 12),
                   _startButton(
-                    context,
-                    ref,
                     icon: Icons.shield_moon,
                     color: AppTheme.alive,
                     label: 'Aが救済者で開始',
@@ -55,8 +64,6 @@ class TitleScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 12),
                   _startButton(
-                    context,
-                    ref,
                     icon: Icons.gavel,
                     color: AppTheme.evil,
                     label: 'Aが執行者で開始',
@@ -77,9 +84,46 @@ class TitleScreen extends ConsumerWidget {
     );
   }
 
-  Widget _startButton(
-    BuildContext context,
-    WidgetRef ref, {
+  Widget _modeToggle() {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppTheme.accent.withValues(alpha: 0.3)),
+      ),
+      padding: const EdgeInsets.all(4),
+      child: Row(
+        children: [
+          _modeChip('CPU対戦', true),
+          _modeChip('2人対戦', false),
+        ],
+      ),
+    );
+  }
+
+  Widget _modeChip(String label, bool cpu) {
+    final active = _vsCpu == cpu;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _vsCpu = cpu),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            color: active ? AppTheme.accent : Colors.transparent,
+          ),
+          child: Text(label,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  color: active ? Colors.black : const Color(0xFFB9B2A2),
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14)),
+        ),
+      ),
+    );
+  }
+
+  Widget _startButton({
     required IconData icon,
     required Color color,
     required String label,
@@ -90,7 +134,9 @@ class TitleScreen extends ConsumerWidget {
       child: ElevatedButton.icon(
         style: ElevatedButton.styleFrom(backgroundColor: color),
         onPressed: () {
-          ref.read(gameControllerProvider.notifier).startGame(faction);
+          ref
+              .read(gameControllerProvider.notifier)
+              .startGame(faction, vsCpu: _vsCpu);
           context.go(AppRoutes.game);
         },
         icon: Icon(icon),

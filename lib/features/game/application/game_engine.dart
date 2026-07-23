@@ -47,7 +47,8 @@ class GameEngine {
   final Random _random;
 
   /// 対戦を初期化する。プレイヤーAの陣営を指定し、Bは反対陣営になる。
-  GameState setup(Faction playerAFaction) {
+  /// [vsCpu] が true のとき、プレイヤーBを CPU にする。
+  GameState setup(Faction playerAFaction, {bool vsCpu = false}) {
     // 9枚の人間カード（善人/中立/悪人 × 得点1/2/3）を生成しシャッフル配置。
     final cards = <HumanCard>[];
     var seq = 0;
@@ -86,6 +87,7 @@ class GameEngine {
         id: PlayerId.b,
         faction: playerBFaction,
         hand: _buildHand(PlayerId.b),
+        isCpu: vsCpu,
       ),
       current: PlayerId.a,
       phase: GamePhase.peekA,
@@ -105,10 +107,13 @@ class GameEngine {
   }
 
   /// 確認フェーズを進める（peekA → peekB → playing）。
+  /// CPU 対戦のときは B の確認フェーズを省略する。
   GameState confirmPeek(GameState state) {
     switch (state.phase) {
       case GamePhase.peekA:
-        return state.copyWith(phase: GamePhase.peekB);
+        return state.copyWith(
+          phase: state.playerB.isCpu ? GamePhase.playing : GamePhase.peekB,
+        );
       case GamePhase.peekB:
         return state.copyWith(phase: GamePhase.playing);
       default:
@@ -184,6 +189,7 @@ class GameEngine {
       lastActionPosition: action.targetPosition,
       lastActionType: card.type,
       lastProtectAbsorbed: protectAbsorbed,
+      peeked: const <int>{}, // 手番交代でのぞき見はリセット
       clearSelection: true,
       clearMessage: true,
     );

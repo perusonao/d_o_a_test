@@ -95,7 +95,8 @@ class GameScreen extends ConsumerWidget {
   Widget _board(WidgetRef ref, GameState state, double size, double gap) {
     final humans = [...state.humans]
       ..sort((a, b) => a.position.compareTo(b.position));
-    final selectable = state.phase == GamePhase.playing;
+    final playing = state.phase == GamePhase.playing;
+    final interactive = playing && !state.isBusy && !state.currentPlayer.isCpu;
     return Center(
       child: SizedBox(
         width: size * 3 + gap * 2,
@@ -104,12 +105,17 @@ class GameScreen extends ConsumerWidget {
           runSpacing: gap,
           alignment: WrapAlignment.center,
           children: humans.map((hcard) {
+            final canPeek = interactive &&
+                state.isKnownBy(state.current, hcard.position) &&
+                !hcard.revealed &&
+                !state.peeked.contains(hcard.position);
             return HumanCardWidget(
               card: hcard,
               faceUp: _faceUp(state, hcard),
               size: size,
               selected: state.selectedPosition == hcard.position,
-              selectable: selectable,
+              selectable: interactive,
+              peekable: canPeek,
               highlight: _highlight(state, hcard),
               onTap: () => ref
                   .read(gameControllerProvider.notifier)
@@ -130,7 +136,7 @@ class GameScreen extends ConsumerWidget {
       case GamePhase.peekB:
         return card.column == 2; // 右列
       case GamePhase.playing:
-        return card.revealed;
+        return card.revealed || state.peeked.contains(card.position);
     }
   }
 
@@ -195,7 +201,7 @@ class _Header extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                      '${cur.id == PlayerId.a ? "プレイヤーA" : "プレイヤーB"}の番'
+                      '${cur.id == PlayerId.a ? "プレイヤーA" : "プレイヤーB"}${cur.isCpu ? "(CPU)" : ""}の番'
                       '（${CardVisuals.factionLabel(cur.faction)}）',
                       style: TextStyle(
                           color: curColor,
@@ -244,6 +250,8 @@ class _PeekBar extends ConsumerWidget {
     final isA = state.phase == GamePhase.peekA;
     final who = isA ? 'プレイヤーA' : 'プレイヤーB';
     final side = isA ? '左列' : '右列';
+    // CPU 対戦では A の確認後すぐ対戦開始（B の確認は無い）。
+    final nextIsStart = !isA || state.playerB.isCpu;
     return Container(
       decoration: const BoxDecoration(
         color: AppTheme.surface,
@@ -265,7 +273,7 @@ class _PeekBar extends ConsumerWidget {
                 onPressed: () =>
                     ref.read(gameControllerProvider.notifier).confirmPeek(),
                 icon: const Icon(Icons.visibility_off),
-                label: Text(isA ? '確認した → プレイヤーBへ' : '確認した → ゲーム開始'),
+                label: Text(nextIsStart ? '確認した → ゲーム開始' : '確認した → プレイヤーBへ'),
               ),
             ),
           ],
@@ -295,7 +303,9 @@ class _HandArea extends ConsumerWidget {
         }
       }
     }
-    final canConfirm = state.selectedActionCardId != null &&
+    final interactive = !state.isBusy && !state.currentPlayer.isCpu;
+    final canConfirm = interactive &&
+        state.selectedActionCardId != null &&
         state.selectedPosition != null;
 
     return Container(
@@ -342,7 +352,7 @@ class _HandArea extends ConsumerWidget {
                   card: card,
                   width: lifeWidth,
                   selected: state.selectedActionCardId == card.id,
-                  enabled: true,
+                  enabled: interactive,
                   onTap: () => controller.selectActionCard(card.id),
                 );
               }).toList(),
@@ -357,7 +367,7 @@ class _HandArea extends ConsumerWidget {
                   padding: const EdgeInsets.symmetric(vertical: 8),
                 ),
                 icon: const Icon(Icons.check, size: 18),
-                label: const Text('決定'),
+                label: Text(interactive ? '決定' : 'CPU の番…'),
               ),
             ),
           ],
