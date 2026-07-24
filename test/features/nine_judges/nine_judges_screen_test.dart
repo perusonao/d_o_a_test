@@ -11,7 +11,11 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(const MaterialApp(home: NineJudgesGameScreen()));
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: NineJudgesGameScreen(initialSettings: NineJudgesGameSettings()),
+      ),
+    );
 
     expect(find.byType(Scrollable), findsNothing);
     expect(find.byKey(const Key('judge-slot-0')), findsOneWidget);
@@ -22,6 +26,19 @@ void main() {
     expect(find.byKey(const Key('judge-button')), findsOneWidget);
     expect(find.textContaining('SAVE'), findsNothing);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('対戦モードとEASY・NORMALを選択できる', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: NineJudgesGameScreen()));
+    expect(find.text('CPU対戦'), findsOneWidget);
+    expect(find.text('2人対戦'), findsOneWidget);
+    expect(find.text('EASY'), findsOneWidget);
+    expect(find.text('NORMAL'), findsOneWidget);
+    await tester.tap(find.text('EASY'));
+    await tester.tap(find.byKey(const Key('start-game')));
+    await tester.pump();
+    expect(find.textContaining('救済者（あなた）'), findsOneWidget);
+    expect(find.textContaining('執行者（CPU）'), findsOneWidget);
   });
 
   testWidgets('人物カードに未知数字・LIFE防護・判決済みを明示する', (tester) async {
