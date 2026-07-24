@@ -1,0 +1,59 @@
+name: Deploy to GitHub Pages
+
+# Flutter Web をビルドし、成果物を gh-pages ブランチへ公開するワークフロー。
+# GitHub Actions 環境（github-pages environment）の権限に依存しないよう、
+# ビルド成果物を gh-pages ブランチへ push する方式を採用している。
+# 初回のみ、リポジトリの Settings > Pages で
+# 「Deploy from a branch」→ ブランチ「gh-pages」/(root) を選択して有効化する。
+
+on:
+  push:
+    branches:
+      - main
+      - agent/nine-judges-prototype
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pages-deploy
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Test
+        run: flutter test
+
+      - name: Build web
+        run: flutter build web --release --base-href /d_o_a_test/ --no-web-resources-cdn
+
+      - name: Publish to gh-pages branch
+        run: |
+          cd build/web
+          touch .nojekyll
+          git init -q
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Deploy ${GITHUB_SHA}"
+          git branch -M gh-pages
+          git push -f "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" gh-pages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

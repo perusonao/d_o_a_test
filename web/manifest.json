@@ -1,0 +1,35 @@
+{
+    "name": "9人の審判",
+    "short_name": "9人の審判",
+    "start_url": ".",
+    "display": "standalone",
+    "background_color": "#09090B",
+    "theme_color": "#09090B",
+    "description": "1対1心理戦カードゲーム 9人の審判",
+    "orientation": "portrait-primary",
+    "prefer_related_applications": false,
+    "icons": [
+        {
+            "src": "icons/Icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "icons/Icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        },
+        {
+            "src": "icons/Icon-maskable-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "maskable"
+        },
+        {
+            "src": "icons/Icon-maskable-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
+        }
+    ]
+}
