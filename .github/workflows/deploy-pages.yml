@@ -9,7 +9,8 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches:
-      - claude/dead-or-alive-prototype-1jzks6
+      - main
+      - agent/nine-judges-prototype
   workflow_dispatch:
 
 permissions:

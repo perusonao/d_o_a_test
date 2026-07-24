@@ -1,19 +1,18 @@
+import 'package:dead_or_alive/features/nine_judges/screens/game_screen.dart';
 import 'package:flutter/material.dart';
 
-import 'router.dart';
 import 'theme.dart';
 
-/// アプリのルート Widget。
 class DeadOrAliveApp extends StatelessWidget {
   const DeadOrAliveApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp.router(
-      title: 'DEAD OR ALIVE（仮）',
+    return MaterialApp(
+      title: '9人の審判',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.build(),
-      routerConfig: appRouter,
+      home: const NineJudgesGameScreen(),
     );
   }
 }

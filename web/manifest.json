@@ -1,11 +1,11 @@
 {
-    "name": "dead_or_alive",
-    "short_name": "dead_or_alive",
+    "name": "9人の審判",
+    "short_name": "9人の審判",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#09090B",
+    "theme_color": "#09090B",
+    "description": "1対1心理戦カードゲーム 9人の審判",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

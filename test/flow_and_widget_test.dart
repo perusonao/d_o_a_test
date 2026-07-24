@@ -1,9 +1,9 @@
 import 'package:dead_or_alive/app/app.dart';
-import 'package:dead_or_alive/app/router.dart';
 import 'package:dead_or_alive/features/game/application/game_controller.dart';
 import 'package:dead_or_alive/features/game/application/game_engine.dart';
 import 'package:dead_or_alive/features/game/domain/enums.dart';
 import 'package:dead_or_alive/features/game/domain/game_state.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -49,16 +49,10 @@ void main() {
     expect(r!.saviorScore + r.executionerScore, 18);
   });
 
-  testWidgets('タイトル→開始で確認フェーズに入る', (tester) async {
-    appRouter.go(AppRoutes.title);
+  testWidgets('9人の審判の盤面を表示する', (tester) async {
     await tester.pumpWidget(const ProviderScope(child: DeadOrAliveApp()));
-    await tester.pumpAndSettle();
-
-    expect(find.text('DEAD OR ALIVE'), findsOneWidget);
-    await tester.tap(find.text('Aが救済者で開始'));
-    await tester.pumpAndSettle();
-
-    // 確認フェーズのボタンが出る（既定は CPU 対戦なので確認後すぐ開始）。
-    expect(find.text('確認した → ゲーム開始'), findsOneWidget);
+    expect(find.text('9人の審判'), findsOneWidget);
+    expect(find.byKey(const Key('judge-slot-0')), findsOneWidget);
+    expect(find.byKey(const Key('save-button')), findsOneWidget);
   });
 }
