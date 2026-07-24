@@ -24,8 +24,23 @@ void main() {
     expect(find.text('DEATH'), findsOneWidget);
     expect(find.text('EYE'), findsOneWidget);
     expect(find.byKey(const Key('judge-button')), findsOneWidget);
+    expect(find.byKey(const Key('rules-button')), findsOneWidget);
+    expect(find.text('アクションを選択してください'), findsOneWidget);
     expect(find.textContaining('SAVE'), findsNothing);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('ルール概要を右上の？から確認できる', (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: NineJudgesGameScreen(initialSettings: NineJudgesGameSettings()),
+      ),
+    );
+    await tester.tap(find.byKey(const Key('rules-button')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('rules-dialog')), findsOneWidget);
+    expect(find.text('死→生 / 生ならDEATHを1回防ぐ'), findsOneWidget);
+    expect(find.text('現在の生死で最終確定'), findsOneWidget);
   });
 
   testWidgets('対戦モードとEASY・NORMALを選択できる', (tester) async {

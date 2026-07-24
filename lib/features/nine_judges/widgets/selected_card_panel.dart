@@ -10,12 +10,7 @@ class SelectedCardPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final index = controller.selectedSlot;
     if (index == null) {
-      return const SizedBox(
-        height: 34,
-        child: Center(
-          child: Text('アクションを選び、対象をタップ', style: TextStyle(fontSize: 12)),
-        ),
-      );
+      return const SizedBox(height: 20);
     }
     final slot = controller.board[index];
     final person = slot.person;
@@ -27,7 +22,7 @@ class SelectedCardPanel extends StatelessWidget {
         ? '${slot.hiddenNumber}'
         : '?';
     return SizedBox(
-      height: 34,
+      height: 20,
       child: Center(
         child: Text(
           '$attribute${person.rank} ｜ ${person.isAlive ? '生' : '死'} ｜ '
@@ -36,7 +31,9 @@ class SelectedCardPanel extends StatelessWidget {
               : person.isJudged
               ? '判決済み'
               : '未判決'}',
-          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600),
         ),
       ),
     );
