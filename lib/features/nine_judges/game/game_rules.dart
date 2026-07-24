@@ -1,4 +1,4 @@
-﻿import 'dart:math';
+import 'dart:math';
 
 import 'package:dead_or_alive/features/nine_judges/game/game_config.dart';
 import 'package:dead_or_alive/features/nine_judges/models/judge_models.dart';
@@ -24,21 +24,19 @@ abstract final class NineJudgesRules {
 
   static bool isAttributeVisible(
     PersonCard person, {
-    required bool viewerHasJudged,
     required bool revealAll,
-  }) => revealAll || !person.hidesAttributeWhenDead || viewerHasJudged;
+  }) => revealAll || !person.hidesAttributeWhenDead;
 
   static bool canUseAction({
     required ActionType action,
     required PersonCard person,
-    required bool viewerHasJudged,
+    required bool viewerKnowsNumber,
   }) {
     if (person.isJudged) return false;
     return switch (action) {
-      ActionType.life => !person.isAlive,
-      ActionType.death => person.isAlive,
-      ActionType.judge =>
-        !person.isAlive && person.hidesAttributeWhenDead && !viewerHasJudged,
+      ActionType.life => !person.isAlive || !person.hasLifeShield,
+      ActionType.death => true,
+      ActionType.eye => !viewerKnowsNumber,
     };
   }
 

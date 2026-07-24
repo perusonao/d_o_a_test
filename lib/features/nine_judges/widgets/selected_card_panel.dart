@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:dead_or_alive/features/nine_judges/game/game_controller.dart';
 
 class SelectedCardPanel extends StatelessWidget {
@@ -31,7 +31,11 @@ class SelectedCardPanel extends StatelessWidget {
       child: Center(
         child: Text(
           '$attribute${person.rank} ｜ ${person.isAlive ? '生' : '死'} ｜ '
-          '数字 $number ｜ ${person.isJudged ? '判決済み' : '未判決'}',
+          '数字 $number ｜ ${person.hasLifeShield
+              ? 'LIFE防護あり'
+              : person.isJudged
+              ? '判決済み'
+              : '未判決'}',
           style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
         ),
       ),

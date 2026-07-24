@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:dead_or_alive/features/nine_judges/game/game_controller.dart';
 import 'package:dead_or_alive/features/nine_judges/models/judge_models.dart';
 import 'package:dead_or_alive/features/nine_judges/screens/handoff_screen.dart';
@@ -60,10 +60,11 @@ class _GameBoard extends StatelessWidget {
         ? const Color(0xFF71B9F0)
         : const Color(0xFFE36A62);
     final instruction = switch (controller.phase) {
-      TurnPhase.selectingAction => 'アクションを選択',
-      TurnPhase.selectingTarget => '${controller.selectedAction!.label}の対象を選択',
-      TurnPhase.awaitingSave => 'アクション完了。SAVEしてください',
-      TurnPhase.selectingSave => '判決する人物を選択',
+      TurnPhase.selectingAction => 'LIFE / DEATH / EYEを選択',
+      TurnPhase.selectingActionTarget =>
+        '${controller.selectedAction!.label}の対象人物を選択',
+      TurnPhase.awaitingJudge => 'JUDGEしてターンを終了',
+      TurnPhase.selectingJudgeTarget => '判決する人物を選択',
     };
     return Scaffold(
       body: SafeArea(
@@ -88,7 +89,7 @@ class _GameBoard extends StatelessWidget {
                             ),
                           ),
                         ),
-                        Text('Turn ${controller.turn}'),
+                        Text('TURN ${controller.turn}'),
                         IconButton(
                           key: const Key('settings-button'),
                           visualDensity: VisualDensity.compact,
@@ -105,7 +106,10 @@ class _GameBoard extends StatelessWidget {
                       children: [
                         Expanded(
                           child: Text(
-                            '救済者 ${controller.debugMode ? controller.score.savior : '—'}',
+                            controller.debugMode
+                                ? '救済者 ${controller.score.savior}'
+                                : '救済者\n善・中立→生 / 悪→死',
+                            maxLines: 2,
                             style: const TextStyle(color: Color(0xFF71B9F0)),
                           ),
                         ),
@@ -118,7 +122,10 @@ class _GameBoard extends StatelessWidget {
                         ),
                         Expanded(
                           child: Text(
-                            '執行者 ${controller.debugMode ? controller.score.executor : '—'}',
+                            controller.debugMode
+                                ? '執行者 ${controller.score.executor}'
+                                : '執行者\n善・中立→死 / 悪→生',
+                            maxLines: 2,
                             textAlign: TextAlign.right,
                             style: const TextStyle(color: Color(0xFFE36A62)),
                           ),

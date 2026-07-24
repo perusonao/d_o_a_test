@@ -1,4 +1,4 @@
-﻿import 'dart:math';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:dead_or_alive/features/nine_judges/game/game_config.dart';
@@ -13,9 +13,9 @@ class NineJudgesController extends ChangeNotifier {
   final Random _random;
   late List<BoardSlot> board;
   late Map<Faction, ActionInventory> inventories;
-  final Map<Faction, Set<String>> judgedKnowledge = {
-    Faction.savior: <String>{},
-    Faction.executor: <String>{},
+  final Map<Faction, Set<int>> knownNumberSlots = {
+    Faction.savior: <int>{},
+    Faction.executor: <int>{},
   };
   final List<GameLogEntry> logs = [];
 
@@ -38,9 +38,12 @@ class NineJudgesController extends ChangeNotifier {
       Faction.savior: NineJudgesConfig.initialInventory,
       Faction.executor: NineJudgesConfig.initialInventory,
     };
-    judgedKnowledge
-      ..[Faction.savior]!.clear()
-      ..[Faction.executor]!.clear();
+    knownNumberSlots[Faction.savior]!
+      ..clear()
+      ..addAll(NineJudgesConfig.saviorKnownNumberSlots);
+    knownNumberSlots[Faction.executor]!
+      ..clear()
+      ..addAll(NineJudgesConfig.executorKnownNumberSlots);
     logs.clear();
     currentPlayer = Faction.savior;
     phase = TurnPhase.selectingAction;
@@ -60,29 +63,23 @@ class NineJudgesController extends ChangeNotifier {
 
   bool knowsNumber(int slotIndex, Faction viewer) {
     if (debugMode || isFinished) return true;
-    final known = viewer == Faction.savior
-        ? NineJudgesConfig.saviorKnownNumberSlots
-        : NineJudgesConfig.executorKnownNumberSlots;
-    return known.contains(slotIndex);
+    return knownNumberSlots[viewer]!.contains(slotIndex);
   }
 
   bool knowsAttribute(PersonCard person, Faction viewer) =>
       NineJudgesRules.isAttributeVisible(
         person,
-        viewerHasJudged: judgedKnowledge[viewer]!.contains(person.id),
         revealAll: debugMode || isFinished,
       );
 
   bool canSelectAction(ActionType action) =>
       phase == TurnPhase.selectingAction &&
       currentInventory.remaining(action) > 0 &&
-      board.any(
-        (slot) => NineJudgesRules.canUseAction(
+      board.asMap().entries.any(
+        (entry) => NineJudgesRules.canUseAction(
           action: action,
-          person: slot.person,
-          viewerHasJudged: judgedKnowledge[currentPlayer]!.contains(
-            slot.person.id,
-          ),
+          person: entry.value.person,
+          viewerKnowsNumber: knowsNumber(entry.key, currentPlayer),
         ),
       );
 
@@ -90,23 +87,21 @@ class NineJudgesController extends ChangeNotifier {
     if (!canSelectAction(action)) return;
     selectedAction = action;
     selectedSlot = null;
-    phase = TurnPhase.selectingTarget;
+    phase = TurnPhase.selectingActionTarget;
     notifyListeners();
   }
 
   bool canTarget(int index) {
-    if (phase == TurnPhase.selectingSave) {
+    if (phase == TurnPhase.selectingJudgeTarget) {
       return !board[index].person.isJudged;
     }
     final action = selectedAction;
-    return phase == TurnPhase.selectingTarget &&
+    return phase == TurnPhase.selectingActionTarget &&
         action != null &&
         NineJudgesRules.canUseAction(
           action: action,
           person: board[index].person,
-          viewerHasJudged: judgedKnowledge[currentPlayer]!.contains(
-            board[index].person.id,
-          ),
+          viewerKnowsNumber: knowsNumber(index, currentPlayer),
         );
   }
 
@@ -116,8 +111,8 @@ class NineJudgesController extends ChangeNotifier {
       notifyListeners();
       return;
     }
-    if (phase == TurnPhase.selectingSave) {
-      _save(index);
+    if (phase == TurnPhase.selectingJudgeTarget) {
+      _judge(index);
     } else {
       _applyAction(index);
     }
@@ -130,36 +125,51 @@ class NineJudgesController extends ChangeNotifier {
     String detail;
     switch (action) {
       case ActionType.life:
-        person = person.copyWith(isAlive: true);
-        detail = 'LIFE → ${_publicName(person)}（死→生）';
+        if (person.isAlive) {
+          person = person.copyWith(hasLifeShield: true);
+          detail = 'LIFE → ${_publicName(person)}（生存防護）';
+        } else {
+          person = person.copyWith(isAlive: true);
+          detail = 'LIFE → ${_publicName(person)}（死→生）';
+        }
         break;
       case ActionType.death:
-        person = person.copyWith(isAlive: false);
-        detail = 'DEATH → ${_publicName(person)}（生→死）';
+        if (!person.isAlive) {
+          person = person.copyWith(isJudged: true);
+          detail = 'DEATH → ${_publicName(person)}（死を即時確定）';
+        } else if (person.hasLifeShield) {
+          person = person.copyWith(hasLifeShield: false);
+          detail = 'DEATH → ${_publicName(person)}（LIFE防護を除去）';
+        } else {
+          person = person.copyWith(isAlive: false);
+          detail = 'DEATH → ${_publicName(person)}（生→死）';
+        }
         break;
-      case ActionType.judge:
-        judgedKnowledge[currentPlayer]!.add(person.id);
-        detail = 'JUDGE → UNKNOWN${person.rank}　結果：${person.attribute.label}';
+      case ActionType.eye:
+        knownNumberSlots[currentPlayer]!.add(index);
+        detail = 'EYE → slot ${index + 1}（数字${slot.hiddenNumber}を確認）';
         break;
     }
     board[index] = slot.copyWith(person: person);
     inventories[currentPlayer] = currentInventory.consume(action);
     logs.add(GameLogEntry(turn: turn, player: currentPlayer, message: detail));
     selectedAction = null;
-    phase = TurnPhase.awaitingSave;
-    notifyListeners();
-  }
-
-  void beginSave() {
-    if (phase != TurnPhase.awaitingSave && phase != TurnPhase.selectingAction) {
-      return;
+    if (action == ActionType.death && person.isJudged) {
+      if (!isFinished) _completeTurn();
+    } else {
+      phase = TurnPhase.awaitingJudge;
     }
-    selectedSlot = null;
-    phase = TurnPhase.selectingSave;
     notifyListeners();
   }
 
-  void _save(int index) {
+  void beginJudge() {
+    if (phase != TurnPhase.awaitingJudge) return;
+    selectedSlot = null;
+    phase = TurnPhase.selectingJudgeTarget;
+    notifyListeners();
+  }
+
+  void _judge(int index) {
     final slot = board[index];
     if (slot.person.isJudged) return;
     board[index] = slot.copyWith(person: slot.person.copyWith(isJudged: true));
@@ -167,7 +177,8 @@ class NineJudgesController extends ChangeNotifier {
       GameLogEntry(
         turn: turn,
         player: currentPlayer,
-        message: 'SAVE → ${_publicName(slot.person)}',
+        message:
+            'JUDGE → ${_publicName(slot.person)}（${slot.person.isAlive ? '生' : '死'}で判決）',
       ),
     );
     if (isFinished) {
@@ -175,16 +186,6 @@ class NineJudgesController extends ChangeNotifier {
       notifyListeners();
       return;
     }
-    _completeTurn();
-  }
-
-  void endTurnWithoutSave() {
-    if (NineJudgesConfig.forceSaveEachTurn || phase != TurnPhase.awaitingSave) {
-      return;
-    }
-    logs.add(
-      GameLogEntry(turn: turn, player: currentPlayer, message: 'SAVEなしでターン終了'),
-    );
     _completeTurn();
   }
 

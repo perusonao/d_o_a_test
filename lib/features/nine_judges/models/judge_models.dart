@@ -1,4 +1,4 @@
-﻿enum Faction {
+enum Faction {
   savior('救済者'),
   executor('執行者');
 
@@ -21,13 +21,18 @@ enum PersonAttribute {
 enum ActionType {
   life('LIFE'),
   death('DEATH'),
-  judge('JUDGE');
+  eye('EYE');
 
   const ActionType(this.label);
   final String label;
 }
 
-enum TurnPhase { selectingAction, selectingTarget, awaitingSave, selectingSave }
+enum TurnPhase {
+  selectingAction,
+  selectingActionTarget,
+  awaitingJudge,
+  selectingJudgeTarget,
+}
 
 class PersonCard {
   const PersonCard({
@@ -36,6 +41,7 @@ class PersonCard {
     required this.rank,
     required this.isAlive,
     this.isJudged = false,
+    this.hasLifeShield = false,
   });
 
   final String id;
@@ -43,16 +49,19 @@ class PersonCard {
   final int rank;
   final bool isAlive;
   final bool isJudged;
+  final bool hasLifeShield;
 
   bool get hidesAttributeWhenDead => rank == 3 && !isAlive;
 
-  PersonCard copyWith({bool? isAlive, bool? isJudged}) => PersonCard(
-    id: id,
-    attribute: attribute,
-    rank: rank,
-    isAlive: isAlive ?? this.isAlive,
-    isJudged: isJudged ?? this.isJudged,
-  );
+  PersonCard copyWith({bool? isAlive, bool? isJudged, bool? hasLifeShield}) =>
+      PersonCard(
+        id: id,
+        attribute: attribute,
+        rank: rank,
+        isAlive: isAlive ?? this.isAlive,
+        isJudged: isJudged ?? this.isJudged,
+        hasLifeShield: hasLifeShield ?? this.hasLifeShield,
+      );
 }
 
 class BoardSlot {
@@ -69,35 +78,23 @@ class ActionInventory {
   const ActionInventory({
     required this.life,
     required this.death,
-    required this.judge,
+    required this.eye,
   });
 
   final int life;
   final int death;
-  final int judge;
+  final int eye;
 
   int remaining(ActionType action) => switch (action) {
     ActionType.life => life,
     ActionType.death => death,
-    ActionType.judge => judge,
+    ActionType.eye => eye,
   };
 
   ActionInventory consume(ActionType action) => switch (action) {
-    ActionType.life => ActionInventory(
-      life: life - 1,
-      death: death,
-      judge: judge,
-    ),
-    ActionType.death => ActionInventory(
-      life: life,
-      death: death - 1,
-      judge: judge,
-    ),
-    ActionType.judge => ActionInventory(
-      life: life,
-      death: death,
-      judge: judge - 1,
-    ),
+    ActionType.life => ActionInventory(life: life - 1, death: death, eye: eye),
+    ActionType.death => ActionInventory(life: life, death: death - 1, eye: eye),
+    ActionType.eye => ActionInventory(life: life, death: death, eye: eye - 1),
   };
 }
 

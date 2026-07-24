@@ -1,5 +1,4 @@
-﻿import 'package:flutter/material.dart';
-import 'package:dead_or_alive/features/nine_judges/game/game_config.dart';
+import 'package:flutter/material.dart';
 import 'package:dead_or_alive/features/nine_judges/game/game_controller.dart';
 import 'package:dead_or_alive/features/nine_judges/models/judge_models.dart';
 
@@ -10,7 +9,7 @@ class ActionPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final selectingSave = controller.phase == TurnPhase.selectingSave;
+    final selectingJudge = controller.phase == TurnPhase.selectingJudgeTarget;
     return Column(
       children: [
         Row(
@@ -18,7 +17,7 @@ class ActionPanel extends StatelessWidget {
             for (final action in ActionType.values) ...[
               Expanded(
                 child: SizedBox(
-                  height: 36,
+                  height: 48,
                   child: OutlinedButton(
                     key: Key('action-${action.name}'),
                     onPressed: controller.canSelectAction(action)
@@ -30,14 +29,28 @@ class ActionPanel extends StatelessWidget {
                           ? const BorderSide(color: Color(0xFFD6B25E), width: 2)
                           : null,
                     ),
-                    child: Text(
-                      '${action.label} ${controller.currentInventory.remaining(action)}',
-                      style: const TextStyle(fontSize: 11),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          action.label,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        Text(
+                          '${_shortEffect(action)} ｜ 残り ${controller.currentInventory.remaining(action)}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 8),
+                        ),
+                      ],
                     ),
                   ),
                 ),
               ),
-              if (action != ActionType.judge) const SizedBox(width: 5),
+              if (action != ActionType.eye) const SizedBox(width: 5),
             ],
           ],
         ),
@@ -46,36 +59,26 @@ class ActionPanel extends StatelessWidget {
           width: double.infinity,
           height: 36,
           child: FilledButton(
-            key: const Key('save-button'),
-            onPressed:
-                controller.phase == TurnPhase.awaitingSave ||
-                    (!NineJudgesConfig.forceSaveEachTurn &&
-                        controller.phase == TurnPhase.selectingAction)
-                ? controller.beginSave
+            key: const Key('judge-button'),
+            onPressed: controller.phase == TurnPhase.awaitingJudge
+                ? controller.beginJudge
                 : null,
             style: FilledButton.styleFrom(
-              backgroundColor: selectingSave
+              backgroundColor: selectingJudge
                   ? const Color(0xFFD6B25E)
                   : const Color(0xFF66552D),
               foregroundColor: Colors.black,
             ),
-            child: Text(selectingSave ? 'SAVE対象を選択中' : 'SAVEしてターン終了'),
+            child: Text(selectingJudge ? '判決する人物を選択' : 'JUDGEしてターン終了'),
           ),
         ),
-        if (!NineJudgesConfig.forceSaveEachTurn) ...[
-          const SizedBox(height: 4),
-          SizedBox(
-            width: double.infinity,
-            height: 32,
-            child: TextButton(
-              onPressed: controller.phase == TurnPhase.awaitingSave
-                  ? controller.endTurnWithoutSave
-                  : null,
-              child: const Text('SAVEせずターン終了'),
-            ),
-          ),
-        ],
       ],
     );
   }
+
+  String _shortEffect(ActionType action) => switch (action) {
+    ActionType.life => '蘇生 / 防護',
+    ActionType.death => '死亡 / 即確定',
+    ActionType.eye => '数字を見る',
+  };
 }
