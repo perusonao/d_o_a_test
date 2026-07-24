@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:dead_or_alive/features/nine_judges/game/game_controller.dart';
 import 'package:dead_or_alive/features/nine_judges/widgets/person_card_widget.dart';
 
@@ -22,12 +22,12 @@ class BoardGrid extends StatelessWidget {
               children: [
                 for (var column = 0; column < 3; column++) ...[
                   Expanded(child: _card(row * 3 + column)),
-                  if (column < 2) const SizedBox(width: 5),
+                  if (column < 2) const SizedBox(width: 4),
                 ],
               ],
             ),
           ),
-          if (row < 2) const SizedBox(height: 5),
+          if (row < 2) const SizedBox(height: 4),
         ],
       ],
     );

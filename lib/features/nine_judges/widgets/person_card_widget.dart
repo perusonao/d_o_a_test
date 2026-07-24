@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
 import 'package:dead_or_alive/features/nine_judges/models/judge_models.dart';
+import 'package:flutter/material.dart';
 
 class PersonCardWidget extends StatelessWidget {
   const PersonCardWidget({
@@ -29,132 +29,233 @@ class PersonCardWidget extends StatelessWidget {
         : selected
         ? const Color(0xFFFFD76A)
         : enabled
-        ? const Color(0xFF7E9BC2)
-        : const Color(0xFF4B4B4B);
+        ? const Color(0xFF8DA4BD)
+        : const Color(0xFF45484E);
     return GestureDetector(
       onTap: enabled || selected ? onTap : null,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 100),
-        padding: const EdgeInsets.all(4),
-        decoration: BoxDecoration(
-          color: person.isJudged
-              ? const Color(0xFF1B1A18)
-              : const Color(0xFF202024),
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(
-            color: borderColor,
-            width: selected || person.isJudged ? 2 : 1,
-          ),
-        ),
-        child: Stack(
-          children: [
-            Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxHeight < 105;
+          return AnimatedContainer(
+            duration: const Duration(milliseconds: 120),
+            padding: EdgeInsets.all(compact ? 3 : 5),
+            decoration: BoxDecoration(
+              color: person.isJudged
+                  ? const Color(0xFF171719)
+                  : enabled
+                  ? const Color(0xFF202329)
+                  : const Color(0xFF181A1E),
+              borderRadius: BorderRadius.circular(7),
+              border: Border.all(
+                color: borderColor,
+                width: selected || person.isJudged ? 2 : 1,
+              ),
+              boxShadow: selected
+                  ? const [
+                      BoxShadow(
+                        color: Color(0x66FFD76A),
+                        blurRadius: 7,
+                        spreadRadius: 1,
+                      ),
+                    ]
+                  : null,
+            ),
+            child: Stack(
               children: [
-                const Icon(Icons.person, size: 24, color: Colors.white54),
-                Text(
-                  person.isAlive ? '生' : '死',
-                  style: TextStyle(
-                    color: person.isAlive
-                        ? const Color(0xFF71B9F0)
-                        : const Color(0xFFE36A62),
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                Row(
+                Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    if (numberVisible)
-                      const Icon(
-                        Icons.visibility_outlined,
-                        size: 10,
-                        color: Colors.white54,
-                      ),
+                    SizedBox(height: compact ? 10 : 15),
+                    Icon(
+                      Icons.person,
+                      size: compact ? 22 : 29,
+                      color: person.isJudged ? Colors.white30 : Colors.white54,
+                    ),
                     Text(
-                      ' ${numberVisible ? slot.hiddenNumber : '?'}',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
+                      person.isAlive ? '生' : '死',
+                      key: Key('life-state-${person.id}'),
+                      style: TextStyle(
+                        color: person.isAlive
+                            ? const Color(0xFF62B9F3)
+                            : const Color(0xFFF0645A),
+                        fontSize: compact ? 18 : 22,
+                        height: 1,
+                        fontWeight: FontWeight.w900,
                       ),
                     ),
+                    const Spacer(),
+                    _NumberMedal(
+                      value: numberVisible ? '${slot.hiddenNumber}' : '?',
+                      known: numberVisible,
+                      compact: compact,
+                    ),
+                    if (scoreDetail != null)
+                      Text(
+                        '${scoreDetail!.faction.label} +${scoreDetail!.points}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Color(0xFFD6B25E),
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    if (person.hasLifeShield || person.isJudged)
+                      SizedBox(height: compact ? 13 : 16),
                   ],
                 ),
-                if (person.hasLifeShield)
-                  const Text(
-                    '♥ LIFE',
-                    key: Key('life-shield'),
+                Positioned(
+                  left: 0,
+                  top: 0,
+                  child: Text(
+                    attributeVisible ? person.attribute.label : '?',
                     style: TextStyle(
-                      color: Color(0xFF72D69A),
-                      fontSize: 9,
+                      color: attributeVisible
+                          ? _attributeColor(person.attribute)
+                          : Colors.white70,
+                      fontSize: compact ? 9 : 10,
                       fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                Positioned(
+                  right: 0,
+                  top: 0,
+                  child: Container(
+                    width: compact ? 19 : 22,
+                    height: compact ? 19 : 22,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: const Color(0xFF111216),
+                      border: Border.all(color: const Color(0xFFD6B25E)),
+                    ),
+                    child: Text(
+                      '${person.rank}',
+                      style: TextStyle(
+                        fontSize: compact ? 10 : 11,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ),
+                if (person.hasLifeShield)
+                  Positioned(
+                    left: 0,
+                    bottom: 0,
+                    child: _StatusBadge(
+                      key: const Key('life-shield'),
+                      icon: Icons.shield_outlined,
+                      label: 'LIFE',
+                      color: const Color(0xFF62D58A),
+                      compact: compact,
                     ),
                   ),
                 if (person.isJudged)
-                  const Text(
-                    '判決済',
-                    key: Key('judged-label'),
-                    style: TextStyle(
-                      color: Color(0xFFD6B25E),
-                      fontSize: 9,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                if (scoreDetail != null)
-                  Text(
-                    '${scoreDetail!.faction.label} +${scoreDetail!.points}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Color(0xFFD6B25E),
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
+                  Positioned(
+                    right: 0,
+                    bottom: 0,
+                    child: _StatusBadge(
+                      key: const Key('judged-label'),
+                      icon: Icons.gavel,
+                      label: '判決済み',
+                      color: const Color(0xFFD6B25E),
+                      compact: compact,
                     ),
                   ),
               ],
             ),
-            Positioned(
-              left: 1,
-              top: 0,
-              child: Text(
-                attributeVisible ? person.attribute.label : '?',
-                style: TextStyle(
-                  color: attributeVisible
-                      ? _attributeColor(person.attribute)
-                      : Colors.white70,
-                  fontSize: 9,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ),
-            Positioned(
-              right: 1,
-              top: 0,
-              child: Container(
-                width: 19,
-                height: 19,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white38),
-                ),
-                child: Text(
-                  '${person.rank}',
-                  style: const TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
 
   Color _attributeColor(PersonAttribute attribute) => switch (attribute) {
-    PersonAttribute.good => const Color(0xFF73B8EA),
-    PersonAttribute.evil => const Color(0xFFE16A62),
+    PersonAttribute.good => const Color(0xFF69BDF2),
+    PersonAttribute.evil => const Color(0xFFF0645A),
     PersonAttribute.neutral => const Color(0xFFC8C3B8),
   };
+}
+
+class _NumberMedal extends StatelessWidget {
+  const _NumberMedal({
+    required this.value,
+    required this.known,
+    required this.compact,
+  });
+
+  final String value;
+  final bool known;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final size = compact ? 25.0 : 31.0;
+    return Container(
+      key: Key('number-$value'),
+      width: size,
+      height: size,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: known ? const Color(0xFF292313) : const Color(0xFF17181C),
+        border: Border.all(
+          color: known ? const Color(0xFFE0BC68) : Colors.white38,
+          width: known ? 1.5 : 1,
+        ),
+      ),
+      child: Text(
+        value,
+        style: TextStyle(
+          color: known ? const Color(0xFFFFD978) : Colors.white60,
+          fontSize: compact ? 14 : 17,
+          height: 1,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+  }
+}
+
+class _StatusBadge extends StatelessWidget {
+  const _StatusBadge({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.compact,
+    super.key,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: compact ? 2 : 4, vertical: 1),
+      decoration: BoxDecoration(
+        color: const Color(0xE6111215),
+        borderRadius: BorderRadius.circular(3),
+        border: Border.all(color: color),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: compact ? 8 : 10, color: color),
+          const SizedBox(width: 2),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: compact ? 7 : 8,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
