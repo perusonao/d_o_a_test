@@ -2,48 +2,104 @@ import 'package:flutter/material.dart';
 import 'package:dead_or_alive/features/nine_judges/game/game_controller.dart';
 import 'package:dead_or_alive/features/nine_judges/models/judge_models.dart';
 import 'package:dead_or_alive/features/nine_judges/screens/handoff_screen.dart';
+import 'package:dead_or_alive/features/nine_judges/screens/mode_select_screen.dart';
 import 'package:dead_or_alive/features/nine_judges/screens/result_screen.dart';
 import 'package:dead_or_alive/features/nine_judges/widgets/action_panel.dart';
 import 'package:dead_or_alive/features/nine_judges/widgets/board_grid.dart';
 import 'package:dead_or_alive/features/nine_judges/widgets/selected_card_panel.dart';
 
 class NineJudgesGameScreen extends StatefulWidget {
-  const NineJudgesGameScreen({super.key});
+  const NineJudgesGameScreen({this.initialSettings, super.key});
+
+  final NineJudgesGameSettings? initialSettings;
 
   @override
   State<NineJudgesGameScreen> createState() => _NineJudgesGameScreenState();
 }
 
 class _NineJudgesGameScreenState extends State<NineJudgesGameScreen> {
-  late final NineJudgesController controller;
+  NineJudgesController? controller;
+  bool _cpuSequenceRunning = false;
 
   @override
   void initState() {
     super.initState();
-    controller = NineJudgesController();
+    if (widget.initialSettings case final settings?) {
+      _startGame(settings);
+    }
   }
 
   @override
   void dispose() {
-    controller.dispose();
+    controller?.dispose();
     super.dispose();
+  }
+
+  void _startGame(NineJudgesGameSettings settings) {
+    controller?.removeListener(_handleControllerChanged);
+    controller?.dispose();
+    controller = NineJudgesController(settings: settings)
+      ..addListener(_handleControllerChanged);
+    _handleControllerChanged();
+    if (mounted) setState(() {});
+  }
+
+  void _handleControllerChanged() {
+    final game = controller;
+    if (game == null ||
+        !game.isCpuTurn ||
+        game.awaitingHandoff ||
+        game.isFinished ||
+        _cpuSequenceRunning) {
+      return;
+    }
+    _runCpuSequence();
+  }
+
+  Future<void> _runCpuSequence() async {
+    final game = controller;
+    if (game == null) return;
+    _cpuSequenceRunning = true;
+    final delay = game.settings.skipCpuDelays
+        ? Duration.zero
+        : const Duration(milliseconds: 550);
+    await Future<void>.delayed(delay);
+    if (!mounted || game != controller || !game.isCpuTurn) {
+      _cpuSequenceRunning = false;
+      return;
+    }
+    game.performCpuAction();
+    if (game.phase == TurnPhase.awaitingJudge) {
+      await Future<void>.delayed(
+        game.settings.skipCpuDelays
+            ? Duration.zero
+            : const Duration(milliseconds: 450),
+      );
+      if (mounted && game == controller) game.performCpuJudge();
+    }
+    _cpuSequenceRunning = false;
+    if (mounted) setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
+    final game = controller;
+    if (game == null) {
+      return NineJudgesModeSelectScreen(onStart: _startGame);
+    }
     return AnimatedBuilder(
-      animation: controller,
+      animation: game,
       builder: (context, _) {
-        if (controller.isFinished) {
-          return ResultScreen(controller: controller);
+        if (game.isFinished) {
+          return ResultScreen(controller: game);
         }
-        if (controller.awaitingHandoff) {
+        if (game.awaitingHandoff) {
           return HandoffScreen(
-            nextPlayer: controller.currentPlayer,
-            onReady: controller.confirmHandoff,
+            nextPlayer: game.currentPlayer,
+            onReady: game.confirmHandoff,
           );
         }
-        return _GameBoard(controller: controller);
+        return _GameBoard(controller: game);
       },
     );
   }
@@ -108,6 +164,8 @@ class _GameBoard extends StatelessWidget {
                           child: Text(
                             controller.debugMode
                                 ? '救済者 ${controller.score.savior}'
+                                : controller.isCpuGame
+                                ? '救済者（あなた）\n善・中立→生 / 悪→死'
                                 : '救済者\n善・中立→生 / 悪→死',
                             maxLines: 2,
                             style: const TextStyle(color: Color(0xFF71B9F0)),
@@ -124,6 +182,8 @@ class _GameBoard extends StatelessWidget {
                           child: Text(
                             controller.debugMode
                                 ? '執行者 ${controller.score.executor}'
+                                : controller.isCpuGame
+                                ? '執行者（CPU）\n善・中立→死 / 悪→生'
                                 : '執行者\n善・中立→死 / 悪→生',
                             maxLines: 2,
                             textAlign: TextAlign.right,
@@ -159,6 +219,30 @@ class _GameBoard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 4),
+                  if (controller.isCpuTurn ||
+                      controller.lastCpuActionMessage != null)
+                    Container(
+                      key: const Key('cpu-action-message'),
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF2A2020),
+                        borderRadius: BorderRadius.circular(5),
+                        border: Border.all(color: const Color(0xFFE36A62)),
+                      ),
+                      child: Text(
+                        controller.isCpuTurn
+                            ? controller.lastCpuActionMessage ??
+                                  'CPU TURN  思考中…'
+                            : controller.lastCpuActionMessage!,
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        style: const TextStyle(fontSize: 10),
+                      ),
+                    ),
                   Expanded(child: BoardGrid(controller: controller)),
                   SelectedCardPanel(controller: controller),
                   ActionPanel(controller: controller),
@@ -200,6 +284,67 @@ class _GameBoard extends StatelessWidget {
                   setDialogState(() {});
                 },
               ),
+              if (controller.isCpuGame) ...[
+                DropdownButtonFormField<CpuLevel>(
+                  key: const Key('settings-cpu-level'),
+                  initialValue: controller.settings.cpuLevel,
+                  decoration: const InputDecoration(labelText: 'CPUレベル'),
+                  items: const [
+                    DropdownMenuItem(
+                      value: CpuLevel.random,
+                      child: Text('EASY / RANDOM'),
+                    ),
+                    DropdownMenuItem(
+                      value: CpuLevel.basic,
+                      child: Text('NORMAL / BASIC'),
+                    ),
+                  ],
+                  onChanged: (value) {
+                    if (value == null) return;
+                    controller.updateSettings(
+                      controller.settings.copyWith(cpuLevel: value),
+                    );
+                    setDialogState(() {});
+                  },
+                ),
+                SwitchListTile(
+                  key: const Key('skip-cpu-delays'),
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('CPU思考演出をスキップ'),
+                  value: controller.settings.skipCpuDelays,
+                  onChanged: (value) {
+                    controller.updateSettings(
+                      controller.settings.copyWith(skipCpuDelays: value),
+                    );
+                    setDialogState(() {});
+                  },
+                ),
+                SwitchListTile(
+                  key: const Key('cpu-evaluation-switch'),
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('CPU評価値を表示'),
+                  value: controller.settings.showCpuEvaluations,
+                  onChanged: (value) {
+                    controller.updateSettings(
+                      controller.settings.copyWith(showCpuEvaluations: value),
+                    );
+                    setDialogState(() {});
+                  },
+                ),
+                if (controller.settings.showCpuEvaluations &&
+                    controller.lastCpuEvaluations.isNotEmpty)
+                  Text(
+                    controller.lastCpuEvaluations
+                        .take(5)
+                        .map(
+                          (candidate) =>
+                              '${candidate.action.label} slot${candidate.targetIndex + 1} '
+                              '${candidate.score.toStringAsFixed(1)}',
+                        )
+                        .join('\n'),
+                    style: const TextStyle(fontSize: 11),
+                  ),
+              ],
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 title: const Text('盤面再シャッフル'),

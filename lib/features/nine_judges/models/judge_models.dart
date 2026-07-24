@@ -34,6 +34,48 @@ enum TurnPhase {
   selectingJudgeTarget,
 }
 
+enum GameMode { hotseat, cpu }
+
+enum CpuLevel {
+  random('EASY', 'RANDOM'),
+  basic('NORMAL', 'BASIC'),
+  smart('HARD', 'SMART');
+
+  const CpuLevel(this.uiLabel, this.strategyLabel);
+  final String uiLabel;
+  final String strategyLabel;
+}
+
+class NineJudgesGameSettings {
+  const NineJudgesGameSettings({
+    this.mode = GameMode.hotseat,
+    this.cpuFaction = Faction.executor,
+    this.cpuLevel = CpuLevel.basic,
+    this.skipCpuDelays = false,
+    this.showCpuEvaluations = false,
+  });
+
+  final GameMode mode;
+  final Faction cpuFaction;
+  final CpuLevel cpuLevel;
+  final bool skipCpuDelays;
+  final bool showCpuEvaluations;
+
+  NineJudgesGameSettings copyWith({
+    GameMode? mode,
+    Faction? cpuFaction,
+    CpuLevel? cpuLevel,
+    bool? skipCpuDelays,
+    bool? showCpuEvaluations,
+  }) => NineJudgesGameSettings(
+    mode: mode ?? this.mode,
+    cpuFaction: cpuFaction ?? this.cpuFaction,
+    cpuLevel: cpuLevel ?? this.cpuLevel,
+    skipCpuDelays: skipCpuDelays ?? this.skipCpuDelays,
+    showCpuEvaluations: showCpuEvaluations ?? this.showCpuEvaluations,
+  );
+}
+
 class PersonCard {
   const PersonCard({
     required this.id,
