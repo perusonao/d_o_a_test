@@ -53,6 +53,6 @@ void main() {
     await tester.pumpWidget(const ProviderScope(child: DeadOrAliveApp()));
     expect(find.text('9人の審判'), findsOneWidget);
     expect(find.byKey(const Key('judge-slot-0')), findsOneWidget);
-    expect(find.byKey(const Key('save-button')), findsOneWidget);
+    expect(find.byKey(const Key('judge-button')), findsOneWidget);
   });
 }

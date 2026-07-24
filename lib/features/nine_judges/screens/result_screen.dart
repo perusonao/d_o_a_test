@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:dead_or_alive/features/nine_judges/game/game_controller.dart';
 import 'package:dead_or_alive/features/nine_judges/widgets/board_grid.dart';
 
@@ -29,7 +29,7 @@ class ResultScreen extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    winner == null ? '引き分け' : '${winner.label}の勝利',
+                    winner == null ? 'DRAW' : 'WINNER ${winner.label}',
                     style: const TextStyle(fontSize: 18),
                   ),
                   const SizedBox(height: 4),

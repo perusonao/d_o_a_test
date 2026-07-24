@@ -1,10 +1,9 @@
-﻿import 'package:dead_or_alive/features/nine_judges/models/judge_models.dart';
+import 'package:dead_or_alive/features/nine_judges/models/judge_models.dart';
 
 abstract final class NineJudgesConfig {
-  static const bool forceSaveEachTurn = true;
   static const int lifeCardsPerPlayer = 3;
   static const int deathCardsPerPlayer = 3;
-  static const int judgeCardsPerPlayer = 2;
+  static const int eyeCardsPerPlayer = 2;
 
   static const Map<int, bool> initialAliveByRank = {1: true, 2: true, 3: false};
 
@@ -14,6 +13,6 @@ abstract final class NineJudgesConfig {
   static const ActionInventory initialInventory = ActionInventory(
     life: lifeCardsPerPlayer,
     death: deathCardsPerPlayer,
-    judge: judgeCardsPerPlayer,
+    eye: eyeCardsPerPlayer,
   );
 }
