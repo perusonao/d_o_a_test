@@ -15,11 +15,7 @@ abstract final class NineJudgesRules {
             isAlive: NineJudgesConfig.initialAliveByRank[rank]!,
           ),
     ]..shuffle(random);
-    final numbers = List.generate(9, (index) => index + 1)..shuffle(random);
-    return List.generate(
-      9,
-      (index) => BoardSlot(person: people[index], hiddenNumber: numbers[index]),
-    );
+    return List.generate(9, (index) => BoardSlot(person: people[index]));
   }
 
   static bool isAttributeVisible(
@@ -38,8 +34,7 @@ abstract final class NineJudgesRules {
       ActionType.life => !person.isAlive || !person.hasLifeShield,
       ActionType.death => true,
       ActionType.eye =>
-        !viewerKnowsNumber ||
-            (person.hidesAttributeWhenDead && !viewerKnowsAttribute),
+        person.rank == 3 && !person.isAlive && !viewerKnowsAttribute,
       ActionType.judge => true,
     };
   }
@@ -58,7 +53,7 @@ abstract final class NineJudgesRules {
     final details = <String, ({Faction faction, int points})>{};
     for (final slot in board) {
       final faction = scoringFaction(slot.person);
-      final points = slot.person.rank + slot.hiddenNumber;
+      final points = slot.person.rank;
       details[slot.person.id] = (faction: faction, points: points);
       if (faction == Faction.savior) {
         savior += points;

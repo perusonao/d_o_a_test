@@ -2,15 +2,8 @@ import 'package:dead_or_alive/features/nine_judges/cpu/cpu_strategy.dart';
 import 'package:dead_or_alive/features/nine_judges/models/judge_models.dart';
 
 abstract final class CpuEvaluator {
-  static double estimatedNumberValue(CpuGameView view, CpuSlotView slot) {
-    if (slot.knownNumber case final value?) return value.toDouble();
-    if (view.unknownNumberCandidates.isEmpty) return 5;
-    return view.unknownNumberCandidates.reduce((a, b) => a + b) /
-        view.unknownNumberCandidates.length;
-  }
-
   static double personValue(CpuGameView view, CpuSlotView slot) =>
-      slot.person.rank + estimatedNumberValue(view, slot);
+      slot.person.rank.toDouble();
 
   static bool prefersAlive(Faction faction, PersonAttribute attribute) {
     final saviorPrefersAlive =
@@ -29,9 +22,7 @@ abstract final class CpuEvaluator {
   }
 
   static EyeInformation preferredEyeInformation(CpuSlotView slot) =>
-      slot.eyeOptions.contains(EyeInformation.attribute)
-      ? EyeInformation.attribute
-      : EyeInformation.number;
+      EyeInformation.attribute;
 
   static double actionScore(
     CpuGameView view,
@@ -60,17 +51,19 @@ abstract final class CpuEvaluator {
             ? 11 + value
             : 0.5,
       ActionType.eye =>
-        (slot.eyeOptions.contains(EyeInformation.attribute) ? 18 : 0) +
-            value +
-            person.rank +
-            (person.rank == 3 ? 2 : 0) +
-            (!person.isJudged ? 1 : 0) -
-            (view.inventory.eye <= 1 ? 2 : 0),
+        (slot.eyeOptions.contains(EyeInformation.attribute) ? 15 : -100) +
+            value -
+            (view.inventory.eye <= 1 ? 1 : 0),
       ActionType.judge =>
         favorable == true
-            ? 20 + value
+            ? 10 +
+                  value * 3 +
+                  (person.isAlive
+                      ? view.opponentInventory.death * 1.5
+                      : view.opponentInventory.life * 1.5) -
+                  (view.inventory.judge <= 1 ? (4 - person.rank) * 3 : 0)
             : favorable == null
-            ? 2
+            ? -2
             : -value,
     };
   }

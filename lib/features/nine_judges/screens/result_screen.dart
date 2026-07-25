@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:dead_or_alive/features/nine_judges/game/game_controller.dart';
 import 'package:dead_or_alive/features/nine_judges/widgets/board_grid.dart';
+import 'package:dead_or_alive/features/nine_judges/screens/play_log_screen.dart';
 
 class ResultScreen extends StatelessWidget {
   const ResultScreen({required this.controller, super.key});
@@ -60,7 +61,18 @@ class ResultScreen extends StatelessWidget {
                       Expanded(
                         child: OutlinedButton(
                           key: const Key('result-log'),
-                          onPressed: () => showGameLogs(context, controller),
+                          onPressed: () async {
+                            await controller.ensureLogSaved();
+                            if (!context.mounted) return;
+                            await Navigator.push<void>(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => PlayLogScreen(
+                                  repository: controller.logRepository,
+                                ),
+                              ),
+                            );
+                          },
                           child: const Text('プレイログ'),
                         ),
                       ),
@@ -74,6 +86,15 @@ class ResultScreen extends StatelessWidget {
                       ),
                     ],
                   ),
+                  SizedBox(
+                    width: double.infinity,
+                    child: TextButton.icon(
+                      key: const Key('playtest-feedback'),
+                      onPressed: () => _showFeedback(context),
+                      icon: const Icon(Icons.edit_note),
+                      label: const Text('テストプレイの感想を保存'),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -82,6 +103,75 @@ class ResultScreen extends StatelessWidget {
       ),
     );
   }
+
+  Future<void> _showFeedback(BuildContext context) async {
+    final notes = TextEditingController(text: controller.session.notes);
+    var fun = controller.session.funRating ?? 3;
+    var reading = controller.session.readingRating ?? 3;
+    var luck = controller.session.luckRating ?? 3;
+    var tempo = controller.session.tempoRating ?? 3;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('テストプレイメモ'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: notes,
+                  maxLines: 4,
+                  decoration: const InputDecoration(hintText: '感想（省略可能）'),
+                ),
+                _rating('面白さ', fun, (v) => setState(() => fun = v)),
+                _rating('読み合い', reading, (v) => setState(() => reading = v)),
+                _rating('運要素', luck, (v) => setState(() => luck = v)),
+                _rating('テンポ', tempo, (v) => setState(() => tempo = v)),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('スキップ'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                await controller.updatePlaytestFeedback(
+                  notes: notes.text,
+                  fun: fun,
+                  reading: reading,
+                  luck: luck,
+                  tempo: tempo,
+                );
+                if (dialogContext.mounted) Navigator.pop(dialogContext);
+              },
+              child: const Text('保存'),
+            ),
+          ],
+        ),
+      ),
+    );
+    notes.dispose();
+  }
+
+  Widget _rating(String label, int value, ValueChanged<int> onChanged) => Row(
+    children: [
+      SizedBox(width: 58, child: Text(label)),
+      Expanded(
+        child: Slider(
+          value: value.toDouble(),
+          min: 1,
+          max: 5,
+          divisions: 4,
+          label: '$value',
+          onChanged: (v) => onChanged(v.round()),
+        ),
+      ),
+      Text('$value'),
+    ],
+  );
 }
 
 void showGameLogs(BuildContext context, NineJudgesController controller) {

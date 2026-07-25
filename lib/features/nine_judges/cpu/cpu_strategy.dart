@@ -4,14 +4,12 @@ class CpuSlotView {
   const CpuSlotView({
     required this.index,
     required this.person,
-    required this.knownNumber,
     this.knownAttribute,
     this.eyeOptions = const [],
   });
 
   final int index;
   final PersonCard person;
-  final int? knownNumber;
   final PersonAttribute? knownAttribute;
   final List<EyeInformation> eyeOptions;
 }
@@ -21,14 +19,19 @@ class CpuGameView {
     required this.faction,
     required this.slots,
     required this.inventory,
-    required this.unknownNumberCandidates,
+    this.opponentInventory = const ActionInventory(
+      life: 0,
+      death: 0,
+      eye: 0,
+      judge: 0,
+    ),
     required this.legalTargets,
   });
 
   final Faction faction;
   final List<CpuSlotView> slots;
   final ActionInventory inventory;
-  final Set<int> unknownNumberCandidates;
+  final ActionInventory opponentInventory;
   final Map<ActionType, List<int>> legalTargets;
 }
 
