@@ -5,11 +5,15 @@ class CpuSlotView {
     required this.index,
     required this.person,
     required this.knownNumber,
+    this.knownAttribute,
+    this.eyeOptions = const [],
   });
 
   final int index;
   final PersonCard person;
   final int? knownNumber;
+  final PersonAttribute? knownAttribute;
+  final List<EyeInformation> eyeOptions;
 }
 
 class CpuGameView {
@@ -33,11 +37,13 @@ class CpuDecision {
     required this.action,
     required this.targetIndex,
     required this.score,
+    this.eyeInformation,
   });
 
   final ActionType action;
   final int targetIndex;
   final double score;
+  final EyeInformation? eyeInformation;
 }
 
 class CpuCandidateScore {
@@ -45,15 +51,16 @@ class CpuCandidateScore {
     required this.action,
     required this.targetIndex,
     required this.score,
+    this.eyeInformation,
   });
 
   final ActionType action;
   final int targetIndex;
   final double score;
+  final EyeInformation? eyeInformation;
 }
 
 abstract interface class CpuStrategy {
   CpuDecision decideAction(CpuGameView view);
-  int decideJudgeTarget(CpuGameView view);
   List<CpuCandidateScore> evaluateActions(CpuGameView view);
 }

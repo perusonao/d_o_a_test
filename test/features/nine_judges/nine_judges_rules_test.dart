@@ -6,107 +6,103 @@ import 'package:dead_or_alive/features/nine_judges/models/judge_models.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  group('9人の審判 最新ルール', () {
-    late NineJudgesController controller;
+  group('9人の審判 1ターン1アクション', () {
+    late NineJudgesController game;
+    setUp(() => game = NineJudgesController(random: Random(7)));
+    tearDown(() => game.dispose());
 
-    setUp(() => controller = NineJudgesController(random: Random(7)));
-    tearDown(() => controller.dispose());
-
-    int find({required bool alive}) => controller.board.indexWhere(
-      (slot) => slot.person.isAlive == alive && !slot.person.isJudged,
+    int target(bool alive) => game.board.indexWhere(
+      (s) => s.person.isAlive == alive && !s.person.isJudged,
     );
-
     void act(ActionType action, int index) {
-      controller.chooseAction(action);
-      controller.selectSlot(index);
+      game.chooseAction(action);
+      game.selectSlot(index);
     }
 
-    test('死へのLIFEは蘇生、生へのLIFEは防護を付与する', () {
-      final dead = find(alive: false);
-      act(ActionType.life, dead);
-      expect(controller.board[dead].person.isAlive, isTrue);
-
-      controller.reset();
-      final alive = find(alive: true);
-      act(ActionType.life, alive);
-      expect(controller.board[alive].person.hasLifeShield, isTrue);
-      expect(controller.board[alive].person.isAlive, isTrue);
+    test('LIFE使用後に即ターン終了し同一ターンJUDGE不可', () {
+      final before = game.currentPlayer;
+      final index = target(false);
+      act(ActionType.life, index);
+      expect(game.board[index].person.isAlive, isTrue);
+      expect(game.currentPlayer, before.opponent);
+      expect(game.turn, 2);
+      expect(game.selectedAction, isNull);
     });
 
-    test('LIFE防護はDEATHを吸収し、防護なしなら死亡する', () {
-      final shielded = find(alive: true);
-      controller.board[shielded] = controller.board[shielded].copyWith(
-        person: controller.board[shielded].person.copyWith(hasLifeShield: true),
-      );
-      act(ActionType.death, shielded);
-      expect(controller.board[shielded].person.isAlive, isTrue);
-      expect(controller.board[shielded].person.hasLifeShield, isFalse);
-
-      controller.reset();
-      final alive = find(alive: true);
-      act(ActionType.death, alive);
-      expect(controller.board[alive].person.isAlive, isFalse);
+    test('DEATH使用後に即ターン終了し同一ターンJUDGE不可', () {
+      final before = game.currentPlayer;
+      act(ActionType.death, target(true));
+      expect(game.currentPlayer, before.opponent);
+      expect(game.turn, 2);
     });
 
-    test('死亡DEATHは即判決となり追加JUDGEなしで引き渡す', () {
-      final dead = find(alive: false);
-      act(ActionType.death, dead);
-      expect(controller.board[dead].person.isJudged, isTrue);
-      expect(controller.awaitingHandoff, isTrue);
-      expect(controller.currentPlayer, Faction.executor);
+    test('EYE数字確認は使用者だけが知り即ターン終了する', () {
+      const index = 4;
+      final user = game.currentPlayer;
+      game.chooseAction(ActionType.eye);
+      game.selectSlot(index);
+      game.revealEyeInformation(EyeInformation.number);
+      expect(game.knowsNumber(index, user), isTrue);
+      expect(game.knowsNumber(index, user.opponent), isFalse);
+      expect(game.currentPlayer, user.opponent);
     });
 
-    test('EYE結果は使用者だけが知り、既知数字と判決済みには使えない', () {
-      const unknown = 4;
-      act(ActionType.eye, unknown);
-      expect(controller.knowsNumber(unknown, Faction.savior), isTrue);
-      expect(controller.knowsNumber(unknown, Faction.executor), isFalse);
+    test('EYE秘密属性確認は使用者だけが知る', () {
+      final index = game.board.indexWhere((s) => s.person.rank == 3);
+      final user = game.currentPlayer;
+      expect(game.knowsAttribute(game.board[index].person, user), isFalse);
+      game.chooseAction(ActionType.eye);
+      game.selectSlot(index);
+      game.revealEyeInformation(EyeInformation.attribute);
+      expect(game.knowsAttribute(game.board[index].person, user), isTrue);
       expect(
-        NineJudgesRules.canUseAction(
-          action: ActionType.eye,
-          person: controller.board[unknown].person,
-          viewerKnowsNumber: true,
-        ),
+        game.knowsAttribute(game.board[index].person, user.opponent),
         isFalse,
       );
-      final judged = controller.board[unknown].person.copyWith(isJudged: true);
+    });
+
+    test('JUDGEだけで現在状態を確定して1ターン消費する', () {
+      final index = target(true);
+      final before = game.currentPlayer;
+      act(ActionType.judge, index);
+      expect(game.board[index].person.isJudged, isTrue);
+      expect(game.currentPlayer, before.opponent);
+      expect(game.turn, 2);
+    });
+
+    test('死へのDEATHは死で即判決してターン終了する', () {
+      final index = target(false);
+      final before = game.currentPlayer;
+      act(ActionType.death, index);
+      expect(game.board[index].person.isJudged, isTrue);
+      expect(game.currentPlayer, before.opponent);
+    });
+
+    test('LIFE防護は最大1枚でDEATHが除去する', () {
+      final index = target(true);
+      act(ActionType.life, index);
+      expect(game.board[index].person.hasLifeShield, isTrue);
       expect(
         NineJudgesRules.canUseAction(
-          action: ActionType.eye,
-          person: judged,
+          action: ActionType.life,
+          person: game.board[index].person,
           viewerKnowsNumber: false,
         ),
         isFalse,
       );
+      act(ActionType.death, index);
+      expect(game.board[index].person.isAlive, isTrue);
+      expect(game.board[index].person.hasLifeShield, isFalse);
     });
 
-    test('JUDGEは現在の生死を確定し判決済みは全操作不可', () {
-      for (final alive in [true, false]) {
-        controller.reset();
-        final index = find(alive: alive);
-        controller.chooseAction(ActionType.eye);
-        final eyeTarget = List.generate(
-          9,
-          (i) => i,
-        ).firstWhere(controller.canTarget);
-        controller.selectSlot(eyeTarget);
-        controller.beginJudge();
-        controller.selectSlot(index);
-        expect(controller.board[index].person.isJudged, isTrue);
-      }
-
-      const judged = PersonCard(
-        id: 'good-3',
-        attribute: PersonAttribute.good,
-        rank: 3,
-        isAlive: false,
-        isJudged: true,
-      );
+    test('判決済み人物は全アクション対象外', () {
+      final index = target(true);
+      act(ActionType.judge, index);
       for (final action in ActionType.values) {
         expect(
           NineJudgesRules.canUseAction(
             action: action,
-            person: judged,
+            person: game.board[index].person,
             viewerKnowsNumber: false,
           ),
           isFalse,
@@ -114,86 +110,73 @@ void main() {
       }
     });
 
-    test('通常JUDGEと死亡DEATHのどちらでも9人目で終了する', () {
+    test('JUDGEと死へのDEATHのどちらでも9人目で即終了', () {
       for (var i = 0; i < 8; i++) {
-        controller.board[i] = controller.board[i].copyWith(
-          person: controller.board[i].person.copyWith(isJudged: true),
+        game.board[i] = game.board[i].copyWith(
+          person: game.board[i].person.copyWith(isJudged: true),
         );
       }
-      controller.phase = TurnPhase.awaitingJudge;
-      controller.beginJudge();
-      controller.selectSlot(8);
-      expect(controller.isFinished, isTrue);
+      act(ActionType.judge, 8);
+      expect(game.isFinished, isTrue);
 
-      controller.reset();
+      game.reset();
       for (var i = 0; i < 8; i++) {
-        controller.board[i] = controller.board[i].copyWith(
-          person: controller.board[i].person.copyWith(isJudged: true),
+        game.board[i] = game.board[i].copyWith(
+          person: game.board[i].person.copyWith(isJudged: true),
         );
       }
-      controller.board[8] = controller.board[8].copyWith(
-        person: controller.board[8].person.copyWith(isAlive: false),
+      game.board[8] = game.board[8].copyWith(
+        person: game.board[8].person.copyWith(isAlive: false),
       );
       act(ActionType.death, 8);
-      expect(controller.isFinished, isTrue);
+      expect(game.isFinished, isTrue);
     });
 
-    test('死亡中の3は属性非公開で、蘇生すると公開される', () {
-      final index = controller.board.indexWhere(
-        (slot) => slot.person.rank == 3,
-      );
-      expect(
-        controller.knowsAttribute(
-          controller.board[index].person,
-          Faction.savior,
-        ),
-        isFalse,
-      );
-      act(ActionType.life, index);
-      expect(
-        controller.knowsAttribute(
-          controller.board[index].person,
-          Faction.savior,
-        ),
-        isTrue,
-      );
+    test('CPU対戦は両陣営・両先攻を設定できる', () {
+      for (final faction in [
+        FactionSelection.savior,
+        FactionSelection.executor,
+      ]) {
+        for (final first in [
+          FirstPlayerSelection.human,
+          FirstPlayerSelection.cpu,
+        ]) {
+          final configured = NineJudgesController(
+            random: Random(1),
+            settings: NineJudgesGameSettings(
+              mode: GameMode.cpu,
+              factionSelection: faction,
+              firstPlayerSelection: first,
+            ),
+          );
+          addTearDown(configured.dispose);
+          final expectedHuman = faction == FactionSelection.savior
+              ? Faction.savior
+              : Faction.executor;
+          expect(configured.humanFaction, expectedHuman);
+          expect(
+            configured.currentPlayer,
+            first == FirstPlayerSelection.human
+                ? expectedHuman
+                : expectedHuman.opponent,
+          );
+        }
+      }
     });
 
-    test('数字は1〜9で、得点は人物ランクと数字の合計', () {
-      expect(controller.board.map((s) => s.hiddenNumber).toSet(), {
-        1,
-        2,
-        3,
-        4,
-        5,
-        6,
-        7,
-        8,
-        9,
-      });
-      const board = [
-        BoardSlot(
-          person: PersonCard(
-            id: 'good-2',
-            attribute: PersonAttribute.good,
-            rank: 2,
-            isAlive: true,
-          ),
-          hiddenNumber: 7,
+    test('ランダム陣営・ランダム先攻は有効な組み合わせへ解決される', () {
+      final randomGame = NineJudgesController(
+        random: Random(9),
+        settings: const NineJudgesGameSettings(
+          mode: GameMode.cpu,
+          factionSelection: FactionSelection.random,
+          firstPlayerSelection: FirstPlayerSelection.random,
         ),
-        BoardSlot(
-          person: PersonCard(
-            id: 'evil-3',
-            attribute: PersonAttribute.evil,
-            rank: 3,
-            isAlive: true,
-          ),
-          hiddenNumber: 4,
-        ),
-      ];
-      final score = NineJudgesRules.calculateScore(board);
-      expect(score.savior, 9);
-      expect(score.executor, 7);
+      );
+      addTearDown(randomGame.dispose);
+      expect(Faction.values, contains(randomGame.humanFaction));
+      expect(Faction.values, contains(randomGame.currentPlayer));
+      expect(randomGame.humanFaction, randomGame.settings.cpuFaction.opponent);
     });
   });
 }

@@ -21,7 +21,8 @@ enum PersonAttribute {
 enum ActionType {
   life('LIFE'),
   death('DEATH'),
-  eye('EYE');
+  eye('EYE'),
+  judge('JUDGE');
 
   const ActionType(this.label);
   final String label;
@@ -30,9 +31,14 @@ enum ActionType {
 enum TurnPhase {
   selectingAction,
   selectingActionTarget,
-  awaitingJudge,
-  selectingJudgeTarget,
+  selectingEyeInformation,
 }
+
+enum EyeInformation { attribute, number }
+
+enum FactionSelection { savior, executor, random }
+
+enum FirstPlayerSelection { human, cpu, random }
 
 enum GameMode { hotseat, cpu }
 
@@ -50,6 +56,9 @@ class NineJudgesGameSettings {
   const NineJudgesGameSettings({
     this.mode = GameMode.hotseat,
     this.cpuFaction = Faction.executor,
+    this.firstPlayer = Faction.savior,
+    this.factionSelection = FactionSelection.savior,
+    this.firstPlayerSelection = FirstPlayerSelection.human,
     this.cpuLevel = CpuLevel.basic,
     this.skipCpuDelays = false,
     this.showCpuEvaluations = false,
@@ -57,6 +66,9 @@ class NineJudgesGameSettings {
 
   final GameMode mode;
   final Faction cpuFaction;
+  final Faction firstPlayer;
+  final FactionSelection factionSelection;
+  final FirstPlayerSelection firstPlayerSelection;
   final CpuLevel cpuLevel;
   final bool skipCpuDelays;
   final bool showCpuEvaluations;
@@ -64,12 +76,18 @@ class NineJudgesGameSettings {
   NineJudgesGameSettings copyWith({
     GameMode? mode,
     Faction? cpuFaction,
+    Faction? firstPlayer,
+    FactionSelection? factionSelection,
+    FirstPlayerSelection? firstPlayerSelection,
     CpuLevel? cpuLevel,
     bool? skipCpuDelays,
     bool? showCpuEvaluations,
   }) => NineJudgesGameSettings(
     mode: mode ?? this.mode,
     cpuFaction: cpuFaction ?? this.cpuFaction,
+    firstPlayer: firstPlayer ?? this.firstPlayer,
+    factionSelection: factionSelection ?? this.factionSelection,
+    firstPlayerSelection: firstPlayerSelection ?? this.firstPlayerSelection,
     cpuLevel: cpuLevel ?? this.cpuLevel,
     skipCpuDelays: skipCpuDelays ?? this.skipCpuDelays,
     showCpuEvaluations: showCpuEvaluations ?? this.showCpuEvaluations,
@@ -131,12 +149,14 @@ class ActionInventory {
     ActionType.life => life,
     ActionType.death => death,
     ActionType.eye => eye,
+    ActionType.judge => 1,
   };
 
   ActionInventory consume(ActionType action) => switch (action) {
     ActionType.life => ActionInventory(life: life - 1, death: death, eye: eye),
     ActionType.death => ActionInventory(life: life, death: death - 1, eye: eye),
     ActionType.eye => ActionInventory(life: life, death: death, eye: eye - 1),
+    ActionType.judge => this,
   };
 }
 

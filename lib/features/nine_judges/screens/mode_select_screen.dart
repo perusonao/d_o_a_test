@@ -15,6 +15,8 @@ class _NineJudgesModeSelectScreenState
     extends State<NineJudgesModeSelectScreen> {
   GameMode mode = GameMode.cpu;
   CpuLevel level = CpuLevel.basic;
+  FactionSelection faction = FactionSelection.random;
+  FirstPlayerSelection firstPlayer = FirstPlayerSelection.random;
 
   @override
   Widget build(BuildContext context) {
@@ -24,7 +26,7 @@ class _NineJudgesModeSelectScreenState
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 430),
             child: Padding(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -62,7 +64,51 @@ class _NineJudgesModeSelectScreenState
                         setState(() => mode = value.first),
                   ),
                   if (mode == GameMode.cpu) ...[
-                    const SizedBox(height: 28),
+                    const SizedBox(height: 16),
+                    const Text('陣営', textAlign: TextAlign.center),
+                    SegmentedButton<FactionSelection>(
+                      key: const Key('faction-selector'),
+                      segments: const [
+                        ButtonSegment(
+                          value: FactionSelection.savior,
+                          label: Text('救済者'),
+                        ),
+                        ButtonSegment(
+                          value: FactionSelection.executor,
+                          label: Text('執行者'),
+                        ),
+                        ButtonSegment(
+                          value: FactionSelection.random,
+                          label: Text('ランダム'),
+                        ),
+                      ],
+                      selected: {faction},
+                      onSelectionChanged: (v) =>
+                          setState(() => faction = v.first),
+                    ),
+                    const SizedBox(height: 10),
+                    const Text('先攻', textAlign: TextAlign.center),
+                    SegmentedButton<FirstPlayerSelection>(
+                      key: const Key('first-player-selector'),
+                      segments: const [
+                        ButtonSegment(
+                          value: FirstPlayerSelection.human,
+                          label: Text('自分'),
+                        ),
+                        ButtonSegment(
+                          value: FirstPlayerSelection.cpu,
+                          label: Text('CPU'),
+                        ),
+                        ButtonSegment(
+                          value: FirstPlayerSelection.random,
+                          label: Text('ランダム'),
+                        ),
+                      ],
+                      selected: {firstPlayer},
+                      onSelectionChanged: (v) =>
+                          setState(() => firstPlayer = v.first),
+                    ),
+                    const SizedBox(height: 14),
                     const Text('CPUレベル', textAlign: TextAlign.center),
                     const SizedBox(height: 10),
                     SegmentedButton<CpuLevel>(
@@ -93,11 +139,16 @@ class _NineJudgesModeSelectScreenState
                       ),
                     ),
                   ],
-                  const SizedBox(height: 36),
+                  const SizedBox(height: 20),
                   FilledButton(
                     key: const Key('start-game'),
                     onPressed: () => widget.onStart(
-                      NineJudgesGameSettings(mode: mode, cpuLevel: level),
+                      NineJudgesGameSettings(
+                        mode: mode,
+                        cpuLevel: level,
+                        factionSelection: faction,
+                        firstPlayerSelection: firstPlayer,
+                      ),
                     ),
                     child: const Text('ゲーム開始'),
                   ),
