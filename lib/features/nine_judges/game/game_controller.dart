@@ -1,35 +1,57 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:dead_or_alive/features/nine_judges/cpu/cpu_player.dart';
 import 'package:dead_or_alive/features/nine_judges/cpu/cpu_strategy.dart';
 import 'package:dead_or_alive/features/nine_judges/game/game_config.dart';
 import 'package:dead_or_alive/features/nine_judges/game/game_rules.dart';
+import 'package:dead_or_alive/features/nine_judges/logging/game_log_models.dart';
+import 'package:dead_or_alive/features/nine_judges/logging/game_log_repository.dart';
 import 'package:dead_or_alive/features/nine_judges/models/judge_models.dart';
 import 'package:flutter/foundation.dart';
 
 class NineJudgesController extends ChangeNotifier {
-  NineJudgesController({
+  factory NineJudgesController({
     Random? random,
-    this.settings = const NineJudgesGameSettings(),
-  }) : _random = random ?? Random() {
+    int? seed,
+    NineJudgesGameSettings settings = const NineJudgesGameSettings(),
+    GameLogRepository? logRepository,
+  }) {
+    final resolvedSeed =
+        seed ?? DateTime.now().microsecondsSinceEpoch & 0x7fffffff;
+    return NineJudgesController._(
+      random ?? Random(resolvedSeed),
+      resolvedSeed,
+      settings,
+      logRepository ?? MemoryGameLogRepository(),
+    );
+  }
+
+  NineJudgesController._(
+    this._random,
+    this.seed,
+    this.settings,
+    this.logRepository,
+  ) {
     reset();
   }
 
   final Random _random;
+  final int seed;
+  final GameLogRepository logRepository;
   NineJudgesGameSettings settings;
   late List<BoardSlot> board;
   late Map<Faction, ActionInventory> inventories;
-  final Map<Faction, Set<int>> knownNumberSlots = {
-    Faction.savior: <int>{},
-    Faction.executor: <int>{},
-  };
   final Map<Faction, Set<int>> knownAttributeSlots = {
     Faction.savior: <int>{},
     Faction.executor: <int>{},
   };
   final List<GameLogEntry> logs = [];
+  final Map<String, Faction> judgedBy = {};
+  final Map<String, int> judgedTurn = {};
 
   late Faction currentPlayer;
+  late GameSession session;
   TurnPhase phase = TurnPhase.selectingAction;
   ActionType? selectedAction;
   int? selectedSlot;
@@ -37,13 +59,20 @@ class NineJudgesController extends ChangeNotifier {
   bool awaitingHandoff = false;
   bool debugMode = false;
   bool cpuActing = false;
+  bool _finished = false;
+  bool _saved = false;
+  Future<void>? _saveFuture;
+  String? endReason;
   String? lastCpuActionMessage;
   List<CpuCandidateScore> lastCpuEvaluations = const [];
+  double? _pendingCpuScore;
+  String? _pendingCpuReason;
 
   int get judgedCount => board.where((s) => s.person.isJudged).length;
-  bool get isFinished => judgedCount == board.length;
+  bool get isFinished => _finished;
   ScoreResult get score => NineJudgesRules.calculateScore(board);
   ActionInventory get currentInventory => inventories[currentPlayer]!;
+  ActionInventory inventoryFor(Faction faction) => inventories[faction]!;
   bool get isCpuGame => settings.mode == GameMode.cpu;
   bool get isCpuTurn =>
       isCpuGame && currentPlayer == settings.cpuFaction && !isFinished;
@@ -57,16 +86,12 @@ class NineJudgesController extends ChangeNotifier {
       Faction.savior: NineJudgesConfig.initialInventory,
       Faction.executor: NineJudgesConfig.initialInventory,
     };
-    knownNumberSlots[Faction.savior]!
-      ..clear()
-      ..addAll(NineJudgesConfig.saviorKnownNumberSlots);
-    knownNumberSlots[Faction.executor]!
-      ..clear()
-      ..addAll(NineJudgesConfig.executorKnownNumberSlots);
     for (final known in knownAttributeSlots.values) {
       known.clear();
     }
     logs.clear();
+    judgedBy.clear();
+    judgedTurn.clear();
     currentPlayer = settings.firstPlayer;
     phase = TurnPhase.selectingAction;
     selectedAction = null;
@@ -74,14 +99,41 @@ class NineJudgesController extends ChangeNotifier {
     turn = 1;
     awaitingHandoff = false;
     cpuActing = false;
+    _finished = false;
+    _saved = false;
+    _saveFuture = null;
+    endReason = null;
     lastCpuActionMessage = null;
     lastCpuEvaluations = const [];
+    final now = DateTime.now();
+    session = GameSession(
+      gameId: '${now.microsecondsSinceEpoch}-$seed',
+      startedAt: now,
+      gameVersion: NineJudgesConfig.gameVersion,
+      rulesVersion: NineJudgesConfig.rulesVersion,
+      mode: settings.mode.name,
+      playerFaction: isCpuGame ? humanFaction.name : Faction.savior.name,
+      cpuFaction: isCpuGame ? settings.cpuFaction.name : '',
+      firstPlayer: currentPlayer.name,
+      cpuDifficulty: isCpuGame ? settings.cpuLevel.strategyLabel : '',
+      seed: seed,
+      initialBoard: [
+        for (var i = 0; i < board.length; i++)
+          LoggedPerson(
+            personId: board[i].person.id,
+            attribute: board[i].person.attribute.name,
+            rank: board[i].person.rank,
+            initialAlive: board[i].person.isAlive,
+            positionIndex: i,
+          ),
+      ],
+    );
     notifyListeners();
   }
 
   void _resolveRandomSettings() {
     if (settings.mode != GameMode.cpu) return;
-    final humanFaction = switch (settings.factionSelection) {
+    final human = switch (settings.factionSelection) {
       FactionSelection.savior => Faction.savior,
       FactionSelection.executor => Faction.executor,
       FactionSelection.random =>
@@ -93,8 +145,8 @@ class NineJudgesController extends ChangeNotifier {
       FirstPlayerSelection.random => _random.nextBool(),
     };
     settings = settings.copyWith(
-      cpuFaction: humanFaction.opponent,
-      firstPlayer: humanStarts ? humanFaction : humanFaction.opponent,
+      cpuFaction: human.opponent,
+      firstPlayer: humanStarts ? human : human.opponent,
     );
   }
 
@@ -110,47 +162,53 @@ class NineJudgesController extends ChangeNotifier {
   }
 
   bool knowsNumber(int index, Faction viewer) =>
-      debugMode || isFinished || knownNumberSlots[viewer]!.contains(index);
+      NineJudgesConfig.numberCardsEnabled && (debugMode || isFinished);
+  bool eyeKnowsNumber(int index, Faction viewer) => false;
 
   bool knowsAttribute(PersonCard person, Faction viewer) {
     if (debugMode || isFinished || !person.hidesAttributeWhenDead) return true;
-    final index = board.indexWhere(
-      (slot) => identical(slot.person, person) || slot.person.id == person.id,
-    );
+    final index = board.indexWhere((slot) => slot.person.id == person.id);
     return index >= 0 && knownAttributeSlots[viewer]!.contains(index);
   }
 
   bool eyeKnowsAttribute(int index, Faction viewer) =>
       knownAttributeSlots[viewer]!.contains(index);
-  bool eyeKnowsNumber(int index, Faction viewer) =>
-      knownNumberSlots[viewer]!.contains(index) &&
-      !(viewer == Faction.savior
-              ? NineJudgesConfig.saviorKnownNumberSlots
-              : NineJudgesConfig.executorKnownNumberSlots)
-          .contains(index);
 
   List<EyeInformation> availableEyeInformation(int index, Faction viewer) {
     final person = board[index].person;
-    if (person.isJudged) return const [];
-    return [
-      if (person.hidesAttributeWhenDead && !knowsAttribute(person, viewer))
-        EyeInformation.attribute,
-      if (!knowsNumber(index, viewer)) EyeInformation.number,
-    ];
+    return person.rank == 3 &&
+            !person.isAlive &&
+            !person.isJudged &&
+            !knowsAttribute(person, viewer)
+        ? const [EyeInformation.attribute]
+        : const [];
   }
 
   bool canSelectAction(ActionType action) =>
       humanInputEnabled &&
       phase == TurnPhase.selectingAction &&
-      (action == ActionType.judge || currentInventory.remaining(action) > 0) &&
-      List.generate(board.length, (i) => i).any((i) => _canUse(action, i));
+      inventoryFor(currentPlayer).remaining(action) > 0 &&
+      _legalTargets(action, currentPlayer).isNotEmpty;
 
-  bool _canUse(ActionType action, int index) => NineJudgesRules.canUseAction(
-    action: action,
-    person: board[index].person,
-    viewerKnowsNumber: knowsNumber(index, currentPlayer),
-    viewerKnowsAttribute: knowsAttribute(board[index].person, currentPlayer),
-  );
+  List<int> _legalTargets(ActionType action, Faction viewer) => [
+    for (var i = 0; i < board.length; i++)
+      if (NineJudgesRules.canUseAction(
+        action: action,
+        person: board[i].person,
+        viewerKnowsNumber: true,
+        viewerKnowsAttribute: knowsAttribute(board[i].person, viewer),
+      ))
+        i,
+  ];
+
+  bool hasLegalAction(Faction faction) {
+    final hand = inventoryFor(faction);
+    return ActionType.values.any(
+      (action) =>
+          hand.remaining(action) > 0 &&
+          _legalTargets(action, faction).isNotEmpty,
+    );
+  }
 
   void chooseAction(ActionType action) {
     if (!canSelectAction(action)) return;
@@ -164,7 +222,7 @@ class NineJudgesController extends ChangeNotifier {
       humanInputEnabled &&
       phase == TurnPhase.selectingActionTarget &&
       selectedAction != null &&
-      _canUse(selectedAction!, index);
+      _legalTargets(selectedAction!, currentPlayer).contains(index);
 
   void selectSlot(int index) {
     if (!canTarget(index)) return;
@@ -181,19 +239,28 @@ class NineJudgesController extends ChangeNotifier {
     final index = selectedSlot;
     if (phase != TurnPhase.selectingEyeInformation ||
         index == null ||
+        information != EyeInformation.attribute ||
         !availableEyeInformation(index, currentPlayer).contains(information)) {
       return;
     }
-    if (information == EyeInformation.number) {
-      knownNumberSlots[currentPlayer]!.add(index);
-    } else {
-      knownAttributeSlots[currentPlayer]!.add(index);
-    }
-    inventories[currentPlayer] = currentInventory.consume(ActionType.eye);
-    logs.add(
-      GameLogEntry(turn: turn, player: currentPlayer, message: 'EYEを使用'),
+    final actor = currentPlayer;
+    final before = board[index].person;
+    final actorBefore = inventoryFor(actor);
+    final opponentBefore = inventoryFor(actor.opponent);
+    inventories[actor] = actorBefore.consume(ActionType.eye);
+    logs.add(GameLogEntry(turn: turn, player: actor, message: 'EYEを使用'));
+    _recordAction(
+      action: ActionType.eye,
+      index: index,
+      actor: actor,
+      before: before,
+      after: before,
+      actorBefore: actorBefore,
+      opponentBefore: opponentBefore,
+      eyeResult: before.attribute.name,
     );
-    _finishAction('${currentPlayer.label}がEYEを使用しました');
+    knownAttributeSlots[actor]!.add(index);
+    _finishAction('${actor.label}がEYEを使用しました');
   }
 
   void cancelEyeInformation() {
@@ -205,48 +272,198 @@ class NineJudgesController extends ChangeNotifier {
 
   void _applyAction(int index) {
     final action = selectedAction!;
+    final actor = currentPlayer;
     final slot = board[index];
-    var person = slot.person;
+    final before = slot.person;
+    final actorBefore = inventoryFor(actor);
+    final opponentBefore = inventoryFor(actor.opponent);
+    var after = before;
     var detail = '';
     switch (action) {
       case ActionType.life:
-        person = person.isAlive
-            ? person.copyWith(hasLifeShield: true)
-            : person.copyWith(isAlive: true);
-        detail = '${person.id}が${person.isAlive ? '生' : '死'}になりました';
+        after = before.isAlive
+            ? before.copyWith(hasLifeShield: true)
+            : before.copyWith(isAlive: true);
+        detail = before.isAlive ? '${after.id}にLIFE防護' : '${after.id}が生になりました';
       case ActionType.death:
-        person = !person.isAlive
-            ? person.copyWith(isJudged: true)
-            : person.hasLifeShield
-            ? person.copyWith(hasLifeShield: false)
-            : person.copyWith(isAlive: false);
-        detail = !slot.person.isAlive
-            ? '${person.id}を死で判決'
-            : '${person.id}へDEATH';
+        after = !before.isAlive
+            ? before.copyWith(isJudged: true)
+            : before.hasLifeShield
+            ? before.copyWith(hasLifeShield: false)
+            : before.copyWith(isAlive: false);
+        detail = !before.isAlive ? '${after.id}を死で判決' : '${after.id}へDEATH';
       case ActionType.judge:
-        person = person.copyWith(isJudged: true);
-        detail = '${person.id}を${person.isAlive ? '生' : '死'}で判決';
+        after = before.copyWith(isJudged: true);
+        detail = '${after.id}を${after.isAlive ? '生' : '死'}で判決';
       case ActionType.eye:
         return;
     }
-    board[index] = slot.copyWith(person: person);
-    if (action != ActionType.judge) {
-      inventories[currentPlayer] = currentInventory.consume(action);
+    board[index] = slot.copyWith(person: after);
+    inventories[actor] = actorBefore.consume(action);
+    if (!before.isJudged && after.isJudged) {
+      judgedBy[after.id] = actor;
+      judgedTurn[after.id] = turn;
     }
-    logs.add(GameLogEntry(turn: turn, player: currentPlayer, message: detail));
-    _finishAction('${currentPlayer.label}が${action.label}を使用\n$detail');
+    logs.add(GameLogEntry(turn: turn, player: actor, message: detail));
+    _recordAction(
+      action: action,
+      index: index,
+      actor: actor,
+      before: before,
+      after: after,
+      actorBefore: actorBefore,
+      opponentBefore: opponentBefore,
+    );
+    _finishAction('${actor.label}が${action.label}を使用\n$detail');
+  }
+
+  void _recordAction({
+    required ActionType action,
+    required int index,
+    required Faction actor,
+    required PersonCard before,
+    required PersonCard after,
+    required ActionInventory actorBefore,
+    required ActionInventory opponentBefore,
+    String? eyeResult,
+  }) {
+    final visible = knowsAttribute(before, actor)
+        ? before.attribute.name
+        : null;
+    session = session.copyWith(
+      actions: [
+        ...session.actions,
+        GameActionLog(
+          actionIndex: session.actions.length + 1,
+          turnNumber: turn,
+          actingPlayer: isCpuGame && actor == settings.cpuFaction
+              ? 'cpu'
+              : 'player',
+          faction: actor.name,
+          actionType: action.name,
+          targetPersonId: before.id,
+          targetRank: before.rank,
+          visibleTargetAttributeAtTime: visible,
+          actualTargetAttribute: before.attribute.name,
+          stateBefore: before.isAlive ? 'alive' : 'dead',
+          stateAfter: after.isAlive ? 'alive' : 'dead',
+          lifeShieldBefore: before.hasLifeShield,
+          lifeShieldAfter: after.hasLifeShield,
+          judgedBefore: before.isJudged,
+          judgedAfter: after.isJudged,
+          eyeResult: eyeResult,
+          actorHandBefore: actorBefore.toJson(),
+          actorHandAfter: inventoryFor(actor).toJson(),
+          opponentHandBefore: opponentBefore.toJson(),
+          opponentHandAfter: inventoryFor(actor.opponent).toJson(),
+          timestamp: DateTime.now(),
+          cpuEvaluationScore: _pendingCpuScore,
+          cpuDecisionReason: _pendingCpuReason,
+        ),
+      ],
+    );
+    _pendingCpuScore = null;
+    _pendingCpuReason = null;
   }
 
   void _finishAction(String publicMessage) {
     lastCpuActionMessage = isCpuTurn ? publicMessage : null;
     selectedAction = null;
     selectedSlot = null;
-    if (!isFinished) {
+    phase = TurnPhase.selectingAction;
+    if (_checkFinished()) {
+      notifyListeners();
+      return;
+    }
+    currentPlayer = currentPlayer.opponent;
+    turn++;
+    if (!hasLegalAction(currentPlayer) &&
+        hasLegalAction(currentPlayer.opponent)) {
       currentPlayer = currentPlayer.opponent;
       turn++;
-      phase = TurnPhase.selectingAction;
-      awaitingHandoff = !isCpuGame;
     }
+    awaitingHandoff = !isCpuGame;
+    notifyListeners();
+  }
+
+  bool _checkFinished() {
+    if (judgedCount == board.length) {
+      _completeGame('allJudged');
+      return true;
+    }
+    if (inventories.values.every((hand) => hand.total == 0)) {
+      _completeGame('allHandsEmpty');
+      return true;
+    }
+    if (!hasLegalAction(Faction.savior) && !hasLegalAction(Faction.executor)) {
+      _completeGame('noLegalActions');
+      return true;
+    }
+    return false;
+  }
+
+  void _completeGame(String reason) {
+    _finished = true;
+    endReason = reason;
+    final result = score;
+    session = session.copyWith(
+      finishedAt: DateTime.now(),
+      winner: result.winner?.name ?? 'draw',
+      saviorScore: result.savior,
+      executorScore: result.executor,
+      totalTurns: turn,
+      endReason: reason,
+      finalBoard: [
+        for (var i = 0; i < board.length; i++)
+          LoggedPerson(
+            personId: board[i].person.id,
+            attribute: board[i].person.attribute.name,
+            rank: board[i].person.rank,
+            initialAlive: session.initialBoard[i].initialAlive,
+            positionIndex: i,
+            finalAlive: board[i].person.isAlive,
+            judged: board[i].person.isJudged,
+            judgedBy: judgedBy[board[i].person.id]?.name,
+            judgedTurn: judgedTurn[board[i].person.id],
+            lifeShieldRemaining: board[i].person.hasLifeShield,
+            scoringFaction: NineJudgesRules.scoringFaction(
+              board[i].person,
+            ).name,
+            scoreValue: board[i].person.rank,
+            eyeSeenBySavior: knownAttributeSlots[Faction.savior]!.contains(i),
+            eyeSeenByExecutor: knownAttributeSlots[Faction.executor]!.contains(
+              i,
+            ),
+          ),
+      ],
+    );
+    if (!_saved) {
+      _saved = true;
+      _saveFuture = logRepository.saveGame(session);
+      unawaited(_saveFuture);
+    }
+  }
+
+  Future<void> ensureLogSaved() async {
+    if (isFinished && !_saved) _completeGame(endReason ?? 'finished');
+    await _saveFuture;
+  }
+
+  Future<void> updatePlaytestFeedback({
+    required String notes,
+    int? fun,
+    int? reading,
+    int? luck,
+    int? tempo,
+  }) async {
+    session = session.copyWith(
+      notes: notes,
+      funRating: fun,
+      readingRating: reading,
+      luckRating: luck,
+      tempoRating: tempo,
+    );
+    await logRepository.saveGame(session);
     notifyListeners();
   }
 
@@ -257,18 +474,10 @@ class NineJudgesController extends ChangeNotifier {
 
   CpuGameView cpuView() {
     final faction = settings.cpuFaction;
-    final known = knownNumberSlots[faction]!;
-    final knownNumbers = {for (final i in known) board[i].hiddenNumber};
     final legal = <ActionType, List<int>>{};
     for (final action in ActionType.values) {
-      if (action != ActionType.judge &&
-          inventories[faction]!.remaining(action) <= 0) {
-        continue;
-      }
-      final targets = [
-        for (var i = 0; i < board.length; i++)
-          if (_cpuCanUse(action, i, faction)) i,
-      ];
+      if (inventoryFor(faction).remaining(action) <= 0) continue;
+      final targets = _legalTargets(action, faction);
       if (targets.isNotEmpty) legal[action] = targets;
     }
     return CpuGameView(
@@ -278,7 +487,9 @@ class NineJudgesController extends ChangeNotifier {
           CpuSlotView(
             index: i,
             person: PersonCard(
-              id: board[i].person.id,
+              id: knowsAttribute(board[i].person, faction)
+                  ? board[i].person.id
+                  : 'unknown-slot-$i',
               attribute: knowsAttribute(board[i].person, faction)
                   ? board[i].person.attribute
                   : PersonAttribute.neutral,
@@ -287,29 +498,17 @@ class NineJudgesController extends ChangeNotifier {
               isJudged: board[i].person.isJudged,
               hasLifeShield: board[i].person.hasLifeShield,
             ),
-            knownNumber: known.contains(i) ? board[i].hiddenNumber : null,
             knownAttribute: knowsAttribute(board[i].person, faction)
                 ? board[i].person.attribute
                 : null,
             eyeOptions: availableEyeInformation(i, faction),
           ),
       ],
-      inventory: inventories[faction]!,
-      unknownNumberCandidates: {
-        for (var n = 1; n <= 9; n++)
-          if (!knownNumbers.contains(n)) n,
-      },
+      inventory: inventoryFor(faction),
+      opponentInventory: inventoryFor(faction.opponent),
       legalTargets: legal,
     );
   }
-
-  bool _cpuCanUse(ActionType action, int i, Faction faction) =>
-      NineJudgesRules.canUseAction(
-        action: action,
-        person: board[i].person,
-        viewerKnowsNumber: knowsNumber(i, faction),
-        viewerKnowsAttribute: knowsAttribute(board[i].person, faction),
-      );
 
   CpuDecision? performCpuAction() {
     if (!isCpuTurn || phase != TurnPhase.selectingAction) return null;
@@ -318,17 +517,15 @@ class NineJudgesController extends ChangeNotifier {
     lastCpuEvaluations = strategy.evaluateActions(view)
       ..sort((a, b) => b.score.compareTo(a.score));
     final decision = strategy.decideAction(view);
+    _pendingCpuScore = decision.score;
+    _pendingCpuReason =
+        'Selected ${decision.action.label}; '
+        'opponent hand ${view.opponentInventory.toJson()}';
     cpuActing = true;
     chooseAction(decision.action);
     selectSlot(decision.targetIndex);
     if (decision.action == ActionType.eye) {
-      revealEyeInformation(
-        decision.eyeInformation ??
-            availableEyeInformation(
-              decision.targetIndex,
-              settings.cpuFaction,
-            ).first,
-      );
+      revealEyeInformation(EyeInformation.attribute);
     }
     cpuActing = false;
     notifyListeners();

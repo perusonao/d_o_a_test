@@ -34,7 +34,7 @@ enum TurnPhase {
   selectingEyeInformation,
 }
 
-enum EyeInformation { attribute, number }
+enum EyeInformation { attribute }
 
 enum FactionSelection { savior, executor, random }
 
@@ -125,7 +125,7 @@ class PersonCard {
 }
 
 class BoardSlot {
-  const BoardSlot({required this.person, required this.hiddenNumber});
+  const BoardSlot({required this.person, this.hiddenNumber = 0});
 
   final PersonCard person;
   final int hiddenNumber;
@@ -139,24 +139,55 @@ class ActionInventory {
     required this.life,
     required this.death,
     required this.eye,
+    this.judge = 3,
   });
 
   final int life;
   final int death;
   final int eye;
+  final int judge;
+
+  int get total => life + death + eye + judge;
 
   int remaining(ActionType action) => switch (action) {
     ActionType.life => life,
     ActionType.death => death,
     ActionType.eye => eye,
-    ActionType.judge => 1,
+    ActionType.judge => judge,
   };
 
   ActionInventory consume(ActionType action) => switch (action) {
-    ActionType.life => ActionInventory(life: life - 1, death: death, eye: eye),
-    ActionType.death => ActionInventory(life: life, death: death - 1, eye: eye),
-    ActionType.eye => ActionInventory(life: life, death: death, eye: eye - 1),
-    ActionType.judge => this,
+    ActionType.life => ActionInventory(
+      life: life - 1,
+      death: death,
+      eye: eye,
+      judge: judge,
+    ),
+    ActionType.death => ActionInventory(
+      life: life,
+      death: death - 1,
+      eye: eye,
+      judge: judge,
+    ),
+    ActionType.eye => ActionInventory(
+      life: life,
+      death: death,
+      eye: eye - 1,
+      judge: judge,
+    ),
+    ActionType.judge => ActionInventory(
+      life: life,
+      death: death,
+      eye: eye,
+      judge: judge - 1,
+    ),
+  };
+
+  Map<String, int> toJson() => {
+    'life': life,
+    'death': death,
+    'eye': eye,
+    'judge': judge,
   };
 }
 

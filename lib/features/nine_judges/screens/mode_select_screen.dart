@@ -2,9 +2,14 @@ import 'package:dead_or_alive/features/nine_judges/models/judge_models.dart';
 import 'package:flutter/material.dart';
 
 class NineJudgesModeSelectScreen extends StatefulWidget {
-  const NineJudgesModeSelectScreen({required this.onStart, super.key});
+  const NineJudgesModeSelectScreen({
+    required this.onStart,
+    this.onOpenLogs,
+    super.key,
+  });
 
   final ValueChanged<NineJudgesGameSettings> onStart;
+  final VoidCallback? onOpenLogs;
 
   @override
   State<NineJudgesModeSelectScreen> createState() =>
@@ -25,8 +30,8 @@ class _NineJudgesModeSelectScreenState
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 430),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -151,6 +156,12 @@ class _NineJudgesModeSelectScreenState
                       ),
                     ),
                     child: const Text('ゲーム開始'),
+                  ),
+                  TextButton.icon(
+                    key: const Key('open-play-logs'),
+                    onPressed: widget.onOpenLogs,
+                    icon: const Icon(Icons.analytics_outlined),
+                    label: const Text('プレイログ・分析'),
                   ),
                 ],
               ),

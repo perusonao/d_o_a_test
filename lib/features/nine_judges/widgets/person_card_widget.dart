@@ -88,12 +88,16 @@ class PersonCardWidget extends StatelessWidget {
                       ),
                     ),
                     const Spacer(),
-                    _NumberMedal(
-                      value: numberVisible ? '${slot.hiddenNumber}' : '?',
-                      known: numberVisible,
-                      compact: compact,
-                      eyeKnown: numberEyeKnown,
-                    ),
+                    if (!person.isJudged)
+                      Text(
+                        attributeEyeKnown ? 'EYE確認済み' : '未判決',
+                        style: TextStyle(
+                          fontSize: compact ? 7 : 9,
+                          color: attributeEyeKnown
+                              ? const Color(0xFFB49CF2)
+                              : Colors.white38,
+                        ),
+                      ),
                     if (scoreDetail != null)
                       Text(
                         '${scoreDetail!.faction.label} +${scoreDetail!.points}',
@@ -191,59 +195,6 @@ class PersonCardWidget extends StatelessWidget {
     PersonAttribute.evil => const Color(0xFFF0645A),
     PersonAttribute.neutral => const Color(0xFFC8C3B8),
   };
-}
-
-class _NumberMedal extends StatelessWidget {
-  const _NumberMedal({
-    required this.value,
-    required this.known,
-    required this.compact,
-    required this.eyeKnown,
-  });
-
-  final String value;
-  final bool known;
-  final bool compact;
-  final bool eyeKnown;
-
-  @override
-  Widget build(BuildContext context) {
-    final size = compact ? 25.0 : 31.0;
-    return Container(
-      key: Key('number-$value'),
-      width: size,
-      height: size,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: known ? const Color(0xFF292313) : const Color(0xFF17181C),
-        border: Border.all(
-          color: known ? const Color(0xFFE0BC68) : Colors.white38,
-          width: known ? 1.5 : 1,
-        ),
-      ),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Text(
-            value,
-            style: TextStyle(
-              color: known ? const Color(0xFFFFD978) : Colors.white60,
-              fontSize: compact ? 14 : 17,
-              height: 1,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          if (eyeKnown)
-            const Positioned(
-              right: 1,
-              bottom: 1,
-              child: Icon(Icons.visibility, size: 7),
-            ),
-        ],
-      ),
-    );
-  }
 }
 
 class _StatusBadge extends StatelessWidget {

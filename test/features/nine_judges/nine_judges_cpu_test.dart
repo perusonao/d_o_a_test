@@ -1,7 +1,6 @@
 import 'dart:math';
 
 import 'package:dead_or_alive/features/nine_judges/cpu/basic_cpu_strategy.dart';
-import 'package:dead_or_alive/features/nine_judges/cpu/cpu_evaluator.dart';
 import 'package:dead_or_alive/features/nine_judges/cpu/cpu_strategy.dart';
 import 'package:dead_or_alive/features/nine_judges/cpu/random_cpu_strategy.dart';
 import 'package:dead_or_alive/features/nine_judges/game/game_controller.dart';
@@ -36,7 +35,7 @@ void main() {
       }
     });
 
-    test('既知数字と判決済み人物はEYE候補にならない', () {
+    test('EYE候補は未判決の死状態人物3だけ', () {
       final controller = NineJudgesController(
         random: Random(2),
         settings: cpuSettings,
@@ -48,45 +47,29 @@ void main() {
       );
       final view = controller.cpuView();
       final eyeTargets = view.legalTargets[ActionType.eye]!;
-      for (final index in controller.knownNumberSlots[Faction.executor]!) {
-        if (eyeTargets.contains(index)) {
-          expect(
-            controller
-                .availableEyeInformation(index, Faction.executor)
-                .contains(EyeInformation.attribute),
-            isTrue,
-          );
-        }
+      for (final index in eyeTargets) {
+        expect(controller.board[index].person.rank, 3);
+        expect(controller.board[index].person.isAlive, isFalse);
+        expect(controller.board[index].person.isJudged, isFalse);
       }
       expect(eyeTargets, isNot(contains(4)));
     });
 
-    test('CPUビューは未知の秘密数字を渡さず期待値を使う', () {
+    test('CPUビューは未確認人物3の属性と属性を含むIDを渡さない', () {
       final controller = NineJudgesController(
-        random: Random(3),
+        random: Random(12),
         settings: cpuSettings,
       );
       addTearDown(controller.dispose);
-      controller.currentPlayer = Faction.executor;
-      const unknownIndex = 4;
-      final firstView = controller.cpuView();
-      expect(firstView.slots[unknownIndex].knownNumber, isNull);
-      final firstEstimate = CpuEvaluator.estimatedNumberValue(
-        firstView,
-        firstView.slots[unknownIndex],
+      final index = controller.board.indexWhere(
+        (slot) => slot.person.rank == 3 && !slot.person.isAlive,
       );
-      controller.board[unknownIndex] = BoardSlot(
-        person: controller.board[unknownIndex].person,
-        hiddenNumber: controller.board[unknownIndex].hiddenNumber == 9 ? 1 : 9,
-      );
-      final secondView = controller.cpuView();
-      expect(secondView.slots[unknownIndex].knownNumber, isNull);
+      final slot = controller.cpuView().slots[index];
+      expect(slot.knownAttribute, isNull);
+      expect(slot.person.id, 'unknown-slot-$index');
       expect(
-        CpuEvaluator.estimatedNumberValue(
-          secondView,
-          secondView.slots[unknownIndex],
-        ),
-        firstEstimate,
+        slot.person.id,
+        isNot(contains(controller.board[index].person.attribute.name)),
       );
     });
 
@@ -102,7 +85,6 @@ void main() {
               rank: 2,
               isAlive: true,
             ),
-            knownNumber: 5,
           ),
           CpuSlotView(
             index: 1,
@@ -112,11 +94,9 @@ void main() {
               rank: 2,
               isAlive: true,
             ),
-            knownNumber: 5,
           ),
         ],
         inventory: ActionInventory(life: 3, death: 3, eye: 2),
-        unknownNumberCandidates: {1, 2, 3, 4, 6, 7, 8, 9},
         legalTargets: {
           ActionType.death: [0, 1],
         },
@@ -136,7 +116,6 @@ void main() {
               rank: 1,
               isAlive: true,
             ),
-            knownNumber: 1,
           ),
           CpuSlotView(
             index: 1,
@@ -146,11 +125,9 @@ void main() {
               rank: 3,
               isAlive: true,
             ),
-            knownNumber: 9,
           ),
         ],
         inventory: ActionInventory(life: 3, death: 3, eye: 2),
-        unknownNumberCandidates: {2, 3, 4, 5, 6, 7, 8},
         legalTargets: {
           ActionType.death: [0, 1],
         },
@@ -218,7 +195,8 @@ void main() {
         }
       }
       expect(controller.isFinished, isTrue);
-      expect(controller.judgedCount, 9);
+      expect(controller.judgedCount, lessThanOrEqualTo(9));
+      expect(controller.endReason, isNotNull);
     });
   });
 }

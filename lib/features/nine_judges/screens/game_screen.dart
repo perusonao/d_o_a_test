@@ -3,9 +3,12 @@ import 'package:dead_or_alive/features/nine_judges/models/judge_models.dart';
 import 'package:dead_or_alive/features/nine_judges/screens/handoff_screen.dart';
 import 'package:dead_or_alive/features/nine_judges/screens/mode_select_screen.dart';
 import 'package:dead_or_alive/features/nine_judges/screens/result_screen.dart';
+import 'package:dead_or_alive/features/nine_judges/screens/play_log_screen.dart';
+import 'package:dead_or_alive/features/nine_judges/logging/game_log_repository.dart';
 import 'package:dead_or_alive/features/nine_judges/widgets/action_panel.dart';
 import 'package:dead_or_alive/features/nine_judges/widgets/board_grid.dart';
 import 'package:dead_or_alive/features/nine_judges/widgets/selected_card_panel.dart';
+import 'package:dead_or_alive/features/nine_judges/widgets/hand_status_panel.dart';
 import 'package:flutter/material.dart';
 
 class NineJudgesGameScreen extends StatefulWidget {
@@ -38,8 +41,10 @@ class _NineJudgesGameScreenState extends State<NineJudgesGameScreen> {
   void _startGame(NineJudgesGameSettings settings) {
     controller?.removeListener(_handleControllerChanged);
     controller?.dispose();
-    controller = NineJudgesController(settings: settings)
-      ..addListener(_handleControllerChanged);
+    controller = NineJudgesController(
+      settings: settings,
+      logRepository: LocalGameLogRepository.instance,
+    )..addListener(_handleControllerChanged);
     _handleControllerChanged();
     if (mounted) setState(() {});
   }
@@ -78,7 +83,16 @@ class _NineJudgesGameScreenState extends State<NineJudgesGameScreen> {
   Widget build(BuildContext context) {
     final game = controller;
     if (game == null) {
-      return NineJudgesModeSelectScreen(onStart: _startGame);
+      return NineJudgesModeSelectScreen(
+        onStart: _startGame,
+        onOpenLogs: () => Navigator.push<void>(
+          context,
+          MaterialPageRoute(
+            builder: (_) =>
+                PlayLogScreen(repository: LocalGameLogRepository.instance),
+          ),
+        ),
+      );
     }
     return AnimatedBuilder(
       animation: game,
@@ -127,8 +141,9 @@ class _GameBoard extends StatelessWidget {
                   const SizedBox(height: 4),
                   Expanded(child: BoardGrid(controller: controller)),
                   SelectedCardPanel(controller: controller),
+                  HandStatusPanel(controller: controller),
                   ActionPanel(controller: controller),
-                  const SizedBox(height: 52),
+                  const SizedBox(height: 8),
                   if (controller.debugMode)
                     SizedBox(
                       height: 21,
@@ -444,14 +459,14 @@ class _PhaseBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     final selectingJudge = controller.selectedAction == ActionType.judge;
     final text = controller.isCpuTurn
-        ? 'CPUが思考中'
+        ? 'CPUが思考中…'
         : switch (controller.phase) {
             TurnPhase.selectingAction => 'アクションを選択してください',
             TurnPhase.selectingActionTarget =>
               switch (controller.selectedAction!) {
                 ActionType.life => 'LIFEを使う人物を選択してください',
                 ActionType.death => 'DEATHを使う人物を選択してください',
-                ActionType.eye => 'EYEを使う人物を選択してください',
+                ActionType.eye => '正体を見る人物3を選択',
                 ActionType.judge => '判決する人物を選択してください',
               },
             TurnPhase.selectingEyeInformation => '確認する情報を選択',
@@ -510,7 +525,7 @@ class _CpuMessage extends StatelessWidget {
       ),
       child: Text(
         controller.isCpuTurn
-            ? controller.lastCpuActionMessage ?? 'CPUが思考中'
+            ? controller.lastCpuActionMessage ?? 'CPUが思考中…'
             : controller.lastCpuActionMessage!,
         textAlign: TextAlign.center,
         maxLines: 2,
@@ -552,8 +567,8 @@ class _RulesDialog extends StatelessWidget {
           Divider(),
           _RuleLine(title: 'LIFE', body: '死→生 / 生ならDEATHを1回防ぐ'),
           _RuleLine(title: 'DEATH', body: '生→死 / 死なら即判決'),
-          _RuleLine(title: 'EYE', body: '秘密の属性または数字を1つ見る'),
-          _RuleLine(title: 'JUDGE', body: '1アクションとして現在の生死で最終確定'),
+          _RuleLine(title: 'EYE', body: '死状態の人物3の属性を自分だけ確認'),
+          _RuleLine(title: 'JUDGE', body: '有限カードで現在の生死を最終確定'),
         ],
       ),
       actions: [

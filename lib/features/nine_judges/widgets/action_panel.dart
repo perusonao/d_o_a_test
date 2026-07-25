@@ -30,14 +30,6 @@ class ActionPanel extends StatelessWidget {
                   ),
                 ),
               if (options.length == 2) const SizedBox(width: 5),
-              if (options.contains(EyeInformation.number))
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () =>
-                        controller.revealEyeInformation(EyeInformation.number),
-                    child: const Text('数字を見る'),
-                  ),
-                ),
             ],
           ),
           TextButton(
@@ -89,10 +81,10 @@ class ActionPanel extends StatelessWidget {
               elevation: controller.canSelectAction(ActionType.judge) ? 5 : 0,
               padding: EdgeInsets.zero,
             ),
-            child: const Column(
+            child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Row(
+                const Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(Icons.balance, size: 18),
@@ -107,7 +99,10 @@ class ActionPanel extends StatelessWidget {
                     ),
                   ],
                 ),
-                Text('現在の生死で判決', style: TextStyle(fontSize: 9, height: 1)),
+                Text(
+                  '現在の生死で判決・残り${controller.currentInventory.judge}',
+                  style: const TextStyle(fontSize: 9, height: 1),
+                ),
               ],
             ),
           ),

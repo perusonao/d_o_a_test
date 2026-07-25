@@ -28,6 +28,9 @@ void main() {
     expect(find.text('DEATH'), findsOneWidget);
     expect(find.text('EYE'), findsOneWidget);
     expect(find.byKey(const Key('judge-button')), findsOneWidget);
+    expect(find.byKey(const Key('own-hand')), findsOneWidget);
+    expect(find.byKey(const Key('opponent-hand')), findsOneWidget);
+    expect(find.textContaining('JUDGE 3'), findsNWidgets(2));
     expect(find.byKey(const Key('rules-button')), findsOneWidget);
     expect(find.text('アクションを選択してください'), findsOneWidget);
     expect(find.textContaining('SAVE'), findsNothing);
@@ -44,7 +47,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('rules-dialog')), findsOneWidget);
     expect(find.text('死→生 / 生ならDEATHを1回防ぐ'), findsOneWidget);
-    expect(find.textContaining('現在の生死で最終確定'), findsOneWidget);
+    expect(find.textContaining('有限カード'), findsOneWidget);
   });
 
   testWidgets('対戦モードとEASY・NORMALを選択できる', (tester) async {
@@ -62,7 +65,7 @@ void main() {
     expect(find.textContaining('執行者（CPU）'), findsOneWidget);
   });
 
-  testWidgets('人物カードに未知数字・LIFE防護・判決済みを明示する', (tester) async {
+  testWidgets('人物カードにLIFE防護・判決済みを明示し数字を表示しない', (tester) async {
     const slot = BoardSlot(
       person: PersonCard(
         id: 'good-2',
@@ -92,7 +95,7 @@ void main() {
         ),
       ),
     );
-    expect(find.textContaining('?'), findsOneWidget);
+    expect(find.byKey(const Key('number-?')), findsNothing);
     expect(find.byKey(const Key('life-shield')), findsOneWidget);
     expect(find.byKey(const Key('judged-label')), findsOneWidget);
   });
@@ -112,11 +115,7 @@ void main() {
       ),
     );
     expect(find.text('何を確認しますか？'), findsOneWidget);
-    expect(
-      find.text('属性を見る').evaluate().isNotEmpty ||
-          find.text('数字を見る').evaluate().isNotEmpty,
-      isTrue,
-    );
+    expect(find.text('属性を見る'), findsOneWidget);
   });
 
   testWidgets('CPU先攻ではCPUが思考中と表示する', (tester) async {
@@ -131,7 +130,7 @@ void main() {
         ),
       ),
     );
-    expect(find.text('CPUが思考中'), findsWidgets);
+    expect(find.text('CPUが思考中…'), findsWidgets);
     await tester.pump(const Duration(milliseconds: 600));
   });
 }
