@@ -246,6 +246,29 @@ class _GameAnalysis extends StatelessWidget {
               a.judgedAfter,
         )
         .length;
+    final judgeContacts = <int>[
+      for (final judge in judges)
+        session.actions
+            .where(
+              (action) =>
+                  action.actionIndex < judge.actionIndex &&
+                  action.targetPersonId == judge.targetPersonId &&
+                  action.actionType != 'judge',
+            )
+            .length,
+    ];
+    final averageContacts = judgeContacts.isEmpty
+        ? 0
+        : judgeContacts.reduce((a, b) => a + b) / judgeContacts.length;
+    final reviewed = session.finalBoard
+        .where(
+          (person) => session.actions.any(
+            (action) =>
+                action.targetPersonId == person.personId &&
+                action.underReviewAfter,
+          ),
+        )
+        .length;
     final remaining = session.actions.isEmpty
         ? const {'life': 4, 'death': 4, 'eye': 4, 'judge': 6}
         : {
@@ -266,7 +289,9 @@ class _GameAnalysis extends StatelessWidget {
         '平均 ${averageJudge.toStringAsFixed(1)}\n'
         '判決率 R1 ${judgedAtRank(1)}/3  R2 ${judgedAtRank(2)}/3  '
         'R3 ${judgedAtRank(3)}/3\n'
-        'EYE後の操作 $eyeFollowUps / 死+DEATH即判決 $instantDeaths',
+        'EYE後の操作 $eyeFollowUps / 死+DEATH即判決 $instantDeaths\n'
+        'JUDGEまでの平均接触 ${averageContacts.toStringAsFixed(1)}回 / '
+        '審議経験 $reviewed人 / 未判決 ${9 - session.finalBoard.where((p) => p.judged == true).length}人',
         style: const TextStyle(fontSize: 11),
       ),
     );
@@ -279,6 +304,8 @@ class _Statistics extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final versions = games.map((game) => game.rulesVersion).toSet().toList()
+      ..sort();
     int wins(String faction) => games.where((g) => g.winner == faction).length;
     double averageUses(String action) => games.isEmpty
         ? 0
@@ -328,7 +355,10 @@ class _Statistics extends StatelessWidget {
         '平均残り L${averageRemaining('life').toStringAsFixed(1)} '
         'D${averageRemaining('death').toStringAsFixed(1)} '
         'E${averageRemaining('eye').toStringAsFixed(1)} '
-        'J${averageRemaining('judge').toStringAsFixed(1)}',
+        'J${averageRemaining('judge').toStringAsFixed(1)}\n'
+        'ルール別: ${versions.map((v) => '$v=${games.where((g) => g.rulesVersion == v).length}件').join(' / ')}  '
+        'ターン制限 ${games.where((g) => g.endReason == 'turnLimit').length}件  '
+        'EYE未使用 ${games.where((g) => g.actions.every((a) => a.actionType != 'eye')).length}件',
         style: const TextStyle(fontSize: 11),
       ),
     );

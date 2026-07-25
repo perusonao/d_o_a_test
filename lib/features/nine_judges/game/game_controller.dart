@@ -46,6 +46,15 @@ class NineJudgesController extends ChangeNotifier {
     Faction.savior: <int>{},
     Faction.executor: <int>{},
   };
+  final Map<Faction, Set<int>> initialKnowledgeSlots = {
+    Faction.savior: <int>{},
+    Faction.executor: <int>{},
+  };
+  final Map<Faction, Set<int>> eyeKnowledgeSlots = {
+    Faction.savior: <int>{},
+    Faction.executor: <int>{},
+  };
+  late Map<Faction, int> actionsUsed;
   final List<GameLogEntry> logs = [];
   final Map<String, Faction> judgedBy = {};
   final Map<String, int> judgedTurn = {};
@@ -78,6 +87,9 @@ class NineJudgesController extends ChangeNotifier {
       isCpuGame && currentPlayer == settings.cpuFaction && !isFinished;
   bool get humanInputEnabled => !isCpuTurn || cpuActing;
   Faction get humanFaction => settings.cpuFaction.opponent;
+  int actionsUsedBy(Faction faction) => actionsUsed[faction]!;
+  int actionsRemainingFor(Faction faction) =>
+      NineJudgesConfig.maxActionsPerPlayer - actionsUsedBy(faction);
 
   void reset() {
     _resolveRandomSettings();
@@ -86,9 +98,24 @@ class NineJudgesController extends ChangeNotifier {
       Faction.savior: NineJudgesConfig.initialInventory,
       Faction.executor: NineJudgesConfig.initialInventory,
     };
+    actionsUsed = {Faction.savior: 0, Faction.executor: 0};
     for (final known in knownAttributeSlots.values) {
       known.clear();
     }
+    for (final known in initialKnowledgeSlots.values) {
+      known.clear();
+    }
+    for (final known in eyeKnowledgeSlots.values) {
+      known.clear();
+    }
+    final rankThreeSlots = [
+      for (var i = 0; i < board.length; i++)
+        if (board[i].person.rank == 3) i,
+    ]..shuffle(_random);
+    initialKnowledgeSlots[Faction.savior]!.add(rankThreeSlots[0]);
+    initialKnowledgeSlots[Faction.executor]!.add(rankThreeSlots[1]);
+    knownAttributeSlots[Faction.savior]!.add(rankThreeSlots[0]);
+    knownAttributeSlots[Faction.executor]!.add(rankThreeSlots[1]);
     logs.clear();
     judgedBy.clear();
     judgedTurn.clear();
@@ -127,6 +154,16 @@ class NineJudgesController extends ChangeNotifier {
             positionIndex: i,
           ),
       ],
+      initialKnowledge: {
+        for (final faction in Faction.values)
+          faction.name: InitialKnowledgeLog(
+            personId: board[initialKnowledgeSlots[faction]!.single].person.id,
+            attribute: board[initialKnowledgeSlots[faction]!.single]
+                .person
+                .attribute
+                .name,
+          ),
+      },
     );
     notifyListeners();
   }
@@ -168,11 +205,29 @@ class NineJudgesController extends ChangeNotifier {
   bool knowsAttribute(PersonCard person, Faction viewer) {
     if (debugMode || isFinished || !person.hidesAttributeWhenDead) return true;
     final index = board.indexWhere((slot) => slot.person.id == person.id);
-    return index >= 0 && knownAttributeSlots[viewer]!.contains(index);
+    return index >= 0 &&
+        (knownAttributeSlots[viewer]!.contains(index) ||
+            inferredAttribute(index, viewer) != null);
   }
 
   bool eyeKnowsAttribute(int index, Faction viewer) =>
-      knownAttributeSlots[viewer]!.contains(index);
+      eyeKnowledgeSlots[viewer]!.contains(index);
+
+  bool initiallyKnowsAttribute(int index, Faction viewer) =>
+      initialKnowledgeSlots[viewer]!.contains(index);
+
+  PersonAttribute? inferredAttribute(int index, Faction viewer) =>
+      NineJudgesRules.inferRank3Attribute(
+        rankThreePeople: [
+          for (final slot in board)
+            if (slot.person.rank == 3) slot.person,
+        ],
+        knownPersonIds: {
+          for (final knownIndex in knownAttributeSlots[viewer]!)
+            board[knownIndex].person.id,
+        },
+        targetPersonId: board[index].person.id,
+      );
 
   List<EyeInformation> availableEyeInformation(int index, Faction viewer) {
     final person = board[index].person;
@@ -187,6 +242,7 @@ class NineJudgesController extends ChangeNotifier {
   bool canSelectAction(ActionType action) =>
       humanInputEnabled &&
       phase == TurnPhase.selectingAction &&
+      actionsRemainingFor(currentPlayer) > 0 &&
       inventoryFor(currentPlayer).remaining(action) > 0 &&
       _legalTargets(action, currentPlayer).isNotEmpty;
 
@@ -202,6 +258,7 @@ class NineJudgesController extends ChangeNotifier {
   ];
 
   bool hasLegalAction(Faction faction) {
+    if (actionsRemainingFor(faction) <= 0) return false;
     final hand = inventoryFor(faction);
     return ActionType.values.any(
       (action) =>
@@ -249,17 +306,21 @@ class NineJudgesController extends ChangeNotifier {
     final opponentBefore = inventoryFor(actor.opponent);
     inventories[actor] = actorBefore.consume(ActionType.eye);
     logs.add(GameLogEntry(turn: turn, player: actor, message: 'EYEを使用'));
+    knownAttributeSlots[actor]!.add(index);
+    eyeKnowledgeSlots[actor]!.add(index);
+    final after = before.copyWith(isUnderReview: true);
+    board[index] = board[index].copyWith(person: after);
     _recordAction(
       action: ActionType.eye,
       index: index,
       actor: actor,
       before: before,
-      after: before,
+      after: after,
       actorBefore: actorBefore,
       opponentBefore: opponentBefore,
       eyeResult: before.attribute.name,
+      knowledgeSource: 'eye',
     );
-    knownAttributeSlots[actor]!.add(index);
     _finishAction('${actor.label}がEYEを使用しました');
   }
 
@@ -282,15 +343,15 @@ class NineJudgesController extends ChangeNotifier {
     switch (action) {
       case ActionType.life:
         after = before.isAlive
-            ? before.copyWith(hasLifeShield: true)
-            : before.copyWith(isAlive: true);
+            ? before.copyWith(hasLifeShield: true, isUnderReview: true)
+            : before.copyWith(isAlive: true, isUnderReview: true);
         detail = before.isAlive ? '${after.id}にLIFE防護' : '${after.id}が生になりました';
       case ActionType.death:
         after = !before.isAlive
             ? before.copyWith(isJudged: true)
             : before.hasLifeShield
-            ? before.copyWith(hasLifeShield: false)
-            : before.copyWith(isAlive: false);
+            ? before.copyWith(hasLifeShield: false, isUnderReview: true)
+            : before.copyWith(isAlive: false, isUnderReview: true);
         detail = !before.isAlive ? '${after.id}を死で判決' : '${after.id}へDEATH';
       case ActionType.judge:
         after = before.copyWith(isJudged: true);
@@ -326,6 +387,7 @@ class NineJudgesController extends ChangeNotifier {
     required ActionInventory actorBefore,
     required ActionInventory opponentBefore,
     String? eyeResult,
+    String knowledgeSource = 'none',
   }) {
     final visible = knowsAttribute(before, actor)
         ? before.attribute.name
@@ -359,6 +421,11 @@ class NineJudgesController extends ChangeNotifier {
           timestamp: DateTime.now(),
           cpuEvaluationScore: _pendingCpuScore,
           cpuDecisionReason: _pendingCpuReason,
+          underReviewBefore: before.isUnderReview,
+          underReviewAfter: after.isUnderReview,
+          remainingActionsBefore: actionsRemainingFor(actor),
+          remainingActionsAfter: actionsRemainingFor(actor) - 1,
+          knowledgeSource: knowledgeSource,
         ),
       ],
     );
@@ -367,6 +434,7 @@ class NineJudgesController extends ChangeNotifier {
   }
 
   void _finishAction(String publicMessage) {
+    actionsUsed[currentPlayer] = actionsUsed[currentPlayer]! + 1;
     lastCpuActionMessage = isCpuTurn ? publicMessage : null;
     selectedAction = null;
     selectedSlot = null;
@@ -380,7 +448,6 @@ class NineJudgesController extends ChangeNotifier {
     if (!hasLegalAction(currentPlayer) &&
         hasLegalAction(currentPlayer.opponent)) {
       currentPlayer = currentPlayer.opponent;
-      turn++;
     }
     awaitingHandoff = !isCpuGame;
     notifyListeners();
@@ -391,8 +458,10 @@ class NineJudgesController extends ChangeNotifier {
       _completeGame('allJudged');
       return true;
     }
-    if (inventories.values.every((hand) => hand.total == 0)) {
-      _completeGame('allHandsEmpty');
+    if (actionsUsed.values.every(
+      (used) => used >= NineJudgesConfig.maxActionsPerPlayer,
+    )) {
+      _completeGame('turnLimit');
       return true;
     }
     if (!hasLegalAction(Faction.savior) && !hasLegalAction(Faction.executor)) {
@@ -413,6 +482,14 @@ class NineJudgesController extends ChangeNotifier {
       executorScore: result.executor,
       totalTurns: turn,
       endReason: reason,
+      actionsUsed: {
+        for (final faction in Faction.values)
+          faction.name: actionsUsedBy(faction),
+      },
+      actionsRemaining: {
+        for (final faction in Faction.values)
+          faction.name: actionsRemainingFor(faction),
+      },
       finalBoard: [
         for (var i = 0; i < board.length; i++)
           LoggedPerson(
@@ -491,21 +568,31 @@ class NineJudgesController extends ChangeNotifier {
                   ? board[i].person.id
                   : 'unknown-slot-$i',
               attribute: knowsAttribute(board[i].person, faction)
-                  ? board[i].person.attribute
+                  ? inferredAttribute(i, faction) ?? board[i].person.attribute
                   : PersonAttribute.neutral,
               rank: board[i].person.rank,
               isAlive: board[i].person.isAlive,
               isJudged: board[i].person.isJudged,
               hasLifeShield: board[i].person.hasLifeShield,
+              isUnderReview: board[i].person.isUnderReview,
             ),
             knownAttribute: knowsAttribute(board[i].person, faction)
-                ? board[i].person.attribute
+                ? inferredAttribute(i, faction) ?? board[i].person.attribute
                 : null,
+            knowledgeSource: eyeKnowledgeSlots[faction]!.contains(i)
+                ? 'eye'
+                : initialKnowledgeSlots[faction]!.contains(i)
+                ? 'initial'
+                : inferredAttribute(i, faction) != null
+                ? 'inference'
+                : 'public',
             eyeOptions: availableEyeInformation(i, faction),
           ),
       ],
       inventory: inventoryFor(faction),
       opponentInventory: inventoryFor(faction.opponent),
+      remainingActions: actionsRemainingFor(faction),
+      opponentRemainingActions: actionsRemainingFor(faction.opponent),
       legalTargets: legal,
     );
   }
@@ -520,7 +607,10 @@ class NineJudgesController extends ChangeNotifier {
     _pendingCpuScore = decision.score;
     _pendingCpuReason =
         'Selected ${decision.action.label}; '
-        'opponent hand ${view.opponentInventory.toJson()}';
+        'opponent hand ${view.opponentInventory.toJson()}; '
+        'remaining actions ${view.remainingActions}/'
+        '${view.opponentRemainingActions}'
+        '${view.slots[decision.targetIndex].knowledgeSource == 'inference' ? '; inferred rank-3 attribute by elimination' : ''}';
     cpuActing = true;
     chooseAction(decision.action);
     selectSlot(decision.targetIndex);

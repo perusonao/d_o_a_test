@@ -93,6 +93,11 @@ class GameActionLog {
     this.eyeResult,
     this.cpuEvaluationScore,
     this.cpuDecisionReason,
+    this.underReviewBefore = false,
+    this.underReviewAfter = false,
+    this.remainingActionsBefore = 0,
+    this.remainingActionsAfter = 0,
+    this.knowledgeSource = 'none',
   });
 
   final int actionIndex;
@@ -118,6 +123,11 @@ class GameActionLog {
   final DateTime timestamp;
   final double? cpuEvaluationScore;
   final String? cpuDecisionReason;
+  final bool underReviewBefore;
+  final bool underReviewAfter;
+  final int remainingActionsBefore;
+  final int remainingActionsAfter;
+  final String knowledgeSource;
 
   Map<String, dynamic> toJson() => {
     'actionIndex': actionIndex,
@@ -143,6 +153,11 @@ class GameActionLog {
     'timestamp': timestamp.toIso8601String(),
     'cpuEvaluationScore': cpuEvaluationScore,
     'cpuDecisionReason': cpuDecisionReason,
+    'underReviewBefore': underReviewBefore,
+    'underReviewAfter': underReviewAfter,
+    'remainingActionsBefore': remainingActionsBefore,
+    'remainingActionsAfter': remainingActionsAfter,
+    'knowledgeSource': knowledgeSource,
   };
 
   factory GameActionLog.fromJson(Map<String, dynamic> json) => GameActionLog(
@@ -170,7 +185,30 @@ class GameActionLog {
     timestamp: DateTime.parse(json['timestamp'] as String),
     cpuEvaluationScore: (json['cpuEvaluationScore'] as num?)?.toDouble(),
     cpuDecisionReason: json['cpuDecisionReason'] as String?,
+    underReviewBefore: json['underReviewBefore'] as bool? ?? false,
+    underReviewAfter: json['underReviewAfter'] as bool? ?? false,
+    remainingActionsBefore: json['remainingActionsBefore'] as int? ?? 0,
+    remainingActionsAfter: json['remainingActionsAfter'] as int? ?? 0,
+    knowledgeSource: json['knowledgeSource'] as String? ?? 'none',
   );
+}
+
+class InitialKnowledgeLog {
+  const InitialKnowledgeLog({required this.personId, required this.attribute});
+
+  final String personId;
+  final String attribute;
+
+  Map<String, dynamic> toJson() => {
+    'personId': personId,
+    'attribute': attribute,
+  };
+
+  factory InitialKnowledgeLog.fromJson(Map<String, dynamic> json) =>
+      InitialKnowledgeLog(
+        personId: json['personId'] as String,
+        attribute: json['attribute'] as String,
+      );
 }
 
 class GameSession {
@@ -199,6 +237,9 @@ class GameSession {
     this.tempoRating,
     this.actions = const [],
     this.finalBoard = const [],
+    this.initialKnowledge = const {},
+    this.actionsUsed = const {},
+    this.actionsRemaining = const {},
   });
 
   final String gameId;
@@ -225,6 +266,9 @@ class GameSession {
   final List<LoggedPerson> initialBoard;
   final List<GameActionLog> actions;
   final List<LoggedPerson> finalBoard;
+  final Map<String, InitialKnowledgeLog> initialKnowledge;
+  final Map<String, int> actionsUsed;
+  final Map<String, int> actionsRemaining;
 
   bool get isFinished => finishedAt != null;
 
@@ -242,6 +286,9 @@ class GameSession {
     int? tempoRating,
     List<GameActionLog>? actions,
     List<LoggedPerson>? finalBoard,
+    Map<String, InitialKnowledgeLog>? initialKnowledge,
+    Map<String, int>? actionsUsed,
+    Map<String, int>? actionsRemaining,
   }) => GameSession(
     gameId: gameId,
     startedAt: startedAt,
@@ -267,6 +314,9 @@ class GameSession {
     initialBoard: initialBoard,
     actions: actions ?? this.actions,
     finalBoard: finalBoard ?? this.finalBoard,
+    initialKnowledge: initialKnowledge ?? this.initialKnowledge,
+    actionsUsed: actionsUsed ?? this.actionsUsed,
+    actionsRemaining: actionsRemaining ?? this.actionsRemaining,
   );
 
   Map<String, dynamic> toJson() => {
@@ -296,6 +346,11 @@ class GameSession {
     'initialBoard': initialBoard.map((e) => e.toJson()).toList(),
     'actions': actions.map((e) => e.toJson()).toList(),
     'finalBoard': finalBoard.map((e) => e.toJson()).toList(),
+    'initialKnowledge': initialKnowledge.map(
+      (key, value) => MapEntry(key, value.toJson()),
+    ),
+    'actionsUsed': actionsUsed,
+    'actionsRemaining': actionsRemaining,
   };
 
   String toPrettyJson() => const JsonEncoder.withIndent('  ').convert(toJson());
@@ -331,12 +386,24 @@ class GameSession {
       ).map(LoggedPerson.fromJson).toList(),
       actions: _maps(json['actions']).map(GameActionLog.fromJson).toList(),
       finalBoard: _maps(json['finalBoard']).map(LoggedPerson.fromJson).toList(),
+      initialKnowledge: ((json['initialKnowledge'] as Map?) ?? const {}).map(
+        (key, value) => MapEntry(
+          '$key',
+          InitialKnowledgeLog.fromJson((value as Map).cast<String, dynamic>()),
+        ),
+      ),
+      actionsUsed: _optionalIntMap(json['actionsUsed']),
+      actionsRemaining: _optionalIntMap(json['actionsRemaining']),
     );
   }
 }
 
 Map<String, int> _intMap(dynamic value) =>
     (value as Map).map((key, value) => MapEntry('$key', value as int));
+
+Map<String, int> _optionalIntMap(dynamic value) => value is Map
+    ? value.map((key, value) => MapEntry('$key', value as int))
+    : const {};
 
 Iterable<Map<String, dynamic>> _maps(dynamic value) =>
     (value as List? ?? const []).map((e) => (e as Map).cast<String, dynamic>());

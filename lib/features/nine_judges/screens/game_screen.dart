@@ -1,4 +1,5 @@
 import 'package:dead_or_alive/features/nine_judges/game/game_controller.dart';
+import 'package:dead_or_alive/features/nine_judges/game/game_config.dart';
 import 'package:dead_or_alive/features/nine_judges/models/judge_models.dart';
 import 'package:dead_or_alive/features/nine_judges/screens/handoff_screen.dart';
 import 'package:dead_or_alive/features/nine_judges/screens/mode_select_screen.dart';
@@ -133,6 +134,10 @@ class _GameBoard extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   _PhaseBanner(controller: controller),
+                  if (!controller.isCpuTurn) ...[
+                    const SizedBox(height: 3),
+                    _InitialKnowledgeBanner(controller: controller),
+                  ],
                   if (controller.isCpuTurn ||
                       controller.lastCpuActionMessage != null) ...[
                     const SizedBox(height: 3),
@@ -336,7 +341,7 @@ class _Header extends StatelessWidget {
                   border: Border.all(color: const Color(0xFFD6B25E)),
                 ),
                 child: Text(
-                  'TURN ${controller.turn}',
+                  'TURN ${controller.turn} / ${NineJudgesConfig.maxTurns}',
                   style: const TextStyle(
                     color: Color(0xFFE7C979),
                     fontSize: 11,
@@ -467,7 +472,7 @@ class _PhaseBanner extends StatelessWidget {
                 ActionType.life => 'LIFEを使う人物を選択してください',
                 ActionType.death => 'DEATHを使う人物を選択してください',
                 ActionType.eye => '正体を見る人物3を選択',
-                ActionType.judge => '判決する人物を選択してください',
+                ActionType.judge => '判決する人物を選択（審議中のみ）',
               },
             TurnPhase.selectingEyeInformation => '確認する情報を選択',
           };
@@ -499,6 +504,38 @@ class _PhaseBanner extends StatelessWidget {
               : const Color(0xFFD6B25E),
           fontSize: 12,
           fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+  }
+}
+
+class _InitialKnowledgeBanner extends StatelessWidget {
+  const _InitialKnowledgeBanner({required this.controller});
+
+  final NineJudgesController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final viewer = controller.currentPlayer;
+    final index = controller.initialKnowledgeSlots[viewer]!.single;
+    final person = controller.board[index].person;
+    return Container(
+      key: const Key('initial-knowledge-confirmation'),
+      width: double.infinity,
+      height: 25,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: const Color(0xFF171B25),
+        borderRadius: BorderRadius.circular(5),
+        border: Border.all(color: const Color(0xFF806A36)),
+      ),
+      child: Text(
+        '◆ 初期情報：${person.attribute.label} 3（位置 ${index + 1}）',
+        style: const TextStyle(
+          color: Color(0xFFE7C979),
+          fontSize: 9,
+          fontWeight: FontWeight.w800,
         ),
       ),
     );
@@ -568,7 +605,7 @@ class _RulesDialog extends StatelessWidget {
           _RuleLine(title: 'LIFE', body: '死→生 / 生ならDEATHを1回防ぐ'),
           _RuleLine(title: 'DEATH', body: '生→死 / 死なら即判決'),
           _RuleLine(title: 'EYE', body: '死状態の人物3の属性を自分だけ確認'),
-          _RuleLine(title: 'JUDGE', body: '有限カードで現在の生死を最終確定'),
+          _RuleLine(title: 'JUDGE', body: '有限カード。一度審議された人物だけを現在の生死で確定'),
         ],
       ),
       actions: [

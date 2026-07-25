@@ -30,7 +30,14 @@ void main() {
     expect(find.byKey(const Key('judge-button')), findsOneWidget);
     expect(find.byKey(const Key('own-hand')), findsOneWidget);
     expect(find.byKey(const Key('opponent-hand')), findsOneWidget);
-    expect(find.textContaining('JUDGE 3'), findsNWidgets(2));
+    expect(find.textContaining('JUDGE 2'), findsNWidgets(2));
+    expect(find.textContaining('EYE 1'), findsNWidgets(2));
+    expect(find.textContaining('残り6手'), findsNWidgets(2));
+    expect(find.textContaining('TURN 1 / 12'), findsOneWidget);
+    expect(
+      find.byKey(const Key('initial-knowledge-confirmation')),
+      findsOneWidget,
+    );
     expect(find.byKey(const Key('rules-button')), findsOneWidget);
     expect(find.text('アクションを選択してください'), findsOneWidget);
     expect(find.textContaining('SAVE'), findsNothing);

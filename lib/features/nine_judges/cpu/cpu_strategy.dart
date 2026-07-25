@@ -6,12 +6,14 @@ class CpuSlotView {
     required this.person,
     this.knownAttribute,
     this.eyeOptions = const [],
+    this.knowledgeSource = 'none',
   });
 
   final int index;
   final PersonCard person;
   final PersonAttribute? knownAttribute;
   final List<EyeInformation> eyeOptions;
+  final String knowledgeSource;
 }
 
 class CpuGameView {
@@ -26,6 +28,8 @@ class CpuGameView {
       judge: 0,
     ),
     required this.legalTargets,
+    this.remainingActions = 6,
+    this.opponentRemainingActions = 6,
   });
 
   final Faction faction;
@@ -33,6 +37,8 @@ class CpuGameView {
   final ActionInventory inventory;
   final ActionInventory opponentInventory;
   final Map<ActionType, List<int>> legalTargets;
+  final int remainingActions;
+  final int opponentRemainingActions;
 }
 
 class CpuDecision {

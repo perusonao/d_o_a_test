@@ -10,6 +10,7 @@ class PersonCardWidget extends StatelessWidget {
     required this.enabled,
     required this.onTap,
     this.attributeEyeKnown = false,
+    this.attributeInitiallyKnown = false,
     this.numberEyeKnown = false,
     this.scoreDetail,
     super.key,
@@ -22,6 +23,7 @@ class PersonCardWidget extends StatelessWidget {
   final bool enabled;
   final VoidCallback onTap;
   final bool attributeEyeKnown;
+  final bool attributeInitiallyKnown;
   final bool numberEyeKnown;
   final ({Faction faction, int points})? scoreDetail;
 
@@ -32,6 +34,8 @@ class PersonCardWidget extends StatelessWidget {
         ? const Color(0xFFD6B25E)
         : selected
         ? const Color(0xFFFFD76A)
+        : person.isUnderReview
+        ? const Color(0xFFD6B25E)
         : enabled
         ? const Color(0xFF8DA4BD)
         : const Color(0xFF45484E);
@@ -90,10 +94,19 @@ class PersonCardWidget extends StatelessWidget {
                     const Spacer(),
                     if (!person.isJudged)
                       Text(
-                        attributeEyeKnown ? 'EYE確認済み' : '未判決',
+                        person.isUnderReview
+                            ? '審議中'
+                            : attributeEyeKnown
+                            ? 'EYE確認済み'
+                            : '未審議',
+                        key: person.isUnderReview
+                            ? const Key('under-review-label')
+                            : const Key('not-reviewed-label'),
                         style: TextStyle(
                           fontSize: compact ? 7 : 9,
-                          color: attributeEyeKnown
+                          color: person.isUnderReview
+                              ? const Color(0xFFD6B25E)
+                              : attributeEyeKnown
                               ? const Color(0xFFB49CF2)
                               : Colors.white38,
                         ),
@@ -131,6 +144,12 @@ class PersonCardWidget extends StatelessWidget {
                       if (attributeEyeKnown)
                         const Icon(
                           Icons.visibility,
+                          size: 9,
+                          color: Color(0xFFD6B25E),
+                        ),
+                      if (attributeInitiallyKnown)
+                        const Icon(
+                          Icons.diamond_outlined,
                           size: 9,
                           color: Color(0xFFD6B25E),
                         ),

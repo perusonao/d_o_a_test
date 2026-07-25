@@ -35,8 +35,28 @@ abstract final class NineJudgesRules {
       ActionType.death => true,
       ActionType.eye =>
         person.rank == 3 && !person.isAlive && !viewerKnowsAttribute,
-      ActionType.judge => true,
+      ActionType.judge => person.isUnderReview,
     };
+  }
+
+  static PersonAttribute? inferRank3Attribute({
+    required List<PersonCard> rankThreePeople,
+    required Set<String> knownPersonIds,
+    required String targetPersonId,
+  }) {
+    if (knownPersonIds.contains(targetPersonId)) {
+      return rankThreePeople
+          .firstWhere((person) => person.id == targetPersonId)
+          .attribute;
+    }
+    final known = rankThreePeople
+        .where((person) => knownPersonIds.contains(person.id))
+        .map((person) => person.attribute)
+        .toSet();
+    if (known.length != 2) return null;
+    return PersonAttribute.values.firstWhere(
+      (attribute) => !known.contains(attribute),
+    );
   }
 
   static Faction scoringFaction(PersonCard person) {
