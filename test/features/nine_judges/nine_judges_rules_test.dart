@@ -47,6 +47,34 @@ void main() {
       );
     });
 
+    test('左・中央・右列はrank 1・2・3で各属性を1枚ずつ含む', () {
+      for (var column = 0; column < 3; column++) {
+        final people = [
+          for (var row = 0; row < 3; row++) game.board[row * 3 + column].person,
+        ];
+        expect(people.map((person) => person.rank).toSet(), {column + 1});
+        expect(
+          people.map((person) => person.attribute).toSet(),
+          PersonAttribute.values.toSet(),
+        );
+      }
+    });
+
+    test('同じseedなら同じ規則配置と初期秘密情報を再現する', () {
+      final first = NineJudgesController(seed: 441);
+      final second = NineJudgesController(seed: 441);
+      addTearDown(first.dispose);
+      addTearDown(second.dispose);
+      expect(
+        first.board.map((slot) => slot.person.id),
+        second.board.map((slot) => slot.person.id),
+      );
+      expect(
+        first.session.initialKnowledge['savior']!.personId,
+        second.session.initialKnowledge['savior']!.personId,
+      );
+    });
+
     test('両陣営に別々の人物3初期秘密情報が付与され相手には漏れない', () {
       final savior = game.initialKnowledgeSlots[Faction.savior]!.single;
       final executor = game.initialKnowledgeSlots[Faction.executor]!.single;
@@ -108,6 +136,9 @@ void main() {
       game.phase = TurnPhase.selectingAction;
       act(ActionType.judge, target);
       expect(game.board[target].person.isJudged, isTrue);
+      expect(game.board[target].person.isUnderReview, isFalse);
+      expect(game.session.actions.last.underReviewBefore, isTrue);
+      expect(game.session.actions.last.underReviewAfter, isFalse);
     });
 
     test('DEATHとEYEでも審議中になり、死へのDEATHは未審議でも即判決', () {
@@ -120,6 +151,7 @@ void main() {
       expect(game.board[dead].person.isUnderReview, isFalse);
       act(ActionType.death, dead);
       expect(game.board[dead].person.isJudged, isTrue);
+      expect(game.board[dead].person.isUnderReview, isFalse);
     });
 
     test('各プレイヤー最大6行動で手札を残してturnLimit終了', () async {
@@ -151,6 +183,79 @@ void main() {
           jsonDecode(await repository.exportGame(saved.gameId))
               as Map<String, dynamic>;
       expect(exported['rulesVersion'], '0.4');
+    });
+
+    test('CPUのEYE結果メッセージは秘密属性を含まない', () {
+      final cpu = NineJudgesController(
+        seed: 81,
+        settings: const NineJudgesGameSettings(
+          mode: GameMode.cpu,
+          cpuFaction: Faction.savior,
+          firstPlayer: Faction.savior,
+          factionSelection: FactionSelection.executor,
+          firstPlayerSelection: FirstPlayerSelection.cpu,
+          skipCpuDelays: true,
+        ),
+      );
+      addTearDown(cpu.dispose);
+      cpu.inventories[cpu.settings.cpuFaction] = const ActionInventory(
+        life: 0,
+        death: 0,
+        eye: 1,
+        judge: 0,
+      );
+      cpu.performCpuAction();
+      expect(cpu.lastCpuActionType, ActionType.eye);
+      expect(cpu.lastCpuActionMessage, '人物3を調査しました');
+      expect(
+        PersonAttribute.values.any(
+          (attribute) => cpu.lastCpuActionMessage!.contains(attribute.label),
+        ),
+        isFalse,
+      );
+    });
+
+    test('CPU LIFE・DEATH・JUDGEは対象と結果を構造化して保持する', () {
+      NineJudgesController cpuFor(ActionType action) {
+        final cpu = NineJudgesController(
+          seed: 93,
+          settings: const NineJudgesGameSettings(
+            mode: GameMode.cpu,
+            factionSelection: FactionSelection.executor,
+            firstPlayerSelection: FirstPlayerSelection.cpu,
+            skipCpuDelays: true,
+          ),
+        );
+        cpu.inventories[cpu.settings.cpuFaction] = ActionInventory(
+          life: action == ActionType.life ? 1 : 0,
+          death: action == ActionType.death ? 1 : 0,
+          eye: 0,
+          judge: action == ActionType.judge ? 1 : 0,
+        );
+        if (action == ActionType.judge) {
+          final target = cpu.board.indexWhere((slot) => slot.person.isAlive);
+          cpu.board[target] = cpu.board[target].copyWith(
+            person: cpu.board[target].person.copyWith(isUnderReview: true),
+          );
+        }
+        return cpu;
+      }
+
+      for (final action in [
+        ActionType.life,
+        ActionType.death,
+        ActionType.judge,
+      ]) {
+        final cpu = cpuFor(action);
+        addTearDown(cpu.dispose);
+        cpu.performCpuAction();
+        expect(cpu.lastCpuActionType, action);
+        expect(cpu.lastCpuTargetIndex, isNotNull);
+        expect(cpu.lastCpuActionMessage, isNotEmpty);
+        if (action == ActionType.judge) {
+          expect(cpu.lastCpuWasJudgment, isTrue);
+        }
+      }
     });
 
     test('Ver.0.3 JSONは新項目なしでも読み込める', () {

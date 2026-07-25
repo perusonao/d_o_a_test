@@ -12,6 +12,7 @@ class PersonCardWidget extends StatelessWidget {
     this.attributeEyeKnown = false,
     this.attributeInitiallyKnown = false,
     this.numberEyeKnown = false,
+    this.cpuHighlighted = false,
     this.scoreDetail,
     super.key,
   });
@@ -25,13 +26,16 @@ class PersonCardWidget extends StatelessWidget {
   final bool attributeEyeKnown;
   final bool attributeInitiallyKnown;
   final bool numberEyeKnown;
+  final bool cpuHighlighted;
   final ({Faction faction, int points})? scoreDetail;
 
   @override
   Widget build(BuildContext context) {
     final person = slot.person;
     final borderColor = person.isJudged
-        ? const Color(0xFFD6B25E)
+        ? const Color(0xFF8A8F98)
+        : cpuHighlighted
+        ? const Color(0xFFFFE08A)
         : selected
         ? const Color(0xFFFFD76A)
         : person.isUnderReview
@@ -44,164 +48,185 @@ class PersonCardWidget extends StatelessWidget {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final compact = constraints.maxHeight < 105;
-          return AnimatedContainer(
+          return AnimatedScale(
+            key: cpuHighlighted ? const Key('cpu-target-highlight') : null,
+            scale: cpuHighlighted ? 1.035 : 1,
             duration: const Duration(milliseconds: 120),
-            padding: EdgeInsets.all(compact ? 3 : 5),
-            decoration: BoxDecoration(
-              color: person.isJudged
-                  ? const Color(0xFF171719)
-                  : enabled
-                  ? const Color(0xFF202329)
-                  : const Color(0xFF181A1E),
-              borderRadius: BorderRadius.circular(7),
-              border: Border.all(
-                color: borderColor,
-                width: selected || person.isJudged ? 2 : 1,
-              ),
-              boxShadow: selected
-                  ? const [
-                      BoxShadow(
-                        color: Color(0x66FFD76A),
-                        blurRadius: 7,
-                        spreadRadius: 1,
-                      ),
-                    ]
-                  : null,
-            ),
-            child: Stack(
-              children: [
-                Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    SizedBox(height: compact ? 10 : 15),
-                    Icon(
-                      Icons.person,
-                      size: compact ? 22 : 29,
-                      color: person.isJudged ? Colors.white30 : Colors.white54,
-                    ),
-                    Text(
-                      person.isAlive ? '生' : '死',
-                      key: Key('life-state-${person.id}'),
-                      style: TextStyle(
-                        color: person.isAlive
-                            ? const Color(0xFF62B9F3)
-                            : const Color(0xFFF0645A),
-                        fontSize: compact ? 18 : 22,
-                        height: 1,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const Spacer(),
-                    if (!person.isJudged)
-                      Text(
-                        person.isUnderReview
-                            ? '審議中'
-                            : attributeEyeKnown
-                            ? 'EYE確認済み'
-                            : '未審議',
-                        key: person.isUnderReview
-                            ? const Key('under-review-label')
-                            : const Key('not-reviewed-label'),
-                        style: TextStyle(
-                          fontSize: compact ? 7 : 9,
-                          color: person.isUnderReview
-                              ? const Color(0xFFD6B25E)
-                              : attributeEyeKnown
-                              ? const Color(0xFFB49CF2)
-                              : Colors.white38,
-                        ),
-                      ),
-                    if (scoreDetail != null)
-                      Text(
-                        '${scoreDetail!.faction.label} +${scoreDetail!.points}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Color(0xFFD6B25E),
-                          fontSize: 9,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    if (person.hasLifeShield || person.isJudged)
-                      SizedBox(height: compact ? 13 : 16),
-                  ],
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 120),
+              padding: EdgeInsets.all(compact ? 3 : 5),
+              decoration: BoxDecoration(
+                color: person.isJudged
+                    ? const Color(0xFF101114)
+                    : person.isUnderReview
+                    ? const Color(0xFF221E16)
+                    : enabled
+                    ? const Color(0xFF202329)
+                    : const Color(0xFF181A1E),
+                borderRadius: BorderRadius.circular(7),
+                border: Border.all(
+                  color: borderColor,
+                  width: cpuHighlighted
+                      ? 3
+                      : selected || person.isJudged
+                      ? 2
+                      : 1,
                 ),
-                Positioned(
-                  left: 0,
-                  top: 0,
-                  child: Row(
+                boxShadow: cpuHighlighted
+                    ? const [
+                        BoxShadow(
+                          color: Color(0x99FFD76A),
+                          blurRadius: 10,
+                          spreadRadius: 2,
+                        ),
+                      ]
+                    : selected
+                    ? const [
+                        BoxShadow(
+                          color: Color(0x66FFD76A),
+                          blurRadius: 7,
+                          spreadRadius: 1,
+                        ),
+                      ]
+                    : null,
+              ),
+              child: Stack(
+                children: [
+                  Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
+                      SizedBox(height: compact ? 10 : 15),
+                      Icon(
+                        Icons.person,
+                        size: compact ? 22 : 29,
+                        color: person.isJudged
+                            ? Colors.white30
+                            : Colors.white54,
+                      ),
                       Text(
-                        attributeVisible ? person.attribute.label : '?',
+                        person.isAlive ? '生' : '死',
+                        key: Key('life-state-${person.id}'),
                         style: TextStyle(
-                          color: attributeVisible
-                              ? _attributeColor(person.attribute)
-                              : Colors.white70,
-                          fontSize: compact ? 9 : 10,
+                          color: person.isAlive
+                              ? const Color(0xFF62B9F3)
+                              : const Color(0xFFF0645A),
+                          fontSize: compact ? 18 : 22,
+                          height: 1,
                           fontWeight: FontWeight.w900,
                         ),
                       ),
-                      if (attributeEyeKnown)
-                        const Icon(
-                          Icons.visibility,
-                          size: 9,
-                          color: Color(0xFFD6B25E),
+                      const Spacer(),
+                      if (!person.isJudged)
+                        Text(
+                          person.isUnderReview
+                              ? '審議中'
+                              : attributeEyeKnown
+                              ? 'EYE確認済み'
+                              : '未審議',
+                          key: person.isUnderReview
+                              ? const Key('under-review-label')
+                              : const Key('not-reviewed-label'),
+                          style: TextStyle(
+                            fontSize: compact ? 7 : 9,
+                            color: person.isUnderReview
+                                ? const Color(0xFFD6B25E)
+                                : attributeEyeKnown
+                                ? const Color(0xFFB49CF2)
+                                : Colors.white38,
+                          ),
                         ),
-                      if (attributeInitiallyKnown)
-                        const Icon(
-                          Icons.diamond_outlined,
-                          size: 9,
-                          color: Color(0xFFD6B25E),
+                      if (scoreDetail != null)
+                        Text(
+                          '${scoreDetail!.faction.label} +${scoreDetail!.points}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Color(0xFFD6B25E),
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
+                      if (person.hasLifeShield || person.isJudged)
+                        SizedBox(height: compact ? 13 : 16),
                     ],
                   ),
-                ),
-                Positioned(
-                  right: 0,
-                  top: 0,
-                  child: Container(
-                    width: compact ? 19 : 22,
-                    height: compact ? 19 : 22,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: const Color(0xFF111216),
-                      border: Border.all(color: const Color(0xFFD6B25E)),
+                  Positioned(
+                    left: 0,
+                    top: 0,
+                    child: Row(
+                      children: [
+                        Text(
+                          attributeVisible ? person.attribute.label : '?',
+                          style: TextStyle(
+                            color: attributeVisible
+                                ? _attributeColor(person.attribute)
+                                : Colors.white70,
+                            fontSize: compact ? 9 : 10,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        if (attributeEyeKnown)
+                          const Icon(
+                            Icons.visibility,
+                            size: 9,
+                            color: Color(0xFFD6B25E),
+                          ),
+                        if (attributeInitiallyKnown)
+                          const Icon(
+                            Icons.diamond_outlined,
+                            size: 9,
+                            color: Color(0xFFD6B25E),
+                          ),
+                      ],
                     ),
-                    child: Text(
-                      '${person.rank}',
-                      style: TextStyle(
-                        fontSize: compact ? 10 : 11,
-                        fontWeight: FontWeight.w900,
+                  ),
+                  Positioned(
+                    right: 0,
+                    top: 0,
+                    child: Container(
+                      width: compact ? 19 : 22,
+                      height: compact ? 19 : 22,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: const Color(0xFF111216),
+                        border: Border.all(color: const Color(0xFFD6B25E)),
+                      ),
+                      child: Text(
+                        '${person.rank}',
+                        style: TextStyle(
+                          fontSize: compact ? 10 : 11,
+                          fontWeight: FontWeight.w900,
+                        ),
                       ),
                     ),
                   ),
-                ),
-                if (person.hasLifeShield)
-                  Positioned(
-                    left: 0,
-                    bottom: 0,
-                    child: _StatusBadge(
-                      key: const Key('life-shield'),
-                      icon: Icons.shield_outlined,
-                      label: 'LIFE',
-                      color: const Color(0xFF62D58A),
-                      compact: compact,
+                  if (person.hasLifeShield)
+                    Positioned(
+                      left: 0,
+                      bottom: 0,
+                      child: _StatusBadge(
+                        key: const Key('life-shield'),
+                        icon: Icons.shield_outlined,
+                        label: 'LIFE',
+                        color: const Color(0xFF62D58A),
+                        compact: compact,
+                      ),
                     ),
-                  ),
-                if (person.isJudged)
-                  Positioned(
-                    right: 0,
-                    bottom: 0,
-                    child: _StatusBadge(
-                      key: const Key('judged-label'),
-                      icon: Icons.gavel,
-                      label: '判決済み',
-                      color: const Color(0xFFD6B25E),
-                      compact: compact,
+                  if (person.isJudged)
+                    Positioned(
+                      right: 0,
+                      bottom: 0,
+                      child: _StatusBadge(
+                        key: const Key('judged-label'),
+                        icon: Icons.balance,
+                        label: '判定済',
+                        color: const Color(0xFFB6BBC4),
+                        compact: compact,
+                      ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
           );
         },

@@ -76,6 +76,12 @@ class _NineJudgesGameScreenState extends State<NineJudgesGameScreen> {
       return;
     }
     game.performCpuAction();
+    await Future<void>.delayed(
+      game.settings.skipCpuDelays
+          ? Duration.zero
+          : const Duration(milliseconds: 950),
+    );
+    if (mounted && game == controller) game.clearCpuFeedback();
     _cpuSequenceRunning = false;
     if (mounted) setState(() {});
   }
@@ -138,13 +144,17 @@ class _GameBoard extends StatelessWidget {
                     const SizedBox(height: 3),
                     _InitialKnowledgeBanner(controller: controller),
                   ],
-                  if (controller.isCpuTurn ||
-                      controller.lastCpuActionMessage != null) ...[
-                    const SizedBox(height: 3),
-                    _CpuMessage(controller: controller),
-                  ],
                   const SizedBox(height: 4),
-                  Expanded(child: BoardGrid(controller: controller)),
+                  Expanded(
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        BoardGrid(controller: controller),
+                        if (controller.lastCpuActionMessage != null)
+                          _CpuMessage(controller: controller),
+                      ],
+                    ),
+                  ),
                   SelectedCardPanel(controller: controller),
                   HandStatusPanel(controller: controller),
                   ActionPanel(controller: controller),
@@ -549,25 +559,70 @@ class _CpuMessage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final action = controller.lastCpuActionType;
+    final judgment = controller.lastCpuWasJudgment;
+    final icon = switch (action) {
+      ActionType.life => Icons.favorite,
+      ActionType.death => Icons.dangerous,
+      ActionType.eye => Icons.visibility,
+      ActionType.judge => Icons.balance,
+      null => Icons.hourglass_top,
+    };
+    return GestureDetector(
       key: const Key('cpu-action-message'),
-      width: double.infinity,
-      height: 31,
-      alignment: Alignment.center,
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      decoration: BoxDecoration(
-        color: const Color(0xFF251B1D),
-        borderRadius: BorderRadius.circular(5),
-        border: Border.all(color: const Color(0xFF8A3E3A)),
-      ),
-      child: Text(
-        controller.isCpuTurn
-            ? controller.lastCpuActionMessage ?? 'CPUが思考中…'
-            : controller.lastCpuActionMessage!,
-        textAlign: TextAlign.center,
-        maxLines: 2,
-        overflow: TextOverflow.ellipsis,
-        style: const TextStyle(fontSize: 9, height: 1.1),
+      onTap: controller.clearCpuFeedback,
+      child: Container(
+        key: judgment
+            ? const Key('cpu-judgment-message')
+            : const Key('cpu-action-result'),
+        width: 245,
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 13),
+        decoration: BoxDecoration(
+          color: const Color(0xF21B1717),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: judgment ? const Color(0xFFFFD76A) : const Color(0xFFC79255),
+            width: judgment ? 3 : 2,
+          ),
+          boxShadow: const [
+            BoxShadow(color: Colors.black87, blurRadius: 14, spreadRadius: 3),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              judgment ? 'CPU JUDGMENT' : 'CPU ACTION',
+              style: const TextStyle(
+                color: Color(0xFFFFD76A),
+                fontSize: 13,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1.4,
+              ),
+            ),
+            const SizedBox(height: 5),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, color: const Color(0xFFE7C979), size: 22),
+                const SizedBox(width: 7),
+                Text(
+                  action?.label ?? '',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 7),
+            Text(
+              controller.lastCpuActionMessage!,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 14, height: 1.25),
+            ),
+          ],
+        ),
       ),
     );
   }

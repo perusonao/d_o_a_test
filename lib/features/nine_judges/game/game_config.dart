@@ -1,7 +1,7 @@
 import 'package:dead_or_alive/features/nine_judges/models/judge_models.dart';
 
 abstract final class NineJudgesConfig {
-  static const String gameVersion = '0.4.0';
+  static const String gameVersion = '0.4.1';
   static const String rulesVersion = '0.4';
   static const bool numberCardsEnabled = false;
 
