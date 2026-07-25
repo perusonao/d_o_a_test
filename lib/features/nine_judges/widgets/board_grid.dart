@@ -42,7 +42,7 @@ class BoardGrid extends StatelessWidget {
         slot.person,
         controller.currentPlayer,
       ),
-      numberVisible: controller.knowsNumber(index, controller.currentPlayer),
+      numberVisible: controller.knowsRank(index, controller.currentPlayer),
       attributeEyeKnown: controller.eyeKnowsAttribute(
         index,
         controller.currentPlayer,

@@ -98,6 +98,9 @@ class GameActionLog {
     this.remainingActionsBefore = 0,
     this.remainingActionsAfter = 0,
     this.knowledgeSource = 'none',
+    this.scoreVisible = true,
+    this.judgeWasAvailable = false,
+    this.judgeAvailableFromTurn = 0,
   });
 
   final int actionIndex;
@@ -128,6 +131,9 @@ class GameActionLog {
   final int remainingActionsBefore;
   final int remainingActionsAfter;
   final String knowledgeSource;
+  final bool scoreVisible;
+  final bool judgeWasAvailable;
+  final int judgeAvailableFromTurn;
 
   Map<String, dynamic> toJson() => {
     'actionIndex': actionIndex,
@@ -158,6 +164,9 @@ class GameActionLog {
     'remainingActionsBefore': remainingActionsBefore,
     'remainingActionsAfter': remainingActionsAfter,
     'knowledgeSource': knowledgeSource,
+    'scoreVisible': scoreVisible,
+    'judgeWasAvailable': judgeWasAvailable,
+    'judgeAvailableFromTurn': judgeAvailableFromTurn,
   };
 
   factory GameActionLog.fromJson(Map<String, dynamic> json) => GameActionLog(
@@ -190,6 +199,9 @@ class GameActionLog {
     remainingActionsBefore: json['remainingActionsBefore'] as int? ?? 0,
     remainingActionsAfter: json['remainingActionsAfter'] as int? ?? 0,
     knowledgeSource: json['knowledgeSource'] as String? ?? 'none',
+    scoreVisible: json['scoreVisible'] as bool? ?? true,
+    judgeWasAvailable: json['judgeWasAvailable'] as bool? ?? false,
+    judgeAvailableFromTurn: json['judgeAvailableFromTurn'] as int? ?? 0,
   );
 }
 
@@ -240,6 +252,7 @@ class GameSession {
     this.initialKnowledge = const {},
     this.actionsUsed = const {},
     this.actionsRemaining = const {},
+    this.scoreVisible = true,
   });
 
   final String gameId;
@@ -269,6 +282,7 @@ class GameSession {
   final Map<String, InitialKnowledgeLog> initialKnowledge;
   final Map<String, int> actionsUsed;
   final Map<String, int> actionsRemaining;
+  final bool scoreVisible;
 
   bool get isFinished => finishedAt != null;
 
@@ -289,6 +303,7 @@ class GameSession {
     Map<String, InitialKnowledgeLog>? initialKnowledge,
     Map<String, int>? actionsUsed,
     Map<String, int>? actionsRemaining,
+    bool? scoreVisible,
   }) => GameSession(
     gameId: gameId,
     startedAt: startedAt,
@@ -317,6 +332,7 @@ class GameSession {
     initialKnowledge: initialKnowledge ?? this.initialKnowledge,
     actionsUsed: actionsUsed ?? this.actionsUsed,
     actionsRemaining: actionsRemaining ?? this.actionsRemaining,
+    scoreVisible: scoreVisible ?? this.scoreVisible,
   );
 
   Map<String, dynamic> toJson() => {
@@ -351,9 +367,29 @@ class GameSession {
     ),
     'actionsUsed': actionsUsed,
     'actionsRemaining': actionsRemaining,
+    'scoreVisible': scoreVisible,
   };
 
   String toPrettyJson() => const JsonEncoder.withIndent('  ').convert(toJson());
+
+  String toReadableText() {
+    final buffer = StringBuffer()
+      ..writeln('9人の審判 $gameVersion / rules $rulesVersion')
+      ..writeln('Game: $gameId')
+      ..writeln('First: $firstPlayer  Winner: ${winner ?? '-'}')
+      ..writeln('Score: ${saviorScore ?? '-'} - ${executorScore ?? '-'}')
+      ..writeln('Turns: $totalTurns  End: ${endReason ?? '-'}')
+      ..writeln('Score visible: $scoreVisible')
+      ..writeln();
+    for (final action in actions) {
+      buffer.writeln(
+        'Turn ${action.turnNumber} ${action.faction} '
+        '${action.actionType.toUpperCase()} -> ${action.targetPersonId} '
+        '[${action.stateBefore} -> ${action.stateAfter}]',
+      );
+    }
+    return buffer.toString();
+  }
 
   factory GameSession.fromJson(Map<String, dynamic> json) {
     final ratings = (json['ratings'] as Map?)?.cast<String, dynamic>() ?? {};
@@ -394,6 +430,7 @@ class GameSession {
       ),
       actionsUsed: _optionalIntMap(json['actionsUsed']),
       actionsRemaining: _optionalIntMap(json['actionsRemaining']),
+      scoreVisible: json['scoreVisible'] as bool? ?? true,
     );
   }
 }

@@ -7,6 +7,7 @@ class CpuSlotView {
     this.knownAttribute,
     this.eyeOptions = const [],
     this.knowledgeSource = 'none',
+    this.knownRank,
   });
 
   final int index;
@@ -14,6 +15,7 @@ class CpuSlotView {
   final PersonAttribute? knownAttribute;
   final List<EyeInformation> eyeOptions;
   final String knowledgeSource;
+  final int? knownRank;
 }
 
 class CpuGameView {

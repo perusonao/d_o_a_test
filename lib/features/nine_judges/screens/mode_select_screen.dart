@@ -22,6 +22,7 @@ class _NineJudgesModeSelectScreenState
   CpuLevel level = CpuLevel.basic;
   FactionSelection faction = FactionSelection.random;
   FirstPlayerSelection firstPlayer = FirstPlayerSelection.random;
+  bool scoreVisible = true;
 
   @override
   Widget build(BuildContext context) {
@@ -144,6 +145,21 @@ class _NineJudgesModeSelectScreenState
                       ),
                     ),
                   ],
+                  const SizedBox(height: 10),
+                  SwitchListTile(
+                    key: const Key('score-visible-switch'),
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('得点を公開'),
+                    subtitle: Text(
+                      scoreVisible
+                          ? '1・2・3点を表示（rank固定列）'
+                          : 'EYEで確認するまで非公開（ランダム配置）',
+                      style: const TextStyle(fontSize: 11),
+                    ),
+                    value: scoreVisible,
+                    onChanged: (value) => setState(() => scoreVisible = value),
+                  ),
                   const SizedBox(height: 20),
                   FilledButton(
                     key: const Key('start-game'),
@@ -153,6 +169,7 @@ class _NineJudgesModeSelectScreenState
                         cpuLevel: level,
                         factionSelection: faction,
                         firstPlayerSelection: firstPlayer,
+                        scoreVisible: scoreVisible,
                       ),
                     ),
                     child: const Text('ゲーム開始'),

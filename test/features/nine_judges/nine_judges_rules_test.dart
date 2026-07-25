@@ -10,7 +10,7 @@ import 'package:dead_or_alive/features/nine_judges/models/judge_models.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  group('9人の審判 Ver.0.4', () {
+  group('9人の審判 Ver.0.5', () {
     late MemoryGameLogRepository repository;
     late NineJudgesController game;
 
@@ -32,12 +32,12 @@ void main() {
       }
     }
 
-    test('数字なし、初期手札は2/2/1/2で合計7枚', () {
+    test('数字なし、初期手札は2/2/1/1で合計6枚', () {
       expect(NineJudgesConfig.numberCardsEnabled, isFalse);
       for (final faction in Faction.values) {
         final hand = game.inventoryFor(faction);
-        expect([hand.life, hand.death, hand.eye, hand.judge], [2, 2, 1, 2]);
-        expect(hand.total, 7);
+        expect([hand.life, hand.death, hand.eye, hand.judge], [2, 2, 1, 1]);
+        expect(hand.total, 6);
         expect(game.actionsRemainingFor(faction), 6);
       }
       expect(
@@ -75,6 +75,40 @@ void main() {
       );
     });
 
+    test('scoreVisible=falseはrankを隠しランダム配置にする', () {
+      final hidden = NineJudgesController(
+        seed: 331,
+        settings: const NineJudgesGameSettings(scoreVisible: false),
+      );
+      addTearDown(hidden.dispose);
+      expect(hidden.settings.scoreVisible, isFalse);
+      expect(
+        List.generate(
+          9,
+          (i) => hidden.knowsRank(i, Faction.savior),
+        ).where((known) => known),
+        hasLength(1),
+      );
+      expect(
+        List.generate(3, (row) => hidden.board[row * 3].person.rank).toSet(),
+        isNot({1}),
+      );
+      expect(hidden.session.scoreVisible, isFalse);
+      final cpuView = NineJudgesController(
+        seed: 332,
+        settings: const NineJudgesGameSettings(
+          mode: GameMode.cpu,
+          scoreVisible: false,
+          factionSelection: FactionSelection.savior,
+        ),
+      );
+      addTearDown(cpuView.dispose);
+      final view = cpuView.cpuView();
+      final unknown = view.slots.firstWhere((slot) => slot.knownRank == null);
+      expect(unknown.person.rank, 2, reason: 'CPUへ真の非公開rankを渡さない');
+      expect(unknown.person.id, startsWith('unknown-slot-'));
+    });
+
     test('両陣営に別々の人物3初期秘密情報が付与され相手には漏れない', () {
       final savior = game.initialKnowledgeSlots[Faction.savior]!.single;
       final executor = game.initialKnowledgeSlots[Faction.executor]!.single;
@@ -90,16 +124,16 @@ void main() {
       );
     });
 
-    test('EYEは未知の死人物3だけに1回使え、審議中になる', () {
+    test('EYEは任意の未知情報を1回だけ属性＋rank確認し使用者だけが知る', () {
       final actor = game.currentPlayer;
-      final target = List.generate(game.board.length, (i) => i).firstWhere(
-        (i) =>
-            game.board[i].person.rank == 3 &&
-            !game.knowsAttribute(game.board[i].person, actor),
-      );
+      final target = List.generate(
+        game.board.length,
+        (i) => i,
+      ).firstWhere((i) => game.availableEyeInformation(i, actor).isNotEmpty);
       act(ActionType.eye, target);
       expect(game.inventoryFor(actor).eye, 0);
       expect(game.eyeKnowsAttribute(target, actor), isTrue);
+      expect(game.knowsRank(target, actor), isTrue);
       expect(game.board[target].person.isUnderReview, isTrue);
       expect(
         game.knowsAttribute(game.board[target].person, actor.opponent),
@@ -132,8 +166,17 @@ void main() {
       game.phase = TurnPhase.selectingAction;
       act(ActionType.life, target);
       expect(game.board[target].person.isUnderReview, isTrue);
+      expect(game.board[target].person.judgeAvailableFromTurn, game.turn + 1);
       game.currentPlayer = game.currentPlayer.opponent;
-      game.phase = TurnPhase.selectingAction;
+      expect(game.canSelectAction(ActionType.judge), isFalse);
+      game.currentPlayer = game.currentPlayer.opponent;
+      final other = game.board.indexWhere(
+        (slot) =>
+            slot.person.id != game.board[target].person.id &&
+            slot.person.isAlive,
+      );
+      act(ActionType.death, other);
+      expect(game.currentPlayer, game.board[target].person.lastStateChangedBy);
       act(ActionType.judge, target);
       expect(game.board[target].person.isJudged, isTrue);
       expect(game.board[target].person.isUnderReview, isFalse);
@@ -167,7 +210,7 @@ void main() {
       expect(game.session.actionsRemaining['savior'], 0);
     });
 
-    test('Ver.0.4ログへ審議・残り行動・初期知識を保存', () async {
+    test('Ver.0.5ログへ審議・JUDGE待機・scoreVisibleを保存', () async {
       game.actionsUsed[Faction.savior] = 5;
       game.actionsUsed[Faction.executor] = 6;
       game.currentPlayer = Faction.savior;
@@ -175,14 +218,29 @@ void main() {
       act(ActionType.life, target);
       await game.ensureLogSaved();
       final saved = await repository.loadGame(game.session.gameId);
-      expect(saved!.rulesVersion, '0.4');
+      expect(saved!.rulesVersion, '0.5');
       expect(saved.initialKnowledge.keys, containsAll(['savior', 'executor']));
       expect(saved.actions.single.underReviewAfter, isTrue);
       expect(saved.actions.single.remainingActionsAfter, 0);
+      expect(saved.actions.single.scoreVisible, isTrue);
+      expect(saved.actions.single.judgeAvailableFromTurn, greaterThan(0));
       final exported =
           jsonDecode(await repository.exportGame(saved.gameId))
               as Map<String, dynamic>;
-      expect(exported['rulesVersion'], '0.4');
+      expect(exported['rulesVersion'], '0.5');
+      expect(await repository.exportGameText(saved.gameId), contains('Turn 1'));
+    });
+
+    test('対象確定前ならアクション選択をキャンセル・切替できる', () {
+      game.chooseAction(ActionType.life);
+      expect(game.phase, TurnPhase.selectingActionTarget);
+      expect(game.canSwitchAction(ActionType.death), isTrue);
+      game.chooseAction(ActionType.death);
+      expect(game.selectedAction, ActionType.death);
+      game.cancelActionSelection();
+      expect(game.phase, TurnPhase.selectingAction);
+      expect(game.selectedAction, isNull);
+      expect(game.inventoryFor(game.currentPlayer).death, 2);
     });
 
     test('CPUのEYE結果メッセージは秘密属性を含まない', () {
@@ -206,7 +264,7 @@ void main() {
       );
       cpu.performCpuAction();
       expect(cpu.lastCpuActionType, ActionType.eye);
-      expect(cpu.lastCpuActionMessage, '人物3を調査しました');
+      expect(cpu.lastCpuActionMessage, '対象の情報を確認しました');
       expect(
         PersonAttribute.values.any(
           (attribute) => cpu.lastCpuActionMessage!.contains(attribute.label),

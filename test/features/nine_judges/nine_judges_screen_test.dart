@@ -6,6 +6,7 @@ import 'package:dead_or_alive/features/nine_judges/game/game_controller.dart';
 import 'package:dead_or_alive/features/nine_judges/models/judge_models.dart';
 import 'package:dead_or_alive/features/nine_judges/screens/game_screen.dart';
 import 'package:dead_or_alive/features/nine_judges/widgets/action_panel.dart';
+import 'package:dead_or_alive/features/nine_judges/widgets/board_grid.dart';
 import 'package:dead_or_alive/features/nine_judges/widgets/person_card_widget.dart';
 
 void main() {
@@ -30,7 +31,7 @@ void main() {
     expect(find.byKey(const Key('judge-button')), findsOneWidget);
     expect(find.byKey(const Key('own-hand')), findsOneWidget);
     expect(find.byKey(const Key('opponent-hand')), findsOneWidget);
-    expect(find.textContaining('JUDGE 2'), findsNWidgets(2));
+    expect(find.textContaining('JUDGE 1'), findsNWidgets(2));
     expect(find.textContaining('EYE 1'), findsNWidgets(2));
     expect(find.textContaining('残り6手'), findsNWidgets(2));
     expect(find.textContaining('TURN 1 / 12'), findsOneWidget);
@@ -66,6 +67,7 @@ void main() {
     await tester.tap(find.text('EASY'));
     await tester.tap(find.text('救済者'));
     await tester.tap(find.text('自分'));
+    await tester.ensureVisible(find.byKey(const Key('start-game')));
     await tester.tap(find.byKey(const Key('start-game')));
     await tester.pump();
     expect(find.textContaining('救済者（あなた）'), findsOneWidget);
@@ -182,7 +184,22 @@ void main() {
       ),
     );
     expect(find.text('何を確認しますか？'), findsOneWidget);
-    expect(find.text('属性を見る'), findsOneWidget);
+    expect(find.text('属性＋得点を見る'), findsOneWidget);
+  });
+
+  testWidgets('scoreVisible=falseでは未確認rankを?表示する', (tester) async {
+    final controller = NineJudgesController(
+      seed: 502,
+      settings: const NineJudgesGameSettings(scoreVisible: false),
+    );
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: BoardGrid(controller: controller)),
+      ),
+    );
+    expect(find.byKey(const Key('rank-hidden')), findsNWidgets(8));
+    expect(find.byKey(const Key('rank-known')), findsOneWidget);
   });
 
   testWidgets('CPU先攻ではCPUが思考中と表示する', (tester) async {
