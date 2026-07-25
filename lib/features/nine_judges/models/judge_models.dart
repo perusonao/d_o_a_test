@@ -62,6 +62,7 @@ class NineJudgesGameSettings {
     this.cpuLevel = CpuLevel.basic,
     this.skipCpuDelays = false,
     this.showCpuEvaluations = false,
+    this.scoreVisible = true,
   });
 
   final GameMode mode;
@@ -72,6 +73,7 @@ class NineJudgesGameSettings {
   final CpuLevel cpuLevel;
   final bool skipCpuDelays;
   final bool showCpuEvaluations;
+  final bool scoreVisible;
 
   NineJudgesGameSettings copyWith({
     GameMode? mode,
@@ -82,6 +84,7 @@ class NineJudgesGameSettings {
     CpuLevel? cpuLevel,
     bool? skipCpuDelays,
     bool? showCpuEvaluations,
+    bool? scoreVisible,
   }) => NineJudgesGameSettings(
     mode: mode ?? this.mode,
     cpuFaction: cpuFaction ?? this.cpuFaction,
@@ -91,6 +94,7 @@ class NineJudgesGameSettings {
     cpuLevel: cpuLevel ?? this.cpuLevel,
     skipCpuDelays: skipCpuDelays ?? this.skipCpuDelays,
     showCpuEvaluations: showCpuEvaluations ?? this.showCpuEvaluations,
+    scoreVisible: scoreVisible ?? this.scoreVisible,
   );
 }
 
@@ -103,6 +107,9 @@ class PersonCard {
     this.isJudged = false,
     this.hasLifeShield = false,
     this.isUnderReview = false,
+    this.lastStateChangedBy,
+    this.lastStateChangedTurn,
+    this.judgeAvailableFromTurn = 0,
   });
 
   final String id;
@@ -112,6 +119,9 @@ class PersonCard {
   final bool isJudged;
   final bool hasLifeShield;
   final bool isUnderReview;
+  final Faction? lastStateChangedBy;
+  final int? lastStateChangedTurn;
+  final int judgeAvailableFromTurn;
 
   bool get hidesAttributeWhenDead => rank == 3 && !isAlive;
 
@@ -120,6 +130,9 @@ class PersonCard {
     bool? isJudged,
     bool? hasLifeShield,
     bool? isUnderReview,
+    Faction? lastStateChangedBy,
+    int? lastStateChangedTurn,
+    int? judgeAvailableFromTurn,
   }) => PersonCard(
     id: id,
     attribute: attribute,
@@ -128,6 +141,10 @@ class PersonCard {
     isJudged: isJudged ?? this.isJudged,
     hasLifeShield: hasLifeShield ?? this.hasLifeShield,
     isUnderReview: isUnderReview ?? this.isUnderReview,
+    lastStateChangedBy: lastStateChangedBy ?? this.lastStateChangedBy,
+    lastStateChangedTurn: lastStateChangedTurn ?? this.lastStateChangedTurn,
+    judgeAvailableFromTurn:
+        judgeAvailableFromTurn ?? this.judgeAvailableFromTurn,
   );
 }
 

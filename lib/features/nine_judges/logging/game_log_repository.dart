@@ -11,6 +11,7 @@ abstract interface class GameLogRepository {
   Future<void> deleteAllGames();
   Future<String> exportGame(String gameId);
   Future<String> exportAllGames();
+  Future<String> exportGameText(String gameId);
 }
 
 class LocalGameLogRepository implements GameLogRepository {
@@ -69,6 +70,10 @@ class LocalGameLogRepository implements GameLogRepository {
   Future<String> exportAllGames() async => const JsonEncoder.withIndent(
     '  ',
   ).convert((await listGames()).map((e) => e.toJson()).toList());
+
+  @override
+  Future<String> exportGameText(String gameId) async =>
+      (await loadGame(gameId))?.toReadableText() ?? '';
 }
 
 class MemoryGameLogRepository implements GameLogRepository {
@@ -92,4 +97,8 @@ class MemoryGameLogRepository implements GameLogRepository {
   @override
   Future<String> exportAllGames() async =>
       jsonEncode(games.values.map((e) => e.toJson()).toList());
+
+  @override
+  Future<String> exportGameText(String gameId) async =>
+      games[gameId]?.toReadableText() ?? '';
 }

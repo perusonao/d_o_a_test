@@ -26,7 +26,7 @@ class ActionPanel extends StatelessWidget {
                     onPressed: () => controller.revealEyeInformation(
                       EyeInformation.attribute,
                     ),
-                    child: const Text('属性を見る'),
+                    child: const Text('属性＋得点を見る'),
                   ),
                 ),
               if (options.length == 2) const SizedBox(width: 5),
@@ -41,6 +41,16 @@ class ActionPanel extends StatelessWidget {
     }
     return Column(
       children: [
+        if (controller.phase == TurnPhase.selectingActionTarget)
+          SizedBox(
+            height: 24,
+            child: TextButton.icon(
+              key: const Key('cancel-action-selection'),
+              onPressed: controller.cancelActionSelection,
+              icon: const Icon(Icons.close, size: 14),
+              label: const Text('選択をキャンセル', style: TextStyle(fontSize: 10)),
+            ),
+          ),
         Row(
           children: [
             for (final action in const [
@@ -61,7 +71,9 @@ class ActionPanel extends StatelessWidget {
           height: 46,
           child: FilledButton(
             key: const Key('judge-button'),
-            onPressed: controller.canSelectAction(ActionType.judge)
+            onPressed:
+                controller.canSelectAction(ActionType.judge) ||
+                    controller.canSwitchAction(ActionType.judge)
                 ? () => controller.chooseAction(ActionType.judge)
                 : null,
             style: FilledButton.styleFrom(
@@ -121,7 +133,9 @@ class _ActionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final selected = controller.selectedAction == action;
-    final enabled = controller.canSelectAction(action);
+    final enabled =
+        controller.canSelectAction(action) ||
+        controller.canSwitchAction(action);
     final remaining = controller.currentInventory.remaining(action);
     final color = _color(action);
     return SizedBox(
@@ -206,7 +220,7 @@ class _ActionCard extends StatelessWidget {
   String _effect(ActionType action) => switch (action) {
     ActionType.life => '蘇生 / 防護',
     ActionType.death => '死亡 / 即確定',
-    ActionType.eye => '秘密を見る',
+    ActionType.eye => '属性＋得点を見る',
     ActionType.judge => '現在の生死で判決',
   };
 

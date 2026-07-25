@@ -3,7 +3,7 @@ import 'package:dead_or_alive/features/nine_judges/models/judge_models.dart';
 
 abstract final class CpuEvaluator {
   static double personValue(CpuGameView view, CpuSlotView slot) =>
-      slot.person.rank.toDouble();
+      (slot.knownRank ?? 2).toDouble();
 
   static bool prefersAlive(Faction faction, PersonAttribute attribute) {
     final saviorPrefersAlive =
@@ -62,7 +62,9 @@ abstract final class CpuEvaluator {
                       (person.isAlive
                           ? view.opponentInventory.death * 1.5
                           : view.opponentInventory.life * 1.5) -
-                      (view.inventory.judge <= 1 ? (4 - person.rank) * 3 : 0)
+                      (view.inventory.judge <= 1
+                          ? (4 - (slot.knownRank ?? 2)) * 3
+                          : 0)
                 : favorable == null
                 ? -2
                 : -value,

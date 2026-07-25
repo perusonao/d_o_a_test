@@ -18,11 +18,14 @@ class SelectedCardPanel extends StatelessWidget {
         controller.knowsAttribute(person, controller.currentPlayer)
         ? person.attribute.label
         : '?';
+    final rank = controller.knowsRank(index, controller.currentPlayer)
+        ? '${person.rank}'
+        : '?';
     return SizedBox(
       height: 20,
       child: Center(
         child: Text(
-          '$attribute${person.rank} ｜ ${person.isAlive ? '生' : '死'} ｜ '
+          '$attribute$rank ｜ ${person.isAlive ? '生' : '死'} ｜ '
           '${person.hasLifeShield
               ? 'LIFE防護あり'
               : person.isJudged

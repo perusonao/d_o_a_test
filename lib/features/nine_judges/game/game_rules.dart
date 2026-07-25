@@ -4,7 +4,10 @@ import 'package:dead_or_alive/features/nine_judges/game/game_config.dart';
 import 'package:dead_or_alive/features/nine_judges/models/judge_models.dart';
 
 abstract final class NineJudgesRules {
-  static List<BoardSlot> createBoard(Random random) {
+  static List<BoardSlot> createBoard(
+    Random random, {
+    bool scoreVisible = true,
+  }) {
     final columns = <List<PersonCard>>[
       for (var rank = 1; rank <= 3; rank++)
         [
@@ -17,11 +20,14 @@ abstract final class NineJudgesRules {
             ),
         ]..shuffle(random),
     ];
-    return [
+    final fixedColumns = [
       for (var row = 0; row < 3; row++)
         for (var column = 0; column < 3; column++)
           BoardSlot(person: columns[column][row]),
     ];
+    if (scoreVisible) return fixedColumns;
+    final shuffled = [...fixedColumns]..shuffle(random);
+    return shuffled;
   }
 
   static bool isAttributeVisible(
@@ -34,14 +40,19 @@ abstract final class NineJudgesRules {
     required PersonCard person,
     required bool viewerKnowsNumber,
     bool viewerKnowsAttribute = false,
+    bool viewerKnowsRank = true,
+    int currentTurn = 0,
+    Faction? viewer,
   }) {
     if (person.isJudged) return false;
     return switch (action) {
       ActionType.life => !person.isAlive || !person.hasLifeShield,
       ActionType.death => true,
-      ActionType.eye =>
-        person.rank == 3 && !person.isAlive && !viewerKnowsAttribute,
-      ActionType.judge => person.isUnderReview,
+      ActionType.eye => !viewerKnowsAttribute || !viewerKnowsRank,
+      ActionType.judge =>
+        person.isUnderReview &&
+            (person.lastStateChangedBy != viewer ||
+                currentTurn >= person.judgeAvailableFromTurn),
     };
   }
 

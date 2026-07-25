@@ -54,6 +54,10 @@ class NineJudgesController extends ChangeNotifier {
     Faction.savior: <int>{},
     Faction.executor: <int>{},
   };
+  final Map<Faction, Set<int>> knownRankSlots = {
+    Faction.savior: <int>{},
+    Faction.executor: <int>{},
+  };
   late Map<Faction, int> actionsUsed;
   final List<GameLogEntry> logs = [];
   final Map<String, Faction> judgedBy = {};
@@ -96,7 +100,10 @@ class NineJudgesController extends ChangeNotifier {
 
   void reset() {
     _resolveRandomSettings();
-    board = NineJudgesRules.createBoard(_random);
+    board = NineJudgesRules.createBoard(
+      _random,
+      scoreVisible: settings.scoreVisible,
+    );
     inventories = {
       Faction.savior: NineJudgesConfig.initialInventory,
       Faction.executor: NineJudgesConfig.initialInventory,
@@ -111,6 +118,11 @@ class NineJudgesController extends ChangeNotifier {
     for (final known in eyeKnowledgeSlots.values) {
       known.clear();
     }
+    for (final known in knownRankSlots.values) {
+      known
+        ..clear()
+        ..addAll(settings.scoreVisible ? List.generate(9, (i) => i) : const []);
+    }
     final rankThreeSlots = [
       for (var i = 0; i < board.length; i++)
         if (board[i].person.rank == 3) i,
@@ -119,6 +131,8 @@ class NineJudgesController extends ChangeNotifier {
     initialKnowledgeSlots[Faction.executor]!.add(rankThreeSlots[1]);
     knownAttributeSlots[Faction.savior]!.add(rankThreeSlots[0]);
     knownAttributeSlots[Faction.executor]!.add(rankThreeSlots[1]);
+    knownRankSlots[Faction.savior]!.add(rankThreeSlots[0]);
+    knownRankSlots[Faction.executor]!.add(rankThreeSlots[1]);
     logs.clear();
     judgedBy.clear();
     judgedTurn.clear();
@@ -170,6 +184,7 @@ class NineJudgesController extends ChangeNotifier {
                 .name,
           ),
       },
+      scoreVisible: settings.scoreVisible,
     );
     notifyListeners();
   }
@@ -208,6 +223,12 @@ class NineJudgesController extends ChangeNotifier {
       NineJudgesConfig.numberCardsEnabled && (debugMode || isFinished);
   bool eyeKnowsNumber(int index, Faction viewer) => false;
 
+  bool knowsRank(int index, Faction viewer) =>
+      debugMode ||
+      isFinished ||
+      settings.scoreVisible ||
+      knownRankSlots[viewer]!.contains(index);
+
   bool knowsAttribute(PersonCard person, Faction viewer) {
     if (debugMode || isFinished || !person.hidesAttributeWhenDead) return true;
     final index = board.indexWhere((slot) => slot.person.id == person.id);
@@ -237,10 +258,8 @@ class NineJudgesController extends ChangeNotifier {
 
   List<EyeInformation> availableEyeInformation(int index, Faction viewer) {
     final person = board[index].person;
-    return person.rank == 3 &&
-            !person.isAlive &&
-            !person.isJudged &&
-            !knowsAttribute(person, viewer)
+    return !person.isJudged &&
+            (!knowsAttribute(person, viewer) || !knowsRank(index, viewer))
         ? const [EyeInformation.attribute]
         : const [];
   }
@@ -259,6 +278,9 @@ class NineJudgesController extends ChangeNotifier {
         person: board[i].person,
         viewerKnowsNumber: true,
         viewerKnowsAttribute: knowsAttribute(board[i].person, viewer),
+        viewerKnowsRank: knowsRank(i, viewer),
+        currentTurn: turn,
+        viewer: viewer,
       ))
         i,
   ];
@@ -274,11 +296,30 @@ class NineJudgesController extends ChangeNotifier {
   }
 
   void chooseAction(ActionType action) {
+    if (phase == TurnPhase.selectingActionTarget && selectedAction != action) {
+      cancelActionSelection(notify: false);
+    }
     if (!canSelectAction(action)) return;
     selectedAction = action;
     selectedSlot = null;
     phase = TurnPhase.selectingActionTarget;
     notifyListeners();
+  }
+
+  bool canSwitchAction(ActionType action) =>
+      humanInputEnabled &&
+      phase == TurnPhase.selectingActionTarget &&
+      selectedAction != action &&
+      actionsRemainingFor(currentPlayer) > 0 &&
+      inventoryFor(currentPlayer).remaining(action) > 0 &&
+      _legalTargets(action, currentPlayer).isNotEmpty;
+
+  void cancelActionSelection({bool notify = true}) {
+    if (phase == TurnPhase.selectingAction) return;
+    selectedAction = null;
+    selectedSlot = null;
+    phase = TurnPhase.selectingAction;
+    if (notify) notifyListeners();
   }
 
   bool canTarget(int index) =>
@@ -313,8 +354,9 @@ class NineJudgesController extends ChangeNotifier {
     inventories[actor] = actorBefore.consume(ActionType.eye);
     logs.add(GameLogEntry(turn: turn, player: actor, message: 'EYEを使用'));
     knownAttributeSlots[actor]!.add(index);
+    knownRankSlots[actor]!.add(index);
     eyeKnowledgeSlots[actor]!.add(index);
-    final after = before.copyWith(isUnderReview: true);
+    final after = _markUnderReview(before, actor);
     board[index] = board[index].copyWith(person: after);
     _recordAction(
       action: ActionType.eye,
@@ -324,10 +366,10 @@ class NineJudgesController extends ChangeNotifier {
       after: after,
       actorBefore: actorBefore,
       opponentBefore: opponentBefore,
-      eyeResult: before.attribute.name,
+      eyeResult: '${before.attribute.name}:${before.rank}',
       knowledgeSource: 'eye',
     );
-    _finishAction('人物3を調査しました', action: ActionType.eye, targetIndex: index);
+    _finishAction('対象の情報を確認しました', action: ActionType.eye, targetIndex: index);
   }
 
   void cancelEyeInformation() {
@@ -349,15 +391,15 @@ class NineJudgesController extends ChangeNotifier {
     switch (action) {
       case ActionType.life:
         after = before.isAlive
-            ? before.copyWith(hasLifeShield: true, isUnderReview: true)
-            : before.copyWith(isAlive: true, isUnderReview: true);
+            ? _markUnderReview(before.copyWith(hasLifeShield: true), actor)
+            : _markUnderReview(before.copyWith(isAlive: true), actor);
         detail = before.isAlive ? '${after.id}にLIFE防護' : '${after.id}が生になりました';
       case ActionType.death:
         after = !before.isAlive
             ? before.copyWith(isJudged: true, isUnderReview: false)
             : before.hasLifeShield
-            ? before.copyWith(hasLifeShield: false, isUnderReview: true)
-            : before.copyWith(isAlive: false, isUnderReview: true);
+            ? _markUnderReview(before.copyWith(hasLifeShield: false), actor)
+            : _markUnderReview(before.copyWith(isAlive: false), actor);
         detail = !before.isAlive ? '${after.id}を死で判決' : '${after.id}へDEATH';
       case ActionType.judge:
         after = before.copyWith(isJudged: true, isUnderReview: false);
@@ -396,15 +438,25 @@ class NineJudgesController extends ChangeNotifier {
     );
   }
 
+  PersonCard _markUnderReview(PersonCard person, Faction actor) =>
+      person.copyWith(
+        isUnderReview: true,
+        lastStateChangedBy: actor,
+        lastStateChangedTurn: turn,
+        judgeAvailableFromTurn: turn + 2,
+      );
+
   String _publicActionResult({
     required ActionType action,
     required int index,
     required PersonCard before,
     required PersonCard after,
   }) {
-    final target = knowsAttribute(before, humanFaction)
-        ? '${before.attribute.label} ${before.rank}'
-        : '人物${before.rank}';
+    final attribute = knowsAttribute(before, humanFaction)
+        ? before.attribute.label
+        : '?';
+    final rank = knowsRank(index, humanFaction) ? '${before.rank}' : '?';
+    final target = '$attribute $rank';
     return switch (action) {
       ActionType.life when !before.isAlive => '$target を「生」にしました',
       ActionType.life => '$target にLIFE防護を付与',
@@ -412,7 +464,7 @@ class NineJudgesController extends ChangeNotifier {
       ActionType.death when before.hasLifeShield => '$target のLIFE防護を破壊',
       ActionType.death => '$target を「死」にしました',
       ActionType.judge => '$target\n「${after.isAlive ? '生' : '死'}」で判定',
-      ActionType.eye => '人物3を調査しました',
+      ActionType.eye => '対象の情報を確認しました',
     };
   }
 
@@ -464,6 +516,12 @@ class NineJudgesController extends ChangeNotifier {
           remainingActionsBefore: actionsRemainingFor(actor),
           remainingActionsAfter: actionsRemainingFor(actor) - 1,
           knowledgeSource: knowledgeSource,
+          scoreVisible: settings.scoreVisible,
+          judgeWasAvailable:
+              before.isUnderReview &&
+              (before.lastStateChangedBy != actor ||
+                  turn >= before.judgeAvailableFromTurn),
+          judgeAvailableFromTurn: after.judgeAvailableFromTurn,
         ),
       ],
     );
@@ -626,21 +684,27 @@ class NineJudgesController extends ChangeNotifier {
           CpuSlotView(
             index: i,
             person: PersonCard(
-              id: knowsAttribute(board[i].person, faction)
+              id:
+                  knowsAttribute(board[i].person, faction) &&
+                      knowsRank(i, faction)
                   ? board[i].person.id
                   : 'unknown-slot-$i',
               attribute: knowsAttribute(board[i].person, faction)
                   ? inferredAttribute(i, faction) ?? board[i].person.attribute
                   : PersonAttribute.neutral,
-              rank: board[i].person.rank,
+              rank: knowsRank(i, faction) ? board[i].person.rank : 2,
               isAlive: board[i].person.isAlive,
               isJudged: board[i].person.isJudged,
               hasLifeShield: board[i].person.hasLifeShield,
               isUnderReview: board[i].person.isUnderReview,
+              lastStateChangedBy: board[i].person.lastStateChangedBy,
+              lastStateChangedTurn: board[i].person.lastStateChangedTurn,
+              judgeAvailableFromTurn: board[i].person.judgeAvailableFromTurn,
             ),
             knownAttribute: knowsAttribute(board[i].person, faction)
                 ? inferredAttribute(i, faction) ?? board[i].person.attribute
                 : null,
+            knownRank: knowsRank(i, faction) ? board[i].person.rank : null,
             knowledgeSource: eyeKnowledgeSlots[faction]!.contains(i)
                 ? 'eye'
                 : initialKnowledgeSlots[faction]!.contains(i)

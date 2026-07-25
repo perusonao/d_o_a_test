@@ -53,6 +53,7 @@ void main() {
     await tester.pumpWidget(const ProviderScope(child: DeadOrAliveApp()));
     expect(find.text('9人の審判'), findsOneWidget);
     await tester.tap(find.text('2人対戦'));
+    await tester.ensureVisible(find.byKey(const Key('start-game')));
     await tester.tap(find.byKey(const Key('start-game')));
     await tester.pump();
     expect(find.byKey(const Key('judge-slot-0')), findsOneWidget);

@@ -136,6 +136,15 @@ class PlayLogDetailScreen extends StatelessWidget {
       title: const Text('ログ詳細'),
       actions: [
         IconButton(
+          key: const Key('export-single-log-text'),
+          tooltip: 'TXTをコピー',
+          onPressed: () async {
+            final text = await repository.exportGameText(session.gameId);
+            await Clipboard.setData(ClipboardData(text: text));
+          },
+          icon: const Icon(Icons.text_snippet_outlined),
+        ),
+        IconButton(
           key: const Key('export-single-log'),
           tooltip: 'JSONを書き出す',
           onPressed: () async {

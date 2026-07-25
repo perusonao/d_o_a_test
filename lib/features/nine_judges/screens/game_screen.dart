@@ -481,7 +481,7 @@ class _PhaseBanner extends StatelessWidget {
               switch (controller.selectedAction!) {
                 ActionType.life => 'LIFEを使う人物を選択してください',
                 ActionType.death => 'DEATHを使う人物を選択してください',
-                ActionType.eye => '正体を見る人物3を選択',
+                ActionType.eye => '属性と得点を調査する人物を選択',
                 ActionType.judge => '判決する人物を選択（審議中のみ）',
               },
             TurnPhase.selectingEyeInformation => '確認する情報を選択',
@@ -659,7 +659,7 @@ class _RulesDialog extends StatelessWidget {
           Divider(),
           _RuleLine(title: 'LIFE', body: '死→生 / 生ならDEATHを1回防ぐ'),
           _RuleLine(title: 'DEATH', body: '生→死 / 死なら即判決'),
-          _RuleLine(title: 'EYE', body: '死状態の人物3の属性を自分だけ確認'),
+          _RuleLine(title: 'EYE', body: '対象の属性と得点を自分だけ確認'),
           _RuleLine(title: 'JUDGE', body: '有限カード。一度審議された人物だけを現在の生死で確定'),
         ],
       ),

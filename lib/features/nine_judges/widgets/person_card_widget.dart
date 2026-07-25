@@ -193,7 +193,8 @@ class PersonCardWidget extends StatelessWidget {
                         border: Border.all(color: const Color(0xFFD6B25E)),
                       ),
                       child: Text(
-                        '${person.rank}',
+                        numberVisible ? '${person.rank}' : '?',
+                        key: Key(numberVisible ? 'rank-known' : 'rank-hidden'),
                         style: TextStyle(
                           fontSize: compact ? 10 : 11,
                           fontWeight: FontWeight.w900,

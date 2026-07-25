@@ -79,6 +79,7 @@ void main() {
         slots: [
           CpuSlotView(
             index: 0,
+            knownRank: 2,
             person: PersonCard(
               id: 'good-2',
               attribute: PersonAttribute.good,
@@ -88,6 +89,7 @@ void main() {
           ),
           CpuSlotView(
             index: 1,
+            knownRank: 2,
             person: PersonCard(
               id: 'evil-2',
               attribute: PersonAttribute.evil,
@@ -110,6 +112,7 @@ void main() {
         slots: [
           CpuSlotView(
             index: 0,
+            knownRank: 1,
             person: PersonCard(
               id: 'good-1',
               attribute: PersonAttribute.good,
@@ -119,6 +122,7 @@ void main() {
           ),
           CpuSlotView(
             index: 1,
+            knownRank: 3,
             person: PersonCard(
               id: 'good-3',
               attribute: PersonAttribute.good,
