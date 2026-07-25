@@ -105,6 +105,66 @@ void main() {
     expect(find.byKey(const Key('number-?')), findsNothing);
     expect(find.byKey(const Key('life-shield')), findsOneWidget);
     expect(find.byKey(const Key('judged-label')), findsOneWidget);
+    expect(find.text('判定済'), findsOneWidget);
+    expect(find.byKey(const Key('under-review-label')), findsNothing);
+  });
+
+  testWidgets('未審議・審議中・判定済を排他的に表示する', (tester) async {
+    Future<void> show(PersonCard person) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 110,
+              height: 150,
+              child: PersonCardWidget(
+                slot: BoardSlot(person: person),
+                attributeVisible: true,
+                numberVisible: false,
+                selected: false,
+                enabled: false,
+                onTap: _noop,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    await show(
+      const PersonCard(
+        id: 'good-1',
+        attribute: PersonAttribute.good,
+        rank: 1,
+        isAlive: true,
+      ),
+    );
+    expect(find.byKey(const Key('not-reviewed-label')), findsOneWidget);
+
+    await show(
+      const PersonCard(
+        id: 'good-1',
+        attribute: PersonAttribute.good,
+        rank: 1,
+        isAlive: true,
+        isUnderReview: true,
+      ),
+    );
+    expect(find.byKey(const Key('under-review-label')), findsOneWidget);
+    expect(find.byKey(const Key('judged-label')), findsNothing);
+
+    await show(
+      const PersonCard(
+        id: 'good-1',
+        attribute: PersonAttribute.good,
+        rank: 1,
+        isAlive: true,
+        isJudged: true,
+        isUnderReview: false,
+      ),
+    );
+    expect(find.byKey(const Key('judged-label')), findsOneWidget);
+    expect(find.byKey(const Key('under-review-label')), findsNothing);
   });
 
   testWidgets('EYE対象選択後に確認情報を選べる', (tester) async {
@@ -139,6 +199,12 @@ void main() {
     );
     expect(find.text('CPUが思考中…'), findsWidgets);
     await tester.pump(const Duration(milliseconds: 600));
+    expect(find.byKey(const Key('cpu-action-message')), findsOneWidget);
+    expect(find.byKey(const Key('cpu-target-highlight')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('cpu-action-message')));
+    await tester.pump();
+    expect(find.byKey(const Key('cpu-action-message')), findsNothing);
+    await tester.pump(const Duration(seconds: 1));
   });
 }
 

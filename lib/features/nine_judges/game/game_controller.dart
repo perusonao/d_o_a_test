@@ -73,6 +73,9 @@ class NineJudgesController extends ChangeNotifier {
   Future<void>? _saveFuture;
   String? endReason;
   String? lastCpuActionMessage;
+  int? lastCpuTargetIndex;
+  ActionType? lastCpuActionType;
+  bool lastCpuWasJudgment = false;
   List<CpuCandidateScore> lastCpuEvaluations = const [];
   double? _pendingCpuScore;
   String? _pendingCpuReason;
@@ -131,6 +134,9 @@ class NineJudgesController extends ChangeNotifier {
     _saveFuture = null;
     endReason = null;
     lastCpuActionMessage = null;
+    lastCpuTargetIndex = null;
+    lastCpuActionType = null;
+    lastCpuWasJudgment = false;
     lastCpuEvaluations = const [];
     final now = DateTime.now();
     session = GameSession(
@@ -321,7 +327,7 @@ class NineJudgesController extends ChangeNotifier {
       eyeResult: before.attribute.name,
       knowledgeSource: 'eye',
     );
-    _finishAction('${actor.label}がEYEを使用しました');
+    _finishAction('人物3を調査しました', action: ActionType.eye, targetIndex: index);
   }
 
   void cancelEyeInformation() {
@@ -348,13 +354,13 @@ class NineJudgesController extends ChangeNotifier {
         detail = before.isAlive ? '${after.id}にLIFE防護' : '${after.id}が生になりました';
       case ActionType.death:
         after = !before.isAlive
-            ? before.copyWith(isJudged: true)
+            ? before.copyWith(isJudged: true, isUnderReview: false)
             : before.hasLifeShield
             ? before.copyWith(hasLifeShield: false, isUnderReview: true)
             : before.copyWith(isAlive: false, isUnderReview: true);
         detail = !before.isAlive ? '${after.id}を死で判決' : '${after.id}へDEATH';
       case ActionType.judge:
-        after = before.copyWith(isJudged: true);
+        after = before.copyWith(isJudged: true, isUnderReview: false);
         detail = '${after.id}を${after.isAlive ? '生' : '死'}で判決';
       case ActionType.eye:
         return;
@@ -375,7 +381,39 @@ class NineJudgesController extends ChangeNotifier {
       actorBefore: actorBefore,
       opponentBefore: opponentBefore,
     );
-    _finishAction('${actor.label}が${action.label}を使用\n$detail');
+    _finishAction(
+      _publicActionResult(
+        action: action,
+        index: index,
+        before: before,
+        after: after,
+      ),
+      action: action,
+      targetIndex: index,
+      judgment:
+          action == ActionType.judge ||
+          (action == ActionType.death && !before.isAlive),
+    );
+  }
+
+  String _publicActionResult({
+    required ActionType action,
+    required int index,
+    required PersonCard before,
+    required PersonCard after,
+  }) {
+    final target = knowsAttribute(before, humanFaction)
+        ? '${before.attribute.label} ${before.rank}'
+        : '人物${before.rank}';
+    return switch (action) {
+      ActionType.life when !before.isAlive => '$target を「生」にしました',
+      ActionType.life => '$target にLIFE防護を付与',
+      ActionType.death when !before.isAlive => '$target を「死」で確定',
+      ActionType.death when before.hasLifeShield => '$target のLIFE防護を破壊',
+      ActionType.death => '$target を「死」にしました',
+      ActionType.judge => '$target\n「${after.isAlive ? '生' : '死'}」で判定',
+      ActionType.eye => '人物3を調査しました',
+    };
   }
 
   void _recordAction({
@@ -433,9 +471,24 @@ class NineJudgesController extends ChangeNotifier {
     _pendingCpuReason = null;
   }
 
-  void _finishAction(String publicMessage) {
+  void _finishAction(
+    String publicMessage, {
+    ActionType? action,
+    int? targetIndex,
+    bool judgment = false,
+  }) {
     actionsUsed[currentPlayer] = actionsUsed[currentPlayer]! + 1;
-    lastCpuActionMessage = isCpuTurn ? publicMessage : null;
+    if (isCpuTurn) {
+      lastCpuActionMessage = publicMessage;
+      lastCpuTargetIndex = targetIndex;
+      lastCpuActionType = action;
+      lastCpuWasJudgment = judgment;
+    } else {
+      lastCpuActionMessage = null;
+      lastCpuTargetIndex = null;
+      lastCpuActionType = null;
+      lastCpuWasJudgment = false;
+    }
     selectedAction = null;
     selectedSlot = null;
     phase = TurnPhase.selectingAction;
@@ -450,6 +503,15 @@ class NineJudgesController extends ChangeNotifier {
       currentPlayer = currentPlayer.opponent;
     }
     awaitingHandoff = !isCpuGame;
+    notifyListeners();
+  }
+
+  void clearCpuFeedback() {
+    if (lastCpuActionMessage == null) return;
+    lastCpuActionMessage = null;
+    lastCpuTargetIndex = null;
+    lastCpuActionType = null;
+    lastCpuWasJudgment = false;
     notifyListeners();
   }
 

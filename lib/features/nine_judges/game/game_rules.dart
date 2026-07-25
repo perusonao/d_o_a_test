@@ -5,17 +5,23 @@ import 'package:dead_or_alive/features/nine_judges/models/judge_models.dart';
 
 abstract final class NineJudgesRules {
   static List<BoardSlot> createBoard(Random random) {
-    final people = [
-      for (final attribute in PersonAttribute.values)
-        for (var rank = 1; rank <= 3; rank++)
-          PersonCard(
-            id: '${attribute.name}-$rank',
-            attribute: attribute,
-            rank: rank,
-            isAlive: NineJudgesConfig.initialAliveByRank[rank]!,
-          ),
-    ]..shuffle(random);
-    return List.generate(9, (index) => BoardSlot(person: people[index]));
+    final columns = <List<PersonCard>>[
+      for (var rank = 1; rank <= 3; rank++)
+        [
+          for (final attribute in PersonAttribute.values)
+            PersonCard(
+              id: '${attribute.name}-$rank',
+              attribute: attribute,
+              rank: rank,
+              isAlive: NineJudgesConfig.initialAliveByRank[rank]!,
+            ),
+        ]..shuffle(random),
+    ];
+    return [
+      for (var row = 0; row < 3; row++)
+        for (var column = 0; column < 3; column++)
+          BoardSlot(person: columns[column][row]),
+    ];
   }
 
   static bool isAttributeVisible(

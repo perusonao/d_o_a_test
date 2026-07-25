@@ -56,6 +56,7 @@ class BoardGrid extends StatelessWidget {
         controller.currentPlayer,
       ),
       selected: controller.selectedSlot == index,
+      cpuHighlighted: controller.lastCpuTargetIndex == index,
       enabled: controller.canTarget(index),
       onTap: () => controller.selectSlot(index),
       scoreDetail: showScores
