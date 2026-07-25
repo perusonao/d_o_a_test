@@ -9,13 +9,53 @@ class ActionPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final judgeReady = controller.phase == TurnPhase.awaitingJudge;
-    final selectingJudge = controller.phase == TurnPhase.selectingJudgeTarget;
+    if (controller.phase == TurnPhase.selectingEyeInformation) {
+      final options = controller.availableEyeInformation(
+        controller.selectedSlot!,
+        controller.currentPlayer,
+      );
+      return Column(
+        key: const Key('eye-information-picker'),
+        children: [
+          const Text('何を確認しますか？', style: TextStyle(fontSize: 11)),
+          Row(
+            children: [
+              if (options.contains(EyeInformation.attribute))
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => controller.revealEyeInformation(
+                      EyeInformation.attribute,
+                    ),
+                    child: const Text('属性を見る'),
+                  ),
+                ),
+              if (options.length == 2) const SizedBox(width: 5),
+              if (options.contains(EyeInformation.number))
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () =>
+                        controller.revealEyeInformation(EyeInformation.number),
+                    child: const Text('数字を見る'),
+                  ),
+                ),
+            ],
+          ),
+          TextButton(
+            onPressed: controller.cancelEyeInformation,
+            child: const Text('キャンセル'),
+          ),
+        ],
+      );
+    }
     return Column(
       children: [
         Row(
           children: [
-            for (final action in ActionType.values) ...[
+            for (final action in const [
+              ActionType.life,
+              ActionType.death,
+              ActionType.eye,
+            ]) ...[
               Expanded(
                 child: _ActionCard(controller: controller, action: action),
               ),
@@ -29,7 +69,9 @@ class ActionPanel extends StatelessWidget {
           height: 46,
           child: FilledButton(
             key: const Key('judge-button'),
-            onPressed: judgeReady ? controller.beginJudge : null,
+            onPressed: controller.canSelectAction(ActionType.judge)
+                ? () => controller.chooseAction(ActionType.judge)
+                : null,
             style: FilledButton.styleFrom(
               disabledBackgroundColor: const Color(0xFF29251D),
               disabledForegroundColor: Colors.white30,
@@ -38,13 +80,13 @@ class ActionPanel extends StatelessWidget {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(7),
                 side: BorderSide(
-                  color: selectingJudge
+                  color: controller.selectedAction == ActionType.judge
                       ? const Color(0xFFFFDF86)
                       : const Color(0xFFD6B25E),
-                  width: selectingJudge ? 2 : 1,
+                  width: controller.selectedAction == ActionType.judge ? 2 : 1,
                 ),
               ),
-              elevation: judgeReady ? 5 : 0,
+              elevation: controller.canSelectAction(ActionType.judge) ? 5 : 0,
               padding: EdgeInsets.zero,
             ),
             child: const Column(
@@ -65,7 +107,7 @@ class ActionPanel extends StatelessWidget {
                     ),
                   ],
                 ),
-                Text('この人物の生死を確定する', style: TextStyle(fontSize: 9, height: 1)),
+                Text('現在の生死で判決', style: TextStyle(fontSize: 9, height: 1)),
               ],
             ),
           ),
@@ -163,17 +205,20 @@ class _ActionCard extends StatelessWidget {
     ActionType.life => Icons.volunteer_activism,
     ActionType.death => Icons.dangerous_outlined,
     ActionType.eye => Icons.visibility_outlined,
+    ActionType.judge => Icons.balance,
   };
 
   String _effect(ActionType action) => switch (action) {
     ActionType.life => '蘇生 / 防護',
     ActionType.death => '死亡 / 即確定',
-    ActionType.eye => '数字を見る',
+    ActionType.eye => '秘密を見る',
+    ActionType.judge => '現在の生死で判決',
   };
 
   Color _color(ActionType action) => switch (action) {
     ActionType.life => const Color(0xFF64D58A),
     ActionType.death => const Color(0xFFF0645A),
     ActionType.eye => const Color(0xFF9B83E6),
+    ActionType.judge => const Color(0xFFD6B25E),
   };
 }

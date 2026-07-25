@@ -31,12 +31,16 @@ abstract final class NineJudgesRules {
     required ActionType action,
     required PersonCard person,
     required bool viewerKnowsNumber,
+    bool viewerKnowsAttribute = false,
   }) {
     if (person.isJudged) return false;
     return switch (action) {
       ActionType.life => !person.isAlive || !person.hasLifeShield,
       ActionType.death => true,
-      ActionType.eye => !viewerKnowsNumber,
+      ActionType.eye =>
+        !viewerKnowsNumber ||
+            (person.hidesAttributeWhenDead && !viewerKnowsAttribute),
+      ActionType.judge => true,
     };
   }
 

@@ -9,6 +9,8 @@ class PersonCardWidget extends StatelessWidget {
     required this.selected,
     required this.enabled,
     required this.onTap,
+    this.attributeEyeKnown = false,
+    this.numberEyeKnown = false,
     this.scoreDetail,
     super.key,
   });
@@ -19,6 +21,8 @@ class PersonCardWidget extends StatelessWidget {
   final bool selected;
   final bool enabled;
   final VoidCallback onTap;
+  final bool attributeEyeKnown;
+  final bool numberEyeKnown;
   final ({Faction faction, int points})? scoreDetail;
 
   @override
@@ -88,6 +92,7 @@ class PersonCardWidget extends StatelessWidget {
                       value: numberVisible ? '${slot.hiddenNumber}' : '?',
                       known: numberVisible,
                       compact: compact,
+                      eyeKnown: numberEyeKnown,
                     ),
                     if (scoreDetail != null)
                       Text(
@@ -107,15 +112,25 @@ class PersonCardWidget extends StatelessWidget {
                 Positioned(
                   left: 0,
                   top: 0,
-                  child: Text(
-                    attributeVisible ? person.attribute.label : '?',
-                    style: TextStyle(
-                      color: attributeVisible
-                          ? _attributeColor(person.attribute)
-                          : Colors.white70,
-                      fontSize: compact ? 9 : 10,
-                      fontWeight: FontWeight.w900,
-                    ),
+                  child: Row(
+                    children: [
+                      Text(
+                        attributeVisible ? person.attribute.label : '?',
+                        style: TextStyle(
+                          color: attributeVisible
+                              ? _attributeColor(person.attribute)
+                              : Colors.white70,
+                          fontSize: compact ? 9 : 10,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      if (attributeEyeKnown)
+                        const Icon(
+                          Icons.visibility,
+                          size: 9,
+                          color: Color(0xFFD6B25E),
+                        ),
+                    ],
                   ),
                 ),
                 Positioned(
@@ -183,11 +198,13 @@ class _NumberMedal extends StatelessWidget {
     required this.value,
     required this.known,
     required this.compact,
+    required this.eyeKnown,
   });
 
   final String value;
   final bool known;
   final bool compact;
+  final bool eyeKnown;
 
   @override
   Widget build(BuildContext context) {
@@ -205,14 +222,25 @@ class _NumberMedal extends StatelessWidget {
           width: known ? 1.5 : 1,
         ),
       ),
-      child: Text(
-        value,
-        style: TextStyle(
-          color: known ? const Color(0xFFFFD978) : Colors.white60,
-          fontSize: compact ? 14 : 17,
-          height: 1,
-          fontWeight: FontWeight.w900,
-        ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Text(
+            value,
+            style: TextStyle(
+              color: known ? const Color(0xFFFFD978) : Colors.white60,
+              fontSize: compact ? 14 : 17,
+              height: 1,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          if (eyeKnown)
+            const Positioned(
+              right: 1,
+              bottom: 1,
+              child: Icon(Icons.visibility, size: 7),
+            ),
+        ],
       ),
     );
   }

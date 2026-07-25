@@ -70,14 +70,6 @@ class _NineJudgesGameScreenState extends State<NineJudgesGameScreen> {
       return;
     }
     game.performCpuAction();
-    if (game.phase == TurnPhase.awaitingJudge) {
-      await Future<void>.delayed(
-        game.settings.skipCpuDelays
-            ? Duration.zero
-            : const Duration(milliseconds: 450),
-      );
-      if (mounted && game == controller) game.performCpuJudge();
-    }
     _cpuSequenceRunning = false;
     if (mounted) setState(() {});
   }
@@ -136,6 +128,7 @@ class _GameBoard extends StatelessWidget {
                   Expanded(child: BoardGrid(controller: controller)),
                   SelectedCardPanel(controller: controller),
                   ActionPanel(controller: controller),
+                  const SizedBox(height: 52),
                   if (controller.debugMode)
                     SizedBox(
                       height: 21,
@@ -361,7 +354,9 @@ class _Header extends StatelessWidget {
             children: [
               Expanded(
                 child: _FactionLabel(
-                  text: controller.isCpuGame ? '救済者（あなた）' : '救済者',
+                  text: controller.isCpuGame
+                      ? '救済者（${controller.humanFaction == Faction.savior ? 'あなた' : 'CPU'}）'
+                      : '救済者',
                   color: const Color(0xFF62B9F3),
                   active: saviorActive,
                   alignment: Alignment.centerLeft,
@@ -370,7 +365,9 @@ class _Header extends StatelessWidget {
               const Icon(Icons.balance, size: 19, color: Color(0xFFD6B25E)),
               Expanded(
                 child: _FactionLabel(
-                  text: controller.isCpuGame ? '執行者（CPU）' : '執行者',
+                  text: controller.isCpuGame
+                      ? '執行者（${controller.humanFaction == Faction.executor ? 'あなた' : 'CPU'}）'
+                      : '執行者',
                   color: const Color(0xFFF0645A),
                   active: executorActive,
                   alignment: Alignment.centerRight,
@@ -445,21 +442,19 @@ class _PhaseBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final selectingJudge =
-        controller.phase == TurnPhase.selectingJudgeTarget ||
-        controller.phase == TurnPhase.awaitingJudge;
+    final selectingJudge = controller.selectedAction == ActionType.judge;
     final text = controller.isCpuTurn
-        ? 'CPU思考中…'
+        ? 'CPUが思考中'
         : switch (controller.phase) {
             TurnPhase.selectingAction => 'アクションを選択してください',
             TurnPhase.selectingActionTarget =>
               switch (controller.selectedAction!) {
                 ActionType.life => 'LIFEを使う人物を選択してください',
                 ActionType.death => 'DEATHを使う人物を選択してください',
-                ActionType.eye => '数字を見る人物を選択してください',
+                ActionType.eye => 'EYEを使う人物を選択してください',
+                ActionType.judge => '判決する人物を選択してください',
               },
-            TurnPhase.awaitingJudge => 'JUDGEを押してください',
-            TurnPhase.selectingJudgeTarget => '判決する人物を選択してください',
+            TurnPhase.selectingEyeInformation => '確認する情報を選択',
           };
     return AnimatedContainer(
       key: const Key('phase-instruction'),
@@ -515,7 +510,7 @@ class _CpuMessage extends StatelessWidget {
       ),
       child: Text(
         controller.isCpuTurn
-            ? controller.lastCpuActionMessage ?? 'CPU思考中…'
+            ? controller.lastCpuActionMessage ?? 'CPUが思考中'
             : controller.lastCpuActionMessage!,
         textAlign: TextAlign.center,
         maxLines: 2,
@@ -557,8 +552,8 @@ class _RulesDialog extends StatelessWidget {
           Divider(),
           _RuleLine(title: 'LIFE', body: '死→生 / 生ならDEATHを1回防ぐ'),
           _RuleLine(title: 'DEATH', body: '生→死 / 死なら即判決'),
-          _RuleLine(title: 'EYE', body: '隠された数字を見る'),
-          _RuleLine(title: 'JUDGE', body: '現在の生死で最終確定'),
+          _RuleLine(title: 'EYE', body: '秘密の属性または数字を1つ見る'),
+          _RuleLine(title: 'JUDGE', body: '1アクションとして現在の生死で最終確定'),
         ],
       ),
       actions: [

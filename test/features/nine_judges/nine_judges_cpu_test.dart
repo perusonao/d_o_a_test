@@ -48,10 +48,16 @@ void main() {
       );
       final view = controller.cpuView();
       final eyeTargets = view.legalTargets[ActionType.eye]!;
-      expect(
-        eyeTargets.any(controller.knownNumberSlots[Faction.executor]!.contains),
-        isFalse,
-      );
+      for (final index in controller.knownNumberSlots[Faction.executor]!) {
+        if (eyeTargets.contains(index)) {
+          expect(
+            controller
+                .availableEyeInformation(index, Faction.executor)
+                .contains(EyeInformation.attribute),
+            isTrue,
+          );
+        }
+      }
       expect(eyeTargets, isNot(contains(4)));
     });
 
@@ -178,9 +184,6 @@ void main() {
       controller.currentPlayer = Faction.executor;
       final decision = controller.performCpuAction();
       expect(decision, isNotNull);
-      if (controller.phase == TurnPhase.awaitingJudge) {
-        expect(controller.performCpuJudge(), isNotNull);
-      }
       expect(controller.currentPlayer, Faction.savior);
       expect(controller.awaitingHandoff, isFalse);
     });
@@ -195,26 +198,22 @@ void main() {
       while (!controller.isFinished && guard++ < 20) {
         if (controller.isCpuTurn) {
           controller.performCpuAction();
-          if (controller.phase == TurnPhase.awaitingJudge) {
-            controller.performCpuJudge();
-          }
         } else {
-          final action = ActionType.values.firstWhere(
-            controller.canSelectAction,
-          );
+          final action = controller.canSelectAction(ActionType.judge)
+              ? ActionType.judge
+              : ActionType.values.firstWhere(controller.canSelectAction);
           controller.chooseAction(action);
           final target = List.generate(
             9,
             (i) => i,
           ).firstWhere(controller.canTarget);
           controller.selectSlot(target);
-          if (controller.phase == TurnPhase.awaitingJudge) {
-            controller.beginJudge();
-            final judgeTarget = List.generate(
-              9,
-              (i) => i,
-            ).firstWhere(controller.canTarget);
-            controller.selectSlot(judgeTarget);
+          if (controller.phase == TurnPhase.selectingEyeInformation) {
+            controller.revealEyeInformation(
+              controller
+                  .availableEyeInformation(target, controller.currentPlayer)
+                  .first,
+            );
           }
         }
       }

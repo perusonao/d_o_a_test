@@ -1,7 +1,11 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:dead_or_alive/features/nine_judges/game/game_controller.dart';
 import 'package:dead_or_alive/features/nine_judges/models/judge_models.dart';
 import 'package:dead_or_alive/features/nine_judges/screens/game_screen.dart';
+import 'package:dead_or_alive/features/nine_judges/widgets/action_panel.dart';
 import 'package:dead_or_alive/features/nine_judges/widgets/person_card_widget.dart';
 
 void main() {
@@ -40,7 +44,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('rules-dialog')), findsOneWidget);
     expect(find.text('死→生 / 生ならDEATHを1回防ぐ'), findsOneWidget);
-    expect(find.text('現在の生死で最終確定'), findsOneWidget);
+    expect(find.textContaining('現在の生死で最終確定'), findsOneWidget);
   });
 
   testWidgets('対戦モードとEASY・NORMALを選択できる', (tester) async {
@@ -50,6 +54,8 @@ void main() {
     expect(find.text('EASY'), findsOneWidget);
     expect(find.text('NORMAL'), findsOneWidget);
     await tester.tap(find.text('EASY'));
+    await tester.tap(find.text('救済者'));
+    await tester.tap(find.text('自分'));
     await tester.tap(find.byKey(const Key('start-game')));
     await tester.pump();
     expect(find.textContaining('救済者（あなた）'), findsOneWidget);
@@ -89,6 +95,44 @@ void main() {
     expect(find.textContaining('?'), findsOneWidget);
     expect(find.byKey(const Key('life-shield')), findsOneWidget);
     expect(find.byKey(const Key('judged-label')), findsOneWidget);
+  });
+
+  testWidgets('EYE対象選択後に確認情報を選べる', (tester) async {
+    final controller = NineJudgesController(random: Random(2));
+    addTearDown(controller.dispose);
+    controller.chooseAction(ActionType.eye);
+    final target = List.generate(
+      9,
+      (index) => index,
+    ).firstWhere(controller.canTarget);
+    controller.selectSlot(target);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: ActionPanel(controller: controller)),
+      ),
+    );
+    expect(find.text('何を確認しますか？'), findsOneWidget);
+    expect(
+      find.text('属性を見る').evaluate().isNotEmpty ||
+          find.text('数字を見る').evaluate().isNotEmpty,
+      isTrue,
+    );
+  });
+
+  testWidgets('CPU先攻ではCPUが思考中と表示する', (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: NineJudgesGameScreen(
+          initialSettings: NineJudgesGameSettings(
+            mode: GameMode.cpu,
+            factionSelection: FactionSelection.savior,
+            firstPlayerSelection: FirstPlayerSelection.cpu,
+          ),
+        ),
+      ),
+    );
+    expect(find.text('CPUが思考中'), findsWidgets);
+    await tester.pump(const Duration(milliseconds: 600));
   });
 }
 

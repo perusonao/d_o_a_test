@@ -22,6 +22,17 @@ abstract final class CpuEvaluator {
   static bool currentStateIsFavorable(Faction faction, PersonCard person) =>
       person.isAlive == prefersAlive(faction, person.attribute);
 
+  static bool? knownStateIsFavorable(Faction faction, CpuSlotView slot) {
+    final attribute = slot.knownAttribute;
+    if (attribute == null) return null;
+    return slot.person.isAlive == prefersAlive(faction, attribute);
+  }
+
+  static EyeInformation preferredEyeInformation(CpuSlotView slot) =>
+      slot.eyeOptions.contains(EyeInformation.attribute)
+      ? EyeInformation.attribute
+      : EyeInformation.number;
+
   static double actionScore(
     CpuGameView view,
     ActionType action,
@@ -29,27 +40,44 @@ abstract final class CpuEvaluator {
   ) {
     final person = slot.person;
     final value = personValue(view, slot);
-    final favorable = currentStateIsFavorable(view.faction, person);
+    final favorable = knownStateIsFavorable(view.faction, slot);
     return switch (action) {
       ActionType.life when !person.isAlive =>
-        prefersAlive(view.faction, person.attribute) ? 12 + value : 1,
-      ActionType.life => favorable ? 6 + value : 0.5,
-      ActionType.death when !person.isAlive => favorable ? 14 + value : 1,
-      ActionType.death when person.hasLifeShield => !favorable ? 5 + value : 1,
+        slot.knownAttribute == null
+            ? 5 + value / 2
+            : prefersAlive(view.faction, slot.knownAttribute!)
+            ? 12 + value
+            : 1,
+      ActionType.life => favorable == true ? 6 + value : 1,
+      ActionType.death when !person.isAlive =>
+        favorable == true ? 14 + value : 2,
+      ActionType.death when person.hasLifeShield =>
+        favorable == false ? 5 + value : 1,
       ActionType.death =>
-        !prefersAlive(view.faction, person.attribute) ? 11 + value : 0.5,
+        slot.knownAttribute == null
+            ? 5 + value / 2
+            : !prefersAlive(view.faction, slot.knownAttribute!)
+            ? 11 + value
+            : 0.5,
       ActionType.eye =>
-        value +
+        (slot.eyeOptions.contains(EyeInformation.attribute) ? 18 : 0) +
+            value +
             person.rank +
             (person.rank == 3 ? 2 : 0) +
             (!person.isJudged ? 1 : 0) -
             (view.inventory.eye <= 1 ? 2 : 0),
+      ActionType.judge =>
+        favorable == true
+            ? 20 + value
+            : favorable == null
+            ? 2
+            : -value,
     };
   }
 
   static double judgeScore(CpuGameView view, CpuSlotView slot) {
     final value = personValue(view, slot);
-    return currentStateIsFavorable(view.faction, slot.person)
+    return knownStateIsFavorable(view.faction, slot) == true
         ? 20 + value
         : -value;
   }

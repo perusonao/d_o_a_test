@@ -43,6 +43,14 @@ class BoardGrid extends StatelessWidget {
         controller.currentPlayer,
       ),
       numberVisible: controller.knowsNumber(index, controller.currentPlayer),
+      attributeEyeKnown: controller.eyeKnowsAttribute(
+        index,
+        controller.currentPlayer,
+      ),
+      numberEyeKnown: controller.eyeKnowsNumber(
+        index,
+        controller.currentPlayer,
+      ),
       selected: controller.selectedSlot == index,
       enabled: controller.canTarget(index),
       onTap: () => controller.selectSlot(index),
