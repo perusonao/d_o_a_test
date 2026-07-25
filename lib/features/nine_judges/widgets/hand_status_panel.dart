@@ -17,11 +17,13 @@ class HandStatusPanel extends StatelessWidget {
           key: const Key('own-hand'),
           label: controller.isCpuGame ? 'あなた' : me.label,
           hand: controller.inventoryFor(me),
+          remainingActions: controller.actionsRemainingFor(me),
         ),
         _HandRow(
           key: const Key('opponent-hand'),
           label: controller.isCpuGame ? 'CPU' : me.opponent.label,
           hand: controller.inventoryFor(me.opponent),
+          remainingActions: controller.actionsRemainingFor(me.opponent),
         ),
       ],
     );
@@ -29,9 +31,15 @@ class HandStatusPanel extends StatelessWidget {
 }
 
 class _HandRow extends StatelessWidget {
-  const _HandRow({required this.label, required this.hand, super.key});
+  const _HandRow({
+    required this.label,
+    required this.hand,
+    required this.remainingActions,
+    super.key,
+  });
   final String label;
   final ActionInventory hand;
+  final int remainingActions;
 
   @override
   Widget build(BuildContext context) => SizedBox(
@@ -39,9 +47,10 @@ class _HandRow extends StatelessWidget {
     child: Row(
       children: [
         SizedBox(
-          width: 42,
+          width: 68,
           child: Text(
-            label,
+            '$label 残り$remainingActions手',
+            key: Key('remaining-actions-$label'),
             style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold),
           ),
         ),

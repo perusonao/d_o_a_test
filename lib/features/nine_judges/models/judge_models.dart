@@ -102,6 +102,7 @@ class PersonCard {
     required this.isAlive,
     this.isJudged = false,
     this.hasLifeShield = false,
+    this.isUnderReview = false,
   });
 
   final String id;
@@ -110,18 +111,24 @@ class PersonCard {
   final bool isAlive;
   final bool isJudged;
   final bool hasLifeShield;
+  final bool isUnderReview;
 
   bool get hidesAttributeWhenDead => rank == 3 && !isAlive;
 
-  PersonCard copyWith({bool? isAlive, bool? isJudged, bool? hasLifeShield}) =>
-      PersonCard(
-        id: id,
-        attribute: attribute,
-        rank: rank,
-        isAlive: isAlive ?? this.isAlive,
-        isJudged: isJudged ?? this.isJudged,
-        hasLifeShield: hasLifeShield ?? this.hasLifeShield,
-      );
+  PersonCard copyWith({
+    bool? isAlive,
+    bool? isJudged,
+    bool? hasLifeShield,
+    bool? isUnderReview,
+  }) => PersonCard(
+    id: id,
+    attribute: attribute,
+    rank: rank,
+    isAlive: isAlive ?? this.isAlive,
+    isJudged: isJudged ?? this.isJudged,
+    hasLifeShield: hasLifeShield ?? this.hasLifeShield,
+    isUnderReview: isUnderReview ?? this.isUnderReview,
+  );
 }
 
 class BoardSlot {
