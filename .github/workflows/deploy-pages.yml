@@ -42,7 +42,7 @@ jobs:
         run: flutter test
 
       - name: Build web
-        run: flutter build web --release --base-href /d_o_a_test/ --no-web-resources-cdn
+        run: flutter build web --release --base-href /nine-verdicts/ --no-web-resources-cdn
 
       - name: Publish to gh-pages branch
         run: |
