@@ -2,9 +2,6 @@ import 'package:dead_or_alive/features/nine_judges/cpu/cpu_strategy.dart';
 import 'package:dead_or_alive/features/nine_judges/models/judge_models.dart';
 
 abstract final class CpuEvaluator {
-  static double personValue(CpuGameView view, CpuSlotView slot) =>
-      (slot.knownRank ?? 2).toDouble();
-
   static bool prefersAlive(Faction faction, PersonAttribute attribute) {
     final saviorPrefersAlive =
         attribute == PersonAttribute.good ||
@@ -12,74 +9,34 @@ abstract final class CpuEvaluator {
     return faction == Faction.savior ? saviorPrefersAlive : !saviorPrefersAlive;
   }
 
-  static bool currentStateIsFavorable(Faction faction, PersonCard person) =>
-      person.isAlive == prefersAlive(faction, person.attribute);
-
-  static bool? knownStateIsFavorable(Faction faction, CpuSlotView slot) {
-    final attribute = slot.knownAttribute;
-    if (attribute == null) return null;
-    return slot.person.isAlive == prefersAlive(faction, attribute);
-  }
-
-  static EyeInformation preferredEyeInformation(CpuSlotView slot) =>
-      EyeInformation.attribute;
-
   static double actionScore(
     CpuGameView view,
     ActionType action,
     CpuSlotView slot,
   ) {
-    final person = slot.person;
-    final value = personValue(view, slot);
-    final favorable = knownStateIsFavorable(view.faction, slot);
+    final known = slot.knownAttribute;
+    final wantsAlive = known == null ? null : prefersAlive(view.faction, known);
+    final bonus = (view.currentBonus ?? 5).toDouble();
     return switch (action) {
-          ActionType.life when !person.isAlive =>
-            slot.knownAttribute == null
-                ? 5 + value / 2
-                : prefersAlive(view.faction, slot.knownAttribute!)
-                ? 12 + value
-                : 1,
-          ActionType.life => favorable == true ? 6 + value : 1,
-          ActionType.death when !person.isAlive =>
-            favorable == true ? 14 + value : 2,
-          ActionType.death when person.hasLifeShield =>
-            favorable == false ? 5 + value : 1,
-          ActionType.death =>
-            slot.knownAttribute == null
-                ? 5 + value / 2
-                : !prefersAlive(view.faction, slot.knownAttribute!)
-                ? 11 + value
-                : 0.5,
-          ActionType.eye =>
-            (slot.eyeOptions.contains(EyeInformation.attribute) ? 15 : -100) +
-                value -
-                (view.inventory.eye <= 1 ? 1 : 0) -
-                (view.remainingActions <= 2 ? 8 : 0),
-          ActionType.judge =>
-            favorable == true
-                ? 10 +
-                      value * 3 +
-                      (person.isAlive
-                          ? view.opponentInventory.death * 1.5
-                          : view.opponentInventory.life * 1.5) -
-                      (view.inventory.judge <= 1
-                          ? (4 - (slot.knownRank ?? 2)) * 3
-                          : 0)
-                : favorable == null
-                ? -2
-                : -value,
-        } -
-        (view.remainingActions <= 2 &&
-                action != ActionType.judge &&
-                action != ActionType.death
-            ? 3
-            : 0);
-  }
-
-  static double judgeScore(CpuGameView view, CpuSlotView slot) {
-    final value = personValue(view, slot);
-    return knownStateIsFavorable(view.faction, slot) == true
-        ? 20 + value
-        : -value;
+      ActionType.eye => known == null ? 12 : -100,
+      ActionType.specialVerdict =>
+        wantsAlive == null
+            ? 2
+            : wantsAlive == (view.faction == Faction.savior)
+            ? 8 + bonus
+            : -5,
+      ActionType.life =>
+        wantsAlive == null
+            ? 4
+            : wantsAlive
+            ? 7 + bonus / 2
+            : 1,
+      ActionType.death =>
+        wantsAlive == null
+            ? 4
+            : !wantsAlive
+            ? 7 + bonus / 2
+            : 1,
+    };
   }
 }

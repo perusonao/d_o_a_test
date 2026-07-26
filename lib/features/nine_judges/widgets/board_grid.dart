@@ -1,6 +1,6 @@
-import 'package:flutter/material.dart';
 import 'package:dead_or_alive/features/nine_judges/game/game_controller.dart';
 import 'package:dead_or_alive/features/nine_judges/widgets/person_card_widget.dart';
+import 'package:flutter/material.dart';
 
 class BoardGrid extends StatelessWidget {
   const BoardGrid({
@@ -8,60 +8,38 @@ class BoardGrid extends StatelessWidget {
     this.showScores = false,
     super.key,
   });
-
   final NineJudgesController controller;
   final bool showScores;
 
   @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        for (var row = 0; row < 3; row++) ...[
-          Expanded(
-            child: Row(
-              children: [
-                for (var column = 0; column < 3; column++) ...[
-                  Expanded(child: _card(row * 3 + column)),
-                  if (column < 2) const SizedBox(width: 4),
-                ],
-              ],
-            ),
-          ),
-          if (row < 2) const SizedBox(height: 4),
-        ],
-      ],
-    );
-  }
-
-  Widget _card(int index) {
-    final slot = controller.board[index];
-    return PersonCardWidget(
-      key: Key('judge-slot-$index'),
-      slot: slot,
-      attributeVisible: controller.knowsAttribute(
-        slot.person,
-        controller.currentPlayer,
-      ),
-      numberVisible: controller.knowsRank(index, controller.currentPlayer),
-      attributeEyeKnown: controller.eyeKnowsAttribute(
-        index,
-        controller.currentPlayer,
-      ),
-      attributeInitiallyKnown: controller.initiallyKnowsAttribute(
-        index,
-        controller.currentPlayer,
-      ),
-      numberEyeKnown: controller.eyeKnowsNumber(
-        index,
-        controller.currentPlayer,
-      ),
-      selected: controller.selectedSlot == index,
-      cpuHighlighted: controller.lastCpuTargetIndex == index,
-      enabled: controller.canTarget(index),
-      onTap: () => controller.selectSlot(index),
-      scoreDetail: showScores
-          ? controller.score.slotScores[slot.person.id]
-          : null,
-    );
-  }
+  Widget build(BuildContext context) => GridView.builder(
+    key: const Key('nine-judges-board'),
+    physics: const NeverScrollableScrollPhysics(),
+    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+      crossAxisCount: 3,
+      crossAxisSpacing: 5,
+      mainAxisSpacing: 5,
+      childAspectRatio: .88,
+    ),
+    itemCount: 9,
+    itemBuilder: (context, index) {
+      final person = controller.board[index].person;
+      return PersonCardWidget(
+        person: person,
+        attributeVisible: controller.knowsAttribute(
+          person,
+          controller.currentPlayer,
+        ),
+        attributeEyeKnown: controller.eyeKnowsAttribute(
+          index,
+          controller.currentPlayer,
+        ),
+        selected: controller.selectedSlot == index,
+        cpuHighlighted: controller.lastCpuTargetIndex == index,
+        enabled: controller.canTarget(index),
+        onTap: () => controller.selectSlot(index),
+        scoreDetail: showScores ? controller.score.slotScores[person.id] : null,
+      );
+    },
+  );
 }

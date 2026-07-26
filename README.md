@@ -1,32 +1,28 @@
-# 9人の審判
+# Dead or Alive / 9人の審判
 
-Flutter Webで動作する、同一端末ホットシート形式の1対1カードゲーム・ルール検証用プロトタイプです。
+Flutter製の2人用・秘密情報対戦ゲームです。現行実装の正規コードは `lib/features/nine_judges/` です。
 
 ## 現在の実装
 
-- 3×3の人カードと、各マスに隠された数字カード1〜9
-- 救済者／執行者によるホットシート対戦
-- LIFE / DEATH / JUDGE / SAVE
-- プレイヤーごとに分離された初期数字情報とJUDGE情報
-- 手番交代時の秘密情報遮断画面
-- 9人全員の判決によるゲーム終了
-- 最終得点、得点先、勝者、プレイログ
-- 全情報、リアルタイム得点、リセット、再シャッフルを備えたデバッグモード
-- 360×640でスクロールを使わない1画面UI
+- 救済者と執行者によるホットシート／CPU対戦
+- 9人全員が属性非公開・審議中で開始
+- 無制限の通常行動 `LIFE` / `DEATH` / `EYE`
+- 各陣営1回限定の特殊行動「審判」
+- 同状態の連続付与、または3回目の介入による確定
+- 1〜9の審判ボーナスと、非確定者への遅延秘密公開
+- プレイヤー別の属性KnowledgeとHandoff画面
+- 構造化プレイログ、JSON/TXTエクスポート、分析画面
+- スマートフォン縦画面向け3×3盤面
 
-実装ルールは [RULES.md](RULES.md) を参照してください。
+ルール詳細は [RULES.md](RULES.md) を参照してください。
 
-旧「DEAD OR ALIVE」実装は削除せず残しています。旧文書は`docs/legacy/`、旧ソースは
-`lib/features/game`、`lib/features/title`、`lib/features/result`、旧バランス実験は`tool/`です。
+## 開発
 
-## 起動と検証
-
-```bash
+```sh
 flutter pub get
-flutter run -d chrome
 flutter analyze
 flutter test
 flutter build web --release --base-href /d_o_a_test/ --no-web-resources-cdn
 ```
 
-ルール設定は`lib/features/nine_judges/game/game_config.dart`に集約しています。
+`lib/features/game/` などは旧プロトタイプであり、現行ルールの正規実装ではありません。
