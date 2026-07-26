@@ -53,7 +53,8 @@ void main() {
     expect(find.byKey(const Key('bonus-history-current')), findsOneWidget);
     expect(find.byKey(const Key('remaining-bonuses')), findsOneWidget);
     expect(find.text('使用済み'), findsOneWidget);
-    expect(find.text('残り候補'), findsOneWidget);
+    expect(find.text('残り（順序非公開）'), findsOneWidget);
+    expect(find.textContaining(RegExp(r'[1-9] / [1-9]')), findsNothing);
   });
 
   testWidgets('CPU対戦であなた・CPU・現在手番を明示する', (tester) async {

@@ -1,4 +1,16 @@
-# Dead or Alive / 9人の審判
+# 9人の審判 / Nine Verdicts
+
+> 正式名称: **9人の審判 / Nine Verdicts**
+>
+> GitHubリポジトリの推奨名は `nine-verdicts` です。GitHubの
+> Settings → General → Repository name で変更した後、ローカルでは次を実行します。
+>
+> ```sh
+> git remote set-url origin https://github.com/perusonao/nine-verdicts.git
+> ```
+>
+> Dart package名 `dead_or_alive`、Firebase project ID、Android applicationId、
+> iOS bundle identifierは既存環境・import・保存データとの互換性のため変更していません。
 
 Flutter製の2人用・秘密情報対戦ゲームです。現行実装の正規コードは `lib/features/nine_judges/` です。
 
@@ -26,7 +38,8 @@ flutter build web --release --base-href /d_o_a_test/ --no-web-resources-cdn
 ```
 
 `lib/features/game/` などは旧プロトタイプであり、現行ルールの正規実装ではありません。
-# 9人の審判 / Nine Verdicts
+
+## 外部テスト版
 
 Ver.1.1プロトタイプ。CPU対戦、ホットシート、ルールガイド、チュートリアル、
 匿名プレイログ送信、ルームコード式オンライン対戦βの基盤を含みます。

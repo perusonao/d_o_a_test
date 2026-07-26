@@ -1,3 +1,4 @@
+import 'package:dead_or_alive/app/theme.dart';
 import 'package:dead_or_alive/features/nine_judges/game/game_controller.dart';
 import 'package:dead_or_alive/features/nine_judges/logging/game_log_repository.dart';
 import 'package:dead_or_alive/features/nine_judges/models/judge_models.dart';
@@ -7,7 +8,6 @@ import 'package:dead_or_alive/features/nine_judges/screens/play_log_screen.dart'
 import 'package:dead_or_alive/features/nine_judges/screens/result_screen.dart';
 import 'package:dead_or_alive/features/nine_judges/widgets/action_panel.dart';
 import 'package:dead_or_alive/features/nine_judges/widgets/board_grid.dart';
-import 'package:dead_or_alive/features/nine_judges/widgets/selected_card_panel.dart';
 import 'package:flutter/material.dart';
 
 class NineJudgesGameScreen extends StatefulWidget {
@@ -121,34 +121,51 @@ class _GameBoard extends StatelessWidget {
   Widget build(BuildContext context) => Scaffold(
     body: Stack(
       children: [
+        Positioned.fill(
+          child: Image.asset(
+            'assets/backgrounds/courtroom.png',
+            fit: BoxFit.cover,
+            alignment: Alignment.topCenter,
+          ),
+        ),
+        const Positioned.fill(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Color(0x99070910),
+                  Color(0xC00B0B10),
+                  Color(0xF20B0B10),
+                ],
+              ),
+            ),
+          ),
+        ),
         SafeArea(
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 430),
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(8, 4, 8, 6),
+                padding: const EdgeInsets.fromLTRB(8, 5, 8, 5),
                 child: Column(
                   children: [
                     _Header(controller: controller),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 3),
                     _PhaseBanner(controller: controller),
-                    const SizedBox(height: 5),
-                    Flexible(
-                      fit: FlexFit.loose,
-                      child: AspectRatio(
-                        aspectRatio: 1.08,
-                        child: Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            BoardGrid(controller: controller),
-                            if (controller.lastCpuActionMessage != null)
-                              _CpuMessage(controller: controller),
-                          ],
-                        ),
+                    const SizedBox(height: 4),
+                    Expanded(
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          BoardGrid(controller: controller),
+                          if (controller.lastCpuActionMessage != null)
+                            _CpuMessage(controller: controller),
+                        ],
                       ),
                     ),
-                    SelectedCardPanel(controller: controller),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 3),
                     ActionPanel(controller: controller),
                   ],
                 ),
@@ -207,12 +224,17 @@ class _Header extends StatelessWidget {
         const SizedBox(height: 3),
         Container(
           key: const Key('current-bonus'),
-          height: 39,
+          height: 48,
           padding: const EdgeInsets.symmetric(horizontal: 8),
           decoration: BoxDecoration(
-            color: const Color(0xFF211D15),
-            border: Border.all(color: const Color(0xFFD6B25E)),
-            borderRadius: BorderRadius.circular(7),
+            gradient: const LinearGradient(
+              colors: [Color(0xE6332A1A), Color(0xE6141218)],
+            ),
+            border: Border.all(color: AppTheme.accent, width: 1.2),
+            borderRadius: BorderRadius.circular(9),
+            boxShadow: const [
+              BoxShadow(color: Color(0x44C8A34A), blurRadius: 8),
+            ],
           ),
           child: Row(
             children: [
@@ -222,10 +244,11 @@ class _Header extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      controller.bonusIndex == 0 ? '最初のボーナス' : '次のボーナス',
+                      controller.bonusIndex == 0 ? '最初の裁定ボーナス' : '次の裁定ボーナス',
                       style: const TextStyle(
-                        fontSize: 9,
-                        color: Colors.white60,
+                        fontSize: 10,
+                        color: Color(0xFFD8C89C),
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                     Text(
@@ -244,8 +267,8 @@ class _Header extends StatelessWidget {
               Text(
                 '${bonus ?? '?'} POINT',
                 style: const TextStyle(
-                  color: Color(0xFFFFD76A),
-                  fontSize: 16,
+                  color: Color(0xFFFFDF79),
+                  fontSize: 18,
                   fontWeight: FontWeight.w900,
                 ),
               ),
@@ -287,15 +310,21 @@ class _Header extends StatelessWidget {
               ),
             ),
             Text(
-              'TURN ${controller.turn}　確定 ${controller.confirmedCount}/9',
+              'TURN ${controller.turn}  ・  確定 ${controller.confirmedCount}/9',
               style: const TextStyle(fontSize: 9),
             ),
           ],
         ),
         Row(
           children: [
+            const Icon(
+              Icons.history_toggle_off,
+              size: 11,
+              color: Colors.white54,
+            ),
+            const SizedBox(width: 3),
             const Text(
-              '直前の行動　',
+              '直前  ',
               style: TextStyle(fontSize: 8, color: Colors.white54),
             ),
             Expanded(
@@ -385,11 +414,17 @@ class _Header extends StatelessWidget {
                   style: const TextStyle(fontSize: 12),
                 ),
               const SizedBox(height: 12),
-              const Text('残り候補', style: TextStyle(fontWeight: FontWeight.w900)),
+              const Text(
+                '残り（順序非公開）',
+                style: TextStyle(fontWeight: FontWeight.w900),
+              ),
               Text(
                 controller.remainingBonuses.isEmpty
                     ? 'なし'
-                    : controller.remainingBonuses.join(' / '),
+                    : List.filled(
+                        controller.remainingBonuses.length,
+                        '?',
+                      ).join(' / '),
                 key: const Key('remaining-bonuses'),
               ),
               const SizedBox(height: 8),
@@ -452,62 +487,89 @@ class _FactionScore extends StatelessWidget {
     final identity = controller.isCpuGame
         ? (faction == controller.humanFaction ? 'あなた' : 'CPU')
         : faction.label;
+    final isSelf = faction == controller.uiViewer;
+    final factionColor = faction == Faction.savior
+        ? AppTheme.savior
+        : AppTheme.executor;
     return Container(
       key: Key('faction-${faction.name}'),
-      height: 42,
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      height: 51,
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
       decoration: BoxDecoration(
-        color: active ? const Color(0xFF302714) : const Color(0xFF191919),
-        borderRadius: BorderRadius.circular(7),
-        border: Border.all(
-          color: active ? const Color(0xFFFFD76A) : Colors.white24,
-          width: active ? 2 : 1,
+        gradient: LinearGradient(
+          colors: [
+            factionColor.withValues(alpha: active ? .30 : .16),
+            const Color(0xEB111118),
+          ],
         ),
+        borderRadius: BorderRadius.circular(9),
+        border: Border.all(
+          color: active
+              ? const Color(0xFFFFD76A)
+              : isSelf
+              ? AppTheme.accent
+              : factionColor.withValues(alpha: .55),
+          width: active ? 2 : 1.1,
+        ),
+        boxShadow: active
+            ? [
+                BoxShadow(
+                  color: factionColor.withValues(alpha: .32),
+                  blurRadius: 9,
+                ),
+              ]
+            : null,
       ),
       child: Row(
         children: [
+          Icon(
+            faction == Faction.savior ? Icons.air : Icons.balance,
+            color: factionColor,
+            size: 20,
+          ),
+          const SizedBox(width: 5),
           Expanded(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(faction.label, style: const TextStyle(fontSize: 9)),
-                Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        identity,
-                        key: Key('identity-${faction.name}'),
-                        maxLines: 1,
-                        style: const TextStyle(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 3),
-                    Text(
-                      controller.specialVerdictAvailable(faction)
-                          ? 'JUDGE●1'
-                          : 'JUDGE済',
-                      key: Key('verdict-status-${faction.name}'),
-                      style: const TextStyle(
-                        fontSize: 7,
-                        color: Colors.white60,
-                      ),
-                    ),
-                  ],
+                Text(
+                  faction.label,
+                  style: TextStyle(
+                    color: factionColor,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                Text(
+                  identity,
+                  key: Key('identity-${faction.name}'),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                Text(
+                  controller.specialVerdictAvailable(faction)
+                      ? 'JUDGE ●1'
+                      : 'JUDGE 済',
+                  key: Key('verdict-status-${faction.name}'),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 7, color: Colors.white60),
                 ),
               ],
             ),
           ),
           Text(
             '${controller.scores[faction]} POINT',
+            textAlign: TextAlign.center,
             style: TextStyle(
-              color: faction == Faction.savior
-                  ? const Color(0xFF69BDF2)
-                  : const Color(0xFFF0645A),
-              fontSize: 13,
+              color: factionColor,
+              height: 1,
+              fontSize: 12,
               fontWeight: FontWeight.w900,
             ),
           ),
@@ -569,19 +631,28 @@ class _PhaseBanner extends StatelessWidget {
     final text = controller.isCpuTurn
         ? 'CPUが思考中…'
         : controller.phase == TurnPhase.selectingAction
-        ? 'アクションを選択してください'
-        : '${controller.selectedAction!.label}の対象を選択してください';
+        ? (controller.isCpuGame
+              ? 'YOUR TURN  ・  あなたの手番'
+              : '${controller.currentPlayer.label}の手番')
+        : '${controller.selectedAction!.label}を使用する人物を選択';
     return Container(
       key: const Key('phase-instruction'),
       width: double.infinity,
-      height: 29,
+      height: 25,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: const Color(0xFF201D16),
+        color: const Color(0xD91A1713),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: const Color(0xFF806A36)),
+        border: Border.all(color: AppTheme.accent.withValues(alpha: .65)),
       ),
-      child: Text(text, style: const TextStyle(fontSize: 11)),
+      child: Text(
+        text,
+        style: const TextStyle(
+          color: Color(0xFFEAD9A4),
+          fontSize: 10,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
     );
   }
 }
@@ -617,43 +688,63 @@ class _ConfirmationOverlay extends StatelessWidget {
   final NineJudgesController controller;
 
   @override
-  Widget build(BuildContext context) => ColoredBox(
-    color: Colors.black54,
-    child: Center(
-      child: Container(
-        key: const Key('confirmation-reveal'),
-        margin: const EdgeInsets.all(24),
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: const Color(0xFF211D15),
-          border: Border.all(color: const Color(0xFFD6B25E), width: 2),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'JUDGEMENT',
-              style: TextStyle(
-                color: Color(0xFFD6B25E),
-                fontSize: 22,
-                fontWeight: FontWeight.w900,
+  Widget build(BuildContext context) {
+    final targetIndex = controller.confirmationTargetIndex;
+    final person = targetIndex == null
+        ? null
+        : controller.board[targetIndex].person;
+    final accent = person?.isAlive == true ? AppTheme.alive : AppTheme.dead;
+    return GestureDetector(
+      onTap: controller.confirmConfirmationReveal,
+      child: ColoredBox(
+        color: Colors.black.withValues(alpha: .72),
+        child: Center(
+          child: Container(
+            key: const Key('confirmation-reveal'),
+            margin: const EdgeInsets.all(38),
+            padding: const EdgeInsets.fromLTRB(22, 18, 22, 16),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF2D261A), Color(0xFF111116)],
               ),
+              border: Border.all(color: accent, width: 2),
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: [
+                BoxShadow(color: accent.withValues(alpha: .36), blurRadius: 18),
+              ],
             ),
-            const SizedBox(height: 16),
-            Text(
-              controller.confirmationRevealMessage!,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 18),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'JUDGEMENT',
+                  style: TextStyle(
+                    color: AppTheme.accent,
+                    fontSize: 19,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  controller.confirmationRevealMessage!,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: accent,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                FilledButton(
+                  style: FilledButton.styleFrom(backgroundColor: accent),
+                  onPressed: controller.confirmConfirmationReveal,
+                  child: const Text('確認'),
+                ),
+              ],
             ),
-            const SizedBox(height: 20),
-            FilledButton(
-              onPressed: controller.confirmConfirmationReveal,
-              child: const Text('確認'),
-            ),
-          ],
+          ),
         ),
       ),
-    ),
-  );
+    );
+  }
 }

@@ -39,8 +39,17 @@ class _NineJudgesModeSelectScreenState
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Icon(Icons.balance, color: Color(0xFFD6B25E), size: 52),
-                  const SizedBox(height: 12),
+                  Center(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(18),
+                      child: Image.asset(
+                        'assets/branding/app_icon.png',
+                        width: 76,
+                        height: 76,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
                   const Text(
                     '9人の審判',
                     textAlign: TextAlign.center,
@@ -48,6 +57,16 @@ class _NineJudgesModeSelectScreenState
                       color: Color(0xFFD6B25E),
                       fontSize: 27,
                       fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const Text(
+                    'NINE VERDICTS',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.white54,
+                      fontSize: 11,
+                      letterSpacing: 3,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                   const SizedBox(height: 36),

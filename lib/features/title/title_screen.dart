@@ -30,19 +30,27 @@ class _TitleScreenState extends ConsumerState<TitleScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.balance,
-                      size: 56, color: AppTheme.accent.withValues(alpha: 0.9)),
+                  Icon(
+                    Icons.balance,
+                    size: 56,
+                    color: AppTheme.accent.withValues(alpha: 0.9),
+                  ),
                   const SizedBox(height: 12),
-                  const Text('DEAD OR ALIVE',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                          fontSize: 36,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 3,
-                          color: AppTheme.good)),
+                  const Text(
+                    'NINE VERDICTS',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 36,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 3,
+                      color: AppTheme.good,
+                    ),
+                  ),
                   const SizedBox(height: 2),
-                  const Text('（仮）',
-                      style: TextStyle(fontSize: 15, color: AppTheme.neutral)),
+                  const Text(
+                    '9人の審判',
+                    style: TextStyle(fontSize: 15, color: AppTheme.neutral),
+                  ),
                   const SizedBox(height: 24),
 
                   // モード選択。
@@ -50,11 +58,12 @@ class _TitleScreenState extends ConsumerState<TitleScreen> {
                   const SizedBox(height: 20),
 
                   Text(
-                      _vsCpu
-                          ? 'あなた（プレイヤーA）の陣営を選んで開始'
-                          : 'プレイヤーAの陣営を選んで開始',
-                      style: const TextStyle(
-                          fontSize: 13, color: Color(0xFFCFC7B5))),
+                    _vsCpu ? 'あなた（プレイヤーA）の陣営を選んで開始' : 'プレイヤーAの陣営を選んで開始',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFFCFC7B5),
+                    ),
+                  ),
                   const SizedBox(height: 12),
                   _startButton(
                     icon: Icons.shield_moon,
@@ -73,7 +82,10 @@ class _TitleScreenState extends ConsumerState<TitleScreen> {
                   const Text(
                     '救済者：善人と中立を生かし、悪人を殺す。\n執行者：悪人を生かし、善人と中立を殺す。\n各カードの得点を最終状態で取り合い、高い方が勝ち。',
                     style: TextStyle(
-                        fontSize: 11, color: Color(0xFF9A9384), height: 1.6),
+                      fontSize: 11,
+                      color: Color(0xFF9A9384),
+                      height: 1.6,
+                    ),
                   ),
                 ],
               ),
@@ -93,10 +105,7 @@ class _TitleScreenState extends ConsumerState<TitleScreen> {
       ),
       padding: const EdgeInsets.all(4),
       child: Row(
-        children: [
-          _modeChip('CPU対戦', true),
-          _modeChip('2人対戦', false),
-        ],
+        children: [_modeChip('CPU対戦', true), _modeChip('2人対戦', false)],
       ),
     );
   }
@@ -112,12 +121,15 @@ class _TitleScreenState extends ConsumerState<TitleScreen> {
             borderRadius: BorderRadius.circular(8),
             color: active ? AppTheme.accent : Colors.transparent,
           ),
-          child: Text(label,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                  color: active ? Colors.black : const Color(0xFFB9B2A2),
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14)),
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: active ? Colors.black : const Color(0xFFB9B2A2),
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+            ),
+          ),
         ),
       ),
     );

@@ -1,23 +1,20 @@
 import 'package:flutter/material.dart';
 
-/// ダークファンタジー寄りのテーマ定義。
-///
-/// 画像素材は使わず、色・図形・アイコンで世界観を表現する。
-class AppTheme {
-  AppTheme._();
-
-  // 世界観カラー。
-  static const Color background = Color(0xFF0E0E12);
-  static const Color surface = Color(0xFF1B1B22);
-  static const Color parchment = Color(0xFF2A2620); // 古びた紙・石板風
-  static const Color parchmentLight = Color(0xFF3A342A);
-  static const Color accent = Color(0xFFB8862F); // 金色のアクセント
-  static const Color good = Color(0xFFE8C86A); // 善人：光
-  static const Color evil = Color(0xFFC1443B); // 悪人：炎・刃
-  static const Color neutral = Color(0xFF8A8FA3); // 中立：仮面
-  static const Color alive = Color(0xFF6FB98F); // 生命
-  static const Color dead = Color(0xFF6B6B72); // 死
-  static const Color keep = Color(0xFF5A8FB0); // 封印・盾
+abstract final class AppTheme {
+  static const background = Color(0xFF0B0B10);
+  static const surface = Color(0xE613141A);
+  static const parchment = Color(0xFF211C16);
+  static const parchmentLight = Color(0xFF332A1F);
+  static const accent = Color(0xFFC8A34A);
+  static const savior = Color(0xFF4EB5E8);
+  static const executor = Color(0xFFE0554F);
+  static const eye = Color(0xFFB078FF);
+  static const good = Color(0xFF6EC8F2);
+  static const evil = Color(0xFFE05A50);
+  static const neutral = Color(0xFFD0A84E);
+  static const alive = Color(0xFF4FCB84);
+  static const dead = Color(0xFFE1524A);
+  static const keep = Color(0xFF5A8FB0);
 
   static ThemeData build() {
     final base = ThemeData.dark(useMaterial3: true);
@@ -29,13 +26,25 @@ class AppTheme {
         surface: surface,
       ),
       textTheme: base.textTheme.apply(
-        bodyColor: const Color(0xFFE6E1D6),
-        displayColor: const Color(0xFFE6E1D6),
+        bodyColor: const Color(0xFFF0E8D8),
+        displayColor: const Color(0xFFF0E8D8),
       ),
       appBarTheme: const AppBarTheme(
-        backgroundColor: background,
+        backgroundColor: Color(0xEE0B0B10),
         elevation: 0,
         centerTitle: true,
+      ),
+      dividerColor: accent.withValues(alpha: .28),
+      bottomSheetTheme: const BottomSheetThemeData(
+        backgroundColor: Color(0xFF141218),
+        modalBackgroundColor: Color(0xFF141218),
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: const Color(0xFF141218),
+        shape: RoundedRectangleBorder(
+          side: const BorderSide(color: accent),
+          borderRadius: BorderRadius.circular(14),
+        ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
@@ -43,9 +52,7 @@ class AppTheme {
           foregroundColor: Colors.black,
           minimumSize: const Size(0, 48),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
@@ -58,6 +65,5 @@ class AppTheme {
     );
   }
 
-  /// 陣営の色。
-  static Color factionColor(bool isGood) => isGood ? good : evil;
+  static Color factionColor(bool isSavior) => isSavior ? savior : executor;
 }

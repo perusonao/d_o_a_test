@@ -7,5 +7,5 @@ import 'features/nine_judges/services/firebase_bootstrap.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await FirebaseBootstrap.initialize();
-  runApp(const ProviderScope(child: DeadOrAliveApp()));
+  runApp(const ProviderScope(child: NineVerdictsApp()));
 }
