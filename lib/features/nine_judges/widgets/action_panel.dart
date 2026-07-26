@@ -55,9 +55,10 @@ class ActionPanel extends StatelessWidget {
       ActionType.life => '生を与える',
       ActionType.death => '死を与える',
       ActionType.eye => '属性を調査',
-      ActionType.specialVerdict => controller.specialVerdictStatus(
-        controller.currentPlayer,
-      ),
+      ActionType.specialVerdict =>
+        controller.specialVerdictAvailable(controller.currentPlayer)
+            ? '残り1'
+            : '使用済み',
     };
     return Material(
       color: selected ? const Color(0xFF493B1D) : const Color(0xFF201D18),

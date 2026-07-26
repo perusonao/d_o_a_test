@@ -9,15 +9,16 @@ class SelectedCardPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final index = controller.selectedSlot;
+    if (controller.phase != TurnPhase.selectingActionTarget && index == null) {
+      return const SizedBox.shrink();
+    }
     return SizedBox(
-      height: 23,
+      height: 18,
       child: Center(
         child: Text(
           controller.phase == TurnPhase.selectingActionTarget
-              ? '${controller.selectedAction!.label}の対象を選択中'
-              : index == null
-              ? '人物とアクションを選択してください'
-              : '${controller.positionLabel(index)}の人物を選択中',
+              ? '${controller.selectedAction!.label}の対象を選択'
+              : '${controller.positionLabel(index!)}を選択中',
           style: const TextStyle(fontSize: 9, color: Colors.white54),
         ),
       ),

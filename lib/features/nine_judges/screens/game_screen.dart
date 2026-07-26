@@ -7,7 +7,6 @@ import 'package:dead_or_alive/features/nine_judges/screens/play_log_screen.dart'
 import 'package:dead_or_alive/features/nine_judges/screens/result_screen.dart';
 import 'package:dead_or_alive/features/nine_judges/widgets/action_panel.dart';
 import 'package:dead_or_alive/features/nine_judges/widgets/board_grid.dart';
-import 'package:dead_or_alive/features/nine_judges/widgets/hand_status_panel.dart';
 import 'package:dead_or_alive/features/nine_judges/widgets/selected_card_panel.dart';
 import 'package:flutter/material.dart';
 
@@ -52,7 +51,6 @@ class _NineJudgesGameScreenState extends State<NineJudgesGameScreen> {
         !game.isCpuTurn ||
         game.awaitingHandoff ||
         game.awaitingConfirmationReveal ||
-        game.awaitingBonusReveal ||
         game.isFinished ||
         _cpuSequenceRunning) {
       return;
@@ -104,9 +102,6 @@ class _NineJudgesGameScreenState extends State<NineJudgesGameScreen> {
           return _ConfirmationRevealScreen(controller: game);
         }
         if (game.isFinished) return ResultScreen(controller: game);
-        if (game.awaitingBonusReveal) {
-          return _BonusRevealScreen(controller: game);
-        }
         if (game.awaitingHandoff) {
           return HandoffScreen(
             nextPlayer: game.currentPlayer,
@@ -137,19 +132,22 @@ class _GameBoard extends StatelessWidget {
                 const SizedBox(height: 4),
                 _PhaseBanner(controller: controller),
                 const SizedBox(height: 5),
-                Expanded(
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      BoardGrid(controller: controller),
-                      if (controller.lastCpuActionMessage != null)
-                        _CpuMessage(controller: controller),
-                    ],
+                Flexible(
+                  fit: FlexFit.loose,
+                  child: AspectRatio(
+                    aspectRatio: 1.08,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        BoardGrid(controller: controller),
+                        if (controller.lastCpuActionMessage != null)
+                          _CpuMessage(controller: controller),
+                      ],
+                    ),
                   ),
                 ),
                 SelectedCardPanel(controller: controller),
-                HandStatusPanel(controller: controller),
-                const SizedBox(height: 3),
+                const SizedBox(height: 4),
                 ActionPanel(controller: controller),
               ],
             ),
@@ -246,6 +244,15 @@ class _Header extends StatelessWidget {
                 ),
               ),
               IconButton(
+                key: const Key('bonus-history'),
+                tooltip: 'ボーナス履歴',
+                visualDensity: VisualDensity.compact,
+                constraints: const BoxConstraints(minWidth: 28),
+                padding: EdgeInsets.zero,
+                onPressed: () => _showBonusHistory(context, viewer),
+                icon: const Icon(Icons.history, size: 17),
+              ),
+              IconButton(
                 key: const Key('bonus-info'),
                 visualDensity: VisualDensity.compact,
                 constraints: const BoxConstraints(minWidth: 28),
@@ -319,7 +326,7 @@ class _Header extends StatelessWidget {
         content: const Text(
           '最初のボーナスは両者に公開されます。\n'
           '以降は、直前の審判を確定させなかったプレイヤーが、'
-          '次の自分の手番終了後に次のボーナスを確認できます。',
+          '次の自分の手番開始時に次のボーナスを確認できます。',
         ),
         actions: [
           TextButton(
@@ -327,6 +334,69 @@ class _Header extends StatelessWidget {
             child: const Text('閉じる'),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showBonusHistory(BuildContext context, Faction viewer) {
+    final current = controller.visibleBonusFor(viewer);
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                '審判ボーナス履歴',
+                key: Key('bonus-history-title'),
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900),
+              ),
+              const SizedBox(height: 12),
+              const Text('現在', style: TextStyle(color: Colors.white60)),
+              Text(
+                '${current ?? '?'} POINT',
+                key: const Key('bonus-history-current'),
+                style: const TextStyle(
+                  color: Color(0xFFFFD76A),
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              Text(controller.bonusVisibilityLabel(viewer)),
+              const SizedBox(height: 12),
+              const Text('使用済み', style: TextStyle(fontWeight: FontWeight.w900)),
+              if (controller.bonusHistory.isEmpty)
+                const Text('まだありません', style: TextStyle(fontSize: 12)),
+              for (final result in controller.bonusHistory)
+                Text(
+                  '${result.order}　${result.bonus} POINT　'
+                  '${result.attribute.label} / ${result.finalState.label}　'
+                  '${result.scoringFaction.label}',
+                  key: Key('used-bonus-${result.order}'),
+                  style: const TextStyle(fontSize: 12),
+                ),
+              const SizedBox(height: 12),
+              const Text('残り', style: TextStyle(fontWeight: FontWeight.w900)),
+              Text(
+                controller.remainingBonuses.isEmpty
+                    ? 'なし'
+                    : controller.remainingBonuses.join(' / '),
+                key: const Key('remaining-bonuses'),
+              ),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('閉じる'),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -396,13 +466,31 @@ class _FactionScore extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(faction.label, style: const TextStyle(fontSize: 9)),
-                Text(
-                  identity,
-                  key: Key('identity-${faction.name}'),
-                  style: const TextStyle(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w900,
-                  ),
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        identity,
+                        key: Key('identity-${faction.name}'),
+                        maxLines: 1,
+                        style: const TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 3),
+                    Text(
+                      controller.specialVerdictAvailable(faction)
+                          ? '審判●1'
+                          : '審判済',
+                      key: Key('verdict-status-${faction.name}'),
+                      style: const TextStyle(
+                        fontSize: 7,
+                        color: Colors.white60,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -528,44 +616,6 @@ class _CpuMessage extends StatelessWidget {
       ),
     ),
   );
-}
-
-class _BonusRevealScreen extends StatelessWidget {
-  const _BonusRevealScreen({required this.controller});
-  final NineJudgesController controller;
-
-  @override
-  Widget build(BuildContext context) {
-    final viewer = controller.currentPlayer.opponent;
-    return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('${viewer.label}だけの秘密情報'),
-              const SizedBox(height: 18),
-              Text(
-                '次の審判ボーナス\n${controller.visibleBonusFor(viewer)} POINT',
-                key: const Key('private-bonus-reveal'),
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Color(0xFFD6B25E),
-                  fontSize: 26,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: 18),
-              FilledButton(
-                onPressed: controller.confirmBonusReveal,
-                child: const Text('確認しました'),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 class _ConfirmationRevealScreen extends StatelessWidget {

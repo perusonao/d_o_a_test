@@ -62,6 +62,7 @@ class NineJudgesController extends ChangeNotifier {
   };
   final Map<Faction, int> scores = {Faction.savior: 0, Faction.executor: 0};
   final List<GameLogEntry> logs = [];
+  final List<VerdictBonusResult> bonusHistory = [];
 
   late Faction currentPlayer;
   late GameSession session;
@@ -71,7 +72,6 @@ class NineJudgesController extends ChangeNotifier {
   int turn = 1;
   int bonusIndex = 0;
   bool awaitingHandoff = false;
-  bool awaitingBonusReveal = false;
   bool awaitingConfirmationReveal = false;
   bool debugMode = false;
   bool cpuActing = false;
@@ -85,10 +85,15 @@ class NineJudgesController extends ChangeNotifier {
   bool lastCpuWasJudgment = false;
   String? confirmationRevealMessage;
   List<CpuCandidateScore> lastCpuEvaluations = const [];
+  bool _bonusRevealTriggeredThisTurn = false;
+  Faction? _bonusViewerThisTurn;
+  int? _revealedBonusThisTurn;
 
   int get confirmedCount => board.where((s) => s.person.isConfirmed).length;
   int get judgedCount => confirmedCount;
   int get currentBonus => bonusDeck[bonusIndex];
+  List<int> get remainingBonuses =>
+      isFinished ? const [] : bonusDeck.sublist(bonusIndex);
   bool get isFinished => _finished;
   bool get isCpuGame => settings.mode == GameMode.cpu;
   bool get isCpuTurn =>
@@ -96,7 +101,6 @@ class NineJudgesController extends ChangeNotifier {
   bool get humanInputEnabled =>
       (!isCpuTurn || cpuActing) &&
       !awaitingConfirmationReveal &&
-      !awaitingBonusReveal &&
       !awaitingHandoff;
   Faction get humanFaction => settings.cpuFaction.opponent;
   Faction get uiViewer => isCpuGame ? humanFaction : currentPlayer;
@@ -145,19 +149,22 @@ class NineJudgesController extends ChangeNotifier {
     selectedAction = null;
     selectedSlot = null;
     awaitingHandoff = false;
-    awaitingBonusReveal = false;
     awaitingConfirmationReveal = false;
     _finished = false;
     _saved = false;
     _saveFuture = null;
     endReason = null;
     logs.clear();
+    bonusHistory.clear();
     lastCpuActionMessage = null;
     lastCpuTargetIndex = null;
     lastCpuActionType = null;
     lastCpuWasJudgment = false;
     confirmationRevealMessage = null;
     lastCpuEvaluations = const [];
+    _bonusRevealTriggeredThisTurn = false;
+    _bonusViewerThisTurn = null;
+    _revealedBonusThisTurn = null;
     final now = DateTime.now();
     session = GameSession(
       gameId: '${now.microsecondsSinceEpoch}-$seed',
@@ -264,13 +271,14 @@ class NineJudgesController extends ChangeNotifier {
       return '$ownerのみ確認済み';
     }
     if (pendingBonusReveal[viewer]!) {
-      return isCpuGame ? 'あなたは手番終了後に確認できます' : '${viewer.label}は手番終了後に確認';
+      final owner = isCpuGame && viewer == humanFaction ? 'あなた' : viewer.label;
+      return '$ownerが次の手番開始時に確認';
     }
     if (pendingBonusReveal[viewer.opponent]!) {
       final owner = isCpuGame
           ? (viewer.opponent == settings.cpuFaction ? 'CPU' : 'あなた')
           : viewer.opponent.label;
-      return '$ownerは次の手番終了後に確認';
+      return '$ownerが次の手番開始時に確認';
     }
     return 'まだ確認できません';
   }
@@ -356,7 +364,6 @@ class NineJudgesController extends ChangeNotifier {
     final action = selectedAction!;
     final actor = currentPlayer;
     final actorKnewAttributeBefore = knowsAttribute(board[index].person, actor);
-    final actorHadPendingReveal = pendingBonusReveal[actor]!;
     final before = board[index].person;
     var after = before;
     if (action == ActionType.eye) {
@@ -377,6 +384,18 @@ class NineJudgesController extends ChangeNotifier {
       final bonus = currentBonus;
       scores[scorer] = scores[scorer]! + bonus;
       after = after.copyWith(scoringFaction: scorer, awardedBonus: bonus);
+      bonusHistory.add(
+        VerdictBonusResult(
+          order: bonusHistory.length + 1,
+          bonus: bonus,
+          scoringFaction: scorer,
+          personId: after.id,
+          targetIndex: index,
+          attribute: after.attribute,
+          finalState: after.verdictState,
+          confirmedBy: actor,
+        ),
+      );
       confirmationRevealMessage =
           '${after.attribute.label}\n${after.verdictState.label}\n'
           '審判ボーナス $bonus POINT\n${scorer.label} +$bonus';
@@ -415,12 +434,7 @@ class NineJudgesController extends ChangeNotifier {
       after,
       actorKnewAttributeBefore: actorKnewAttributeBefore,
     );
-    _finishAction(
-      detail,
-      action: action,
-      targetIndex: index,
-      revealPendingBonus: actorHadPendingReveal && !after.isConfirmed,
-    );
+    _finishAction(detail, action: action, targetIndex: index);
   }
 
   String _actionDetail(ActionType action, PersonCard before, PersonCard after) {
@@ -496,7 +510,10 @@ class NineJudgesController extends ChangeNotifier {
           confirmedBy: after.confirmedBy?.name,
           scoringFaction: after.scoringFaction?.name,
           verdictBonus: after.awardedBonus,
-          nextBonusViewer: after.isConfirmed ? actor.opponent.name : null,
+          nextBonusViewer:
+              after.isConfirmed && bonusHistory.length < bonusDeck.length
+              ? actor.opponent.name
+              : null,
           verdictHistoryBefore: [
             for (final item in before.verdictHistory) item.name,
           ],
@@ -504,6 +521,20 @@ class NineJudgesController extends ChangeNotifier {
             for (final item in after.verdictHistory) item.name,
           ],
           bonusViewerState: bonusVisibilityLabel(actor),
+          bonusOrder: after.isConfirmed ? bonusHistory.length : null,
+          nextBonusValue:
+              after.isConfirmed && bonusHistory.length < bonusDeck.length
+              ? currentBonus
+              : null,
+          nextBonusKnownByPlayer: isCpuGame
+              ? privateBonusKnowledge[humanFaction] == currentBonus
+              : privateBonusKnowledge[Faction.savior] == currentBonus,
+          nextBonusKnownByCpu: isCpuGame
+              ? privateBonusKnowledge[settings.cpuFaction] == currentBonus
+              : privateBonusKnowledge[Faction.executor] == currentBonus,
+          bonusRevealTriggered: _bonusRevealTriggeredThisTurn,
+          bonusViewer: _bonusViewerThisTurn?.name,
+          revealedBonus: _revealedBonusThisTurn,
           cpuDecisionReason: action == ActionType.eye
               ? 'unknown attribute'
               : 'state and bonus evaluation',
@@ -516,7 +547,6 @@ class NineJudgesController extends ChangeNotifier {
     String publicMessage, {
     required ActionType action,
     required int targetIndex,
-    required bool revealPendingBonus,
   }) {
     final actor = currentPlayer;
     if (isCpuTurn) {
@@ -535,32 +565,38 @@ class NineJudgesController extends ChangeNotifier {
       notifyListeners();
       return;
     }
-    if (revealPendingBonus) {
-      privateBonusKnowledge[actor] = currentBonus;
-      pendingBonusReveal[actor] = false;
-      awaitingBonusReveal = !isCpuGame;
-    }
+    _bonusRevealTriggeredThisTurn = false;
+    _bonusViewerThisTurn = null;
+    _revealedBonusThisTurn = null;
     currentPlayer = actor.opponent;
     turn++;
     awaitingHandoff = !isCpuGame;
-    notifyListeners();
-  }
-
-  void confirmBonusReveal() {
-    awaitingBonusReveal = false;
-    awaitingHandoff = true;
+    if (!awaitingHandoff && !awaitingConfirmationReveal) {
+      _beginCurrentTurn();
+    }
     notifyListeners();
   }
 
   void confirmConfirmationReveal() {
     awaitingConfirmationReveal = false;
     confirmationRevealMessage = null;
+    if (!awaitingHandoff) _beginCurrentTurn();
     notifyListeners();
   }
 
   void confirmHandoff() {
     awaitingHandoff = false;
+    _beginCurrentTurn();
     notifyListeners();
+  }
+
+  void _beginCurrentTurn() {
+    if (!pendingBonusReveal[currentPlayer]!) return;
+    privateBonusKnowledge[currentPlayer] = currentBonus;
+    pendingBonusReveal[currentPlayer] = false;
+    _bonusRevealTriggeredThisTurn = true;
+    _bonusViewerThisTurn = currentPlayer;
+    _revealedBonusThisTurn = currentBonus;
   }
 
   void clearCpuFeedback() {

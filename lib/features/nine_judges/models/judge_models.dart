@@ -187,6 +187,28 @@ class GameLogEntry {
   final Faction? scoringFaction;
 }
 
+class VerdictBonusResult {
+  const VerdictBonusResult({
+    required this.order,
+    required this.bonus,
+    required this.scoringFaction,
+    required this.personId,
+    required this.targetIndex,
+    required this.attribute,
+    required this.finalState,
+    required this.confirmedBy,
+  });
+
+  final int order;
+  final int bonus;
+  final Faction scoringFaction;
+  final String personId;
+  final int targetIndex;
+  final PersonAttribute attribute;
+  final VerdictState finalState;
+  final Faction confirmedBy;
+}
+
 class ScoreResult {
   const ScoreResult({
     required this.savior,

@@ -208,21 +208,68 @@ void main() {
       );
     });
 
-    test('非確定者は次の自分の行動完了後に次ボーナスを知る', () {
+    test('非確定者は次の自分の手番開始時に次ボーナスを知る', () {
       final game = NineJudgesController(seed: 50);
       game.chooseAction(ActionType.specialVerdict);
       game.selectSlot(0);
       final nextBonus = game.currentBonus;
       expect(game.visibleBonusFor(Faction.executor), isNull);
+      expect(game.pendingBonusReveal[Faction.executor], isTrue);
       game.confirmConfirmationReveal();
+      expect(game.visibleBonusFor(Faction.executor), isNull);
       game.confirmHandoff();
-      game.chooseAction(ActionType.eye);
-      game.selectSlot(1);
       expect(game.privateBonusKnowledge[Faction.executor], nextBonus);
       expect(game.privateBonusKnowledge[Faction.savior], isNull);
-      expect(game.awaitingBonusReveal, isTrue);
       expect(game.bonusVisibilityLabel(Faction.executor), contains('のみ確認'));
       expect(game.bonusVisibilityLabel(Faction.savior), contains('執行者のみ確認済み'));
+    });
+
+    test('閲覧者は確定アクションより前にボーナスを確認済み', () {
+      final game = NineJudgesController(seed: 51);
+      game.chooseAction(ActionType.specialVerdict);
+      game.selectSlot(0);
+      game.confirmConfirmationReveal();
+      game.confirmHandoff();
+      final revealed = game.currentBonus;
+      expect(game.visibleBonusFor(Faction.executor), revealed);
+
+      game.chooseAction(ActionType.specialVerdict);
+      game.selectSlot(1);
+      final action = game.session.actions.last;
+      expect(action.bonusRevealTriggered, isTrue);
+      expect(action.bonusViewer, Faction.executor.name);
+      expect(action.revealedBonus, revealed);
+      expect(action.verdictBonus, revealed);
+      expect(game.bonusHistory, hasLength(2));
+      expect(game.bonusHistory.map((item) => item.order), [1, 2]);
+    });
+
+    test('確定者が変わると次ボーナス閲覧者も切り替わる', () {
+      final game = NineJudgesController(seed: 52);
+      game.chooseAction(ActionType.specialVerdict);
+      game.selectSlot(0);
+      game.confirmConfirmationReveal();
+      game.confirmHandoff();
+      game.chooseAction(ActionType.specialVerdict);
+      game.selectSlot(1);
+      expect(game.pendingBonusReveal[Faction.savior], isTrue);
+      expect(game.pendingBonusReveal[Faction.executor], isFalse);
+      expect(game.session.actions.last.nextBonusViewer, Faction.savior.name);
+    });
+
+    test('ボーナス履歴と残りは使用順・重複なしで一致する', () {
+      final game = NineJudgesController(seed: 53);
+      final first = game.currentBonus;
+      game.chooseAction(ActionType.specialVerdict);
+      game.selectSlot(0);
+      expect(game.bonusHistory.single.bonus, first);
+      expect(game.bonusHistory.single.order, 1);
+      expect(game.bonusHistory.single.scoringFaction, isNotNull);
+      expect(game.remainingBonuses, isNot(contains(first)));
+      expect({
+        ...game.bonusHistory.map((item) => item.bonus),
+        ...game.remainingBonuses,
+      }, game.bonusDeck.toSet());
     });
 
     test('確定者と得点者を分離しログ保存する', () async {
@@ -273,7 +320,6 @@ void main() {
         if (game.awaitingConfirmationReveal) {
           game.confirmConfirmationReveal();
         }
-        if (game.awaitingBonusReveal) game.confirmBonusReveal();
         if (game.awaitingHandoff) game.confirmHandoff();
       }
       expect(game.isFinished, isTrue);
