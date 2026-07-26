@@ -26,3 +26,37 @@ flutter build web --release --base-href /d_o_a_test/ --no-web-resources-cdn
 ```
 
 `lib/features/game/` などは旧プロトタイプであり、現行ルールの正規実装ではありません。
+# 9人の審判 / Nine Verdicts
+
+Ver.1.1プロトタイプ。CPU対戦、ホットシート、ルールガイド、チュートリアル、
+匿名プレイログ送信、ルームコード式オンライン対戦βの基盤を含みます。
+
+## Firebaseセットアップ
+
+Firebase未設定でもCPU対戦とローカルログは動作します。未設定時はオンライン対戦と
+クラウド送信を無効表示にします。
+
+1. Firebase Consoleでプロジェクトを作成します。
+2. `dart pub global activate flutterfire_cli`でFlutterFire CLIを導入します。
+3. リポジトリ直下で`flutterfire configure`を実行し、対象プラットフォームを選びます。
+4. 生成された`lib/firebase_options.dart`を使って
+   `Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform)`へ切り替えます。
+5. AuthenticationのSign-in methodでAnonymousを有効化します。
+6. Cloud Firestoreを作成します。
+7. `firebase deploy --only firestore:rules`で`firestore.rules`を適用します。
+8. Webを利用する場合はFirebaseへWebアプリを登録します。
+9. `flutter run -d chrome`で起動します。別ブラウザ／シークレットウィンドウを使い、
+   片方でルーム作成、もう片方で6桁コード参加を確認します。
+10. Firestoreの`playtests`で送信ログ、`rooms`でβルームを確認します。
+
+APIキーはFirebaseクライアント設定として公開可能な識別子ですが、サービスアカウント鍵、
+Admin SDK秘密鍵、CIトークンはコミットしないでください。
+
+## オンラインβのセキュリティ制約
+
+共有`rooms/{roomId}`には属性・EYE結果・bonusOrderを保存しません。秘密情報は
+`rooms/{roomId}/players/{uid}`へ分離し、本人だけが読めるRulesを適用します。
+
+現段階はクライアント生成方式です。完全な不正防止と権威的な盤面進行にはCloud Functions
+が必要です。盤面・ボーナス生成、合法手検証、秘密情報配布をFunctionsへ移すことを
+オンライン正式版の必須TODOとしています。

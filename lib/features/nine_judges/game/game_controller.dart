@@ -386,6 +386,24 @@ class NineJudgesController extends ChangeNotifier {
     _applyAction(index);
   }
 
+  /// Drives the real rules engine from the fixed, guided tutorial.
+  ///
+  /// This deliberately bypasses only the human/CPU input gate. Target legality,
+  /// state transitions, scoring, knowledge and logging still use the production
+  /// path below, so the tutorial cannot drift into a second rules implementation.
+  bool performTutorialAction(ActionType action, int index) {
+    if (_finished ||
+        awaitingConfirmationReveal ||
+        awaitingHandoff ||
+        !_legalTargets(action, currentPlayer).contains(index)) {
+      return false;
+    }
+    selectedAction = action;
+    selectedSlot = index;
+    _applyAction(index);
+    return true;
+  }
+
   void _applyAction(int index) {
     final action = selectedAction!;
     final actor = currentPlayer;

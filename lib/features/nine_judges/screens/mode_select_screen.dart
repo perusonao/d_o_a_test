@@ -1,4 +1,7 @@
 import 'package:dead_or_alive/features/nine_judges/models/judge_models.dart';
+import 'package:dead_or_alive/features/nine_judges/online/online_lobby_screen.dart';
+import 'package:dead_or_alive/features/nine_judges/rules/rules_guide_screen.dart';
+import 'package:dead_or_alive/features/nine_judges/tutorial/tutorial_screen.dart';
 import 'package:flutter/material.dart';
 
 class NineJudgesModeSelectScreen extends StatefulWidget {
@@ -156,6 +159,47 @@ class _NineJudgesModeSelectScreenState
                       ),
                     ),
                     child: const Text('ゲーム開始'),
+                  ),
+                  OutlinedButton.icon(
+                    key: const Key('open-online'),
+                    onPressed: () => Navigator.push<void>(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const OnlineLobbyScreen(),
+                      ),
+                    ),
+                    icon: const Icon(Icons.public),
+                    label: const Text('オンライン対戦 β'),
+                  ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextButton.icon(
+                          key: const Key('open-tutorial'),
+                          onPressed: () => Navigator.push<void>(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const TutorialScreen(),
+                            ),
+                          ),
+                          icon: const Icon(Icons.school_outlined),
+                          label: const Text('チュートリアル'),
+                        ),
+                      ),
+                      Expanded(
+                        child: TextButton.icon(
+                          key: const Key('open-rules'),
+                          onPressed: () => Navigator.push<void>(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const RulesGuideScreen(),
+                            ),
+                          ),
+                          icon: const Icon(Icons.menu_book_outlined),
+                          label: const Text('遊び方'),
+                        ),
+                      ),
+                    ],
                   ),
                   TextButton.icon(
                     key: const Key('open-play-logs'),
