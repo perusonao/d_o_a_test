@@ -21,6 +21,7 @@ void main() {
     );
     expect(find.byKey(const Key('nine-judges-board')), findsOneWidget);
     expect(find.byKey(const Key('current-bonus')), findsOneWidget);
+    expect(find.byKey(const Key('bonus-history')), findsOneWidget);
     expect(find.byKey(const Key('faction-savior')), findsOneWidget);
     expect(find.text('0'), findsNWidgets(2));
     expect(find.byKey(const Key('action-life')), findsOneWidget);
@@ -28,7 +29,25 @@ void main() {
     expect(find.byKey(const Key('action-specialVerdict')), findsOneWidget);
     expect(find.byKey(const Key('action-death')), findsNothing);
     expect(find.textContaining('SAVE'), findsNothing);
+    expect(find.text('人物とアクションを選択してください'), findsNothing);
+    expect(find.byKey(const Key('verdict-status-savior')), findsOneWidget);
+    expect(find.byKey(const Key('verdict-status-executor')), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('ボーナス履歴は現在・使用済み・残りを表示する', (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: NineJudgesGameScreen(initialSettings: NineJudgesGameSettings()),
+      ),
+    );
+    await tester.tap(find.byKey(const Key('bonus-history')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('bonus-history-title')), findsOneWidget);
+    expect(find.byKey(const Key('bonus-history-current')), findsOneWidget);
+    expect(find.byKey(const Key('remaining-bonuses')), findsOneWidget);
+    expect(find.text('使用済み'), findsOneWidget);
+    expect(find.text('残り'), findsOneWidget);
   });
 
   testWidgets('CPU対戦であなた・CPU・現在手番を明示する', (tester) async {

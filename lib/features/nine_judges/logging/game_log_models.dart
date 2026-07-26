@@ -127,6 +127,13 @@ class GameActionLog {
     this.verdictHistoryBefore = const [],
     this.verdictHistoryAfter = const [],
     this.bonusViewerState,
+    this.bonusOrder,
+    this.nextBonusValue,
+    this.nextBonusKnownByPlayer,
+    this.nextBonusKnownByCpu,
+    this.bonusRevealTriggered = false,
+    this.bonusViewer,
+    this.revealedBonus,
   });
 
   final int actionIndex;
@@ -169,6 +176,13 @@ class GameActionLog {
   final List<String> verdictHistoryBefore;
   final List<String> verdictHistoryAfter;
   final String? bonusViewerState;
+  final int? bonusOrder;
+  final int? nextBonusValue;
+  final bool? nextBonusKnownByPlayer;
+  final bool? nextBonusKnownByCpu;
+  final bool bonusRevealTriggered;
+  final String? bonusViewer;
+  final int? revealedBonus;
 
   Map<String, dynamic> toJson() => {
     'actionIndex': actionIndex,
@@ -211,6 +225,13 @@ class GameActionLog {
     'verdictHistoryBefore': verdictHistoryBefore,
     'verdictHistoryAfter': verdictHistoryAfter,
     'bonusViewerState': bonusViewerState,
+    'bonusOrder': bonusOrder,
+    'nextBonusValue': nextBonusValue,
+    'nextBonusKnownByPlayer': nextBonusKnownByPlayer,
+    'nextBonusKnownByCpu': nextBonusKnownByCpu,
+    'bonusRevealTriggered': bonusRevealTriggered,
+    'bonusViewer': bonusViewer,
+    'revealedBonus': revealedBonus,
   };
 
   factory GameActionLog.fromJson(Map<String, dynamic> json) => GameActionLog(
@@ -257,6 +278,13 @@ class GameActionLog {
     verdictHistoryAfter:
         (json['verdictHistoryAfter'] as List?)?.cast<String>() ?? const [],
     bonusViewerState: json['bonusViewerState'] as String?,
+    bonusOrder: json['bonusOrder'] as int?,
+    nextBonusValue: json['nextBonusValue'] as int?,
+    nextBonusKnownByPlayer: json['nextBonusKnownByPlayer'] as bool?,
+    nextBonusKnownByCpu: json['nextBonusKnownByCpu'] as bool?,
+    bonusRevealTriggered: json['bonusRevealTriggered'] as bool? ?? false,
+    bonusViewer: json['bonusViewer'] as String?,
+    revealedBonus: json['revealedBonus'] as int?,
   );
 }
 
