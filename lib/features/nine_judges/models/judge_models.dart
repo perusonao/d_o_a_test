@@ -38,7 +38,7 @@ enum ActionType {
   life('LIFE'),
   death('DEATH'),
   eye('EYE'),
-  specialVerdict('審判');
+  specialVerdict('JUDGE');
 
   const ActionType(this.label);
   final String label;

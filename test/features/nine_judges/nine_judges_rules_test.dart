@@ -102,24 +102,83 @@ void main() {
       expect(alive.verdictState, VerdictState.aliveConfirmed);
       expect(dead.verdictState, VerdictState.deadConfirmed);
     });
+
+    test('救済者DEATHと執行者LIFEは各1回だけ使用可能', () {
+      final game = NineJudgesController(seed: 22);
+      expect(game.canSelectAction(ActionType.death), isTrue);
+      game.chooseAction(ActionType.death);
+      game.selectSlot(3);
+      expect(game.reverseActionUsed[Faction.savior], isTrue);
+      expect(game.session.actions.last.wasReverseAction, isTrue);
+      expect(game.session.actions.last.actorHandBefore['reverseDeath'], 1);
+      expect(game.session.actions.last.actorHandAfter['reverseDeath'], 0);
+      game.confirmHandoff();
+
+      expect(game.canSelectAction(ActionType.life), isTrue);
+      game.chooseAction(ActionType.life);
+      game.selectSlot(4);
+      expect(game.reverseActionUsed[Faction.executor], isTrue);
+      expect(game.session.actions.last.wasReverseAction, isTrue);
+      game.confirmHandoff();
+
+      expect(game.canSelectAction(ActionType.death), isFalse);
+      game.chooseAction(ActionType.life);
+      game.selectSlot(5);
+      game.confirmHandoff();
+      expect(game.canSelectAction(ActionType.life), isFalse);
+    });
   });
 
   group('EYEと特殊審判', () {
+    test('開始時は各自の手前3枚だけ既知で中央は双方未知', () {
+      final game = NineJudgesController(seed: 29);
+      for (final index in [6, 7, 8]) {
+        expect(
+          game.knowsAttribute(game.board[index].person, Faction.savior),
+          isTrue,
+        );
+        expect(
+          game.knowsAttribute(game.board[index].person, Faction.executor),
+          isFalse,
+        );
+      }
+      for (final index in [0, 1, 2]) {
+        expect(
+          game.knowsAttribute(game.board[index].person, Faction.executor),
+          isTrue,
+        );
+        expect(
+          game.knowsAttribute(game.board[index].person, Faction.savior),
+          isFalse,
+        );
+      }
+      for (final index in [3, 4, 5]) {
+        expect(
+          game.knowsAttribute(game.board[index].person, Faction.savior),
+          isFalse,
+        );
+        expect(
+          game.knowsAttribute(game.board[index].person, Faction.executor),
+          isFalse,
+        );
+      }
+      expect(game.session.initialKnowledge, hasLength(6));
+    });
     test('EYEは本人だけが知り、状態を変えず再調査不可', () {
       final game = NineJudgesController(seed: 30);
-      final before = game.board[0].person;
+      final before = game.board[3].person;
       game.chooseAction(ActionType.eye);
-      game.selectSlot(0);
+      game.selectSlot(3);
       expect(game.knowsAttribute(before, Faction.savior), isTrue);
       expect(game.knowsAttribute(before, Faction.executor), isFalse);
-      expect(game.eyeSeenSlots[Faction.savior], contains(0));
-      expect(game.eyeSeenSlots[Faction.executor], isNot(contains(0)));
-      expect(game.board[0].person.verdictState, VerdictState.deliberating);
+      expect(game.eyeSeenSlots[Faction.savior], contains(3));
+      expect(game.eyeSeenSlots[Faction.executor], isNot(contains(3)));
+      expect(game.board[3].person.verdictState, VerdictState.deliberating);
       expect(game.session.actions.single.visibleTargetAttributeAtTime, isNull);
       expect(
         NineJudgesRules.canUseAction(
           action: ActionType.eye,
-          person: game.board[0].person,
+          person: game.board[3].person,
           actor: Faction.savior,
           actorKnowsAttribute: true,
           specialVerdictUsed: false,
@@ -131,19 +190,19 @@ void main() {
     test('相手のEYEだけでは属性を知らず、LIFE/DEATHでも公開されない', () {
       final game = NineJudgesController(seed: 31);
       game.chooseAction(ActionType.eye);
-      game.selectSlot(0);
+      game.selectSlot(3);
       expect(
-        game.knowsAttribute(game.board[0].person, Faction.executor),
+        game.knowsAttribute(game.board[3].person, Faction.executor),
         isFalse,
       );
       game.confirmHandoff();
       game.chooseAction(ActionType.death);
-      game.selectSlot(0);
+      game.selectSlot(3);
       expect(
-        game.knowsAttribute(game.board[0].person, Faction.executor),
+        game.knowsAttribute(game.board[3].person, Faction.executor),
         isFalse,
       );
-      expect(game.knowsAttribute(game.board[0].person, Faction.savior), isTrue);
+      expect(game.knowsAttribute(game.board[3].person, Faction.savior), isTrue);
     });
 
     test('特殊審判は未介入人物だけ、陣営の状態で即確定し1回のみ', () {
@@ -285,7 +344,7 @@ void main() {
       expect(person.scoringFaction, Faction.executor);
       expect(person.awardedBonus, isNotNull);
       expect(game.session.actions.single.actionType, 'specialVerdict');
-      expect(game.session.rulesVersion, '1.0');
+      expect(game.session.rulesVersion, '1.1');
       expect(game.session.actions.single.verdictHistoryBefore, isEmpty);
       expect(game.session.actions.single.confirmedBy, 'savior');
     });
@@ -329,6 +388,10 @@ void main() {
       expect(
         game.board.map((slot) => slot.person.awardedBonus).toSet(),
         game.bonusDeck.toSet(),
+      );
+      expect(
+        game.remainingBonuses,
+        orderedEquals([...game.remainingBonuses]..sort()),
       );
     });
   });

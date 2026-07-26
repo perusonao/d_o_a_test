@@ -98,11 +98,10 @@ class _NineJudgesGameScreenState extends State<NineJudgesGameScreen> {
     return AnimatedBuilder(
       animation: game,
       builder: (context, _) {
-        if (game.awaitingConfirmationReveal) {
-          return _ConfirmationRevealScreen(controller: game);
+        if (game.isFinished && !game.awaitingConfirmationReveal) {
+          return ResultScreen(controller: game);
         }
-        if (game.isFinished) return ResultScreen(controller: game);
-        if (game.awaitingHandoff) {
+        if (game.awaitingHandoff && !game.awaitingConfirmationReveal) {
           return HandoffScreen(
             nextPlayer: game.currentPlayer,
             onReady: game.confirmHandoff,
@@ -120,40 +119,46 @@ class _GameBoard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    body: SafeArea(
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 430),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(8, 4, 8, 6),
-            child: Column(
-              children: [
-                _Header(controller: controller),
-                const SizedBox(height: 4),
-                _PhaseBanner(controller: controller),
-                const SizedBox(height: 5),
-                Flexible(
-                  fit: FlexFit.loose,
-                  child: AspectRatio(
-                    aspectRatio: 1.08,
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        BoardGrid(controller: controller),
-                        if (controller.lastCpuActionMessage != null)
-                          _CpuMessage(controller: controller),
-                      ],
+    body: Stack(
+      children: [
+        SafeArea(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 430),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(8, 4, 8, 6),
+                child: Column(
+                  children: [
+                    _Header(controller: controller),
+                    const SizedBox(height: 4),
+                    _PhaseBanner(controller: controller),
+                    const SizedBox(height: 5),
+                    Flexible(
+                      fit: FlexFit.loose,
+                      child: AspectRatio(
+                        aspectRatio: 1.08,
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            BoardGrid(controller: controller),
+                            if (controller.lastCpuActionMessage != null)
+                              _CpuMessage(controller: controller),
+                          ],
+                        ),
+                      ),
                     ),
-                  ),
+                    SelectedCardPanel(controller: controller),
+                    const SizedBox(height: 4),
+                    ActionPanel(controller: controller),
+                  ],
                 ),
-                SelectedCardPanel(controller: controller),
-                const SizedBox(height: 4),
-                ActionPanel(controller: controller),
-              ],
+              ),
             ),
           ),
         ),
-      ),
+        if (controller.awaitingConfirmationReveal)
+          Positioned.fill(child: _ConfirmationOverlay(controller: controller)),
+      ],
     ),
   );
 }
@@ -183,19 +188,20 @@ class _Header extends StatelessWidget {
                 faction: Faction.executor,
               ),
             ),
-            IconButton(
-              key: const Key('debug-button'),
-              visualDensity: VisualDensity.compact,
-              onPressed: () async {
-                controller.setDebugMode(true);
-                await showDialog<void>(
-                  context: context,
-                  builder: (_) => _DebugDialog(controller: controller),
-                );
-                controller.setDebugMode(false);
-              },
-              icon: const Icon(Icons.bug_report_outlined, size: 18),
-            ),
+            if (controller.settings.showCpuEvaluations)
+              IconButton(
+                key: const Key('debug-button'),
+                visualDensity: VisualDensity.compact,
+                onPressed: () async {
+                  controller.setDebugMode(true);
+                  await showDialog<void>(
+                    context: context,
+                    builder: (_) => _DebugDialog(controller: controller),
+                  );
+                  controller.setDebugMode(false);
+                },
+                icon: const Icon(Icons.bug_report_outlined, size: 18),
+              ),
           ],
         ),
         const SizedBox(height: 3),
@@ -379,7 +385,7 @@ class _Header extends StatelessWidget {
                   style: const TextStyle(fontSize: 12),
                 ),
               const SizedBox(height: 12),
-              const Text('残り', style: TextStyle(fontWeight: FontWeight.w900)),
+              const Text('残り候補', style: TextStyle(fontWeight: FontWeight.w900)),
               Text(
                 controller.remainingBonuses.isEmpty
                     ? 'なし'
@@ -482,8 +488,8 @@ class _FactionScore extends StatelessWidget {
                     const SizedBox(width: 3),
                     Text(
                       controller.specialVerdictAvailable(faction)
-                          ? '審判●1'
-                          : '審判済',
+                          ? 'JUDGE●1'
+                          : 'JUDGE済',
                       key: Key('verdict-status-${faction.name}'),
                       style: const TextStyle(
                         fontSize: 7,
@@ -496,27 +502,15 @@ class _FactionScore extends StatelessWidget {
             ),
           ),
           Text(
-            '${controller.scores[faction]}',
+            '${controller.scores[faction]} POINT',
             style: TextStyle(
               color: faction == Faction.savior
                   ? const Color(0xFF69BDF2)
                   : const Color(0xFFF0645A),
-              fontSize: 18,
+              fontSize: 13,
               fontWeight: FontWeight.w900,
             ),
           ),
-          if (active)
-            const Padding(
-              padding: EdgeInsets.only(left: 3),
-              child: Text(
-                'TURN',
-                style: TextStyle(
-                  color: Color(0xFFFFD76A),
-                  fontSize: 6,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ),
         ],
       ),
     );
@@ -618,47 +612,46 @@ class _CpuMessage extends StatelessWidget {
   );
 }
 
-class _ConfirmationRevealScreen extends StatelessWidget {
-  const _ConfirmationRevealScreen({required this.controller});
+class _ConfirmationOverlay extends StatelessWidget {
+  const _ConfirmationOverlay({required this.controller});
   final NineJudgesController controller;
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    body: SafeArea(
-      child: Center(
-        child: Container(
-          key: const Key('confirmation-reveal'),
-          margin: const EdgeInsets.all(24),
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: const Color(0xFF211D15),
-            border: Border.all(color: const Color(0xFFD6B25E), width: 2),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                '審判確定',
-                style: TextStyle(
-                  color: Color(0xFFD6B25E),
-                  fontSize: 22,
-                  fontWeight: FontWeight.w900,
-                ),
+  Widget build(BuildContext context) => ColoredBox(
+    color: Colors.black54,
+    child: Center(
+      child: Container(
+        key: const Key('confirmation-reveal'),
+        margin: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: const Color(0xFF211D15),
+          border: Border.all(color: const Color(0xFFD6B25E), width: 2),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'JUDGEMENT',
+              style: TextStyle(
+                color: Color(0xFFD6B25E),
+                fontSize: 22,
+                fontWeight: FontWeight.w900,
               ),
-              const SizedBox(height: 16),
-              Text(
-                controller.confirmationRevealMessage!,
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 18),
-              ),
-              const SizedBox(height: 20),
-              FilledButton(
-                onPressed: controller.confirmConfirmationReveal,
-                child: const Text('確認'),
-              ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              controller.confirmationRevealMessage!,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 18),
+            ),
+            const SizedBox(height: 20),
+            FilledButton(
+              onPressed: controller.confirmConfirmationReveal,
+              child: const Text('確認'),
+            ),
+          ],
         ),
       ),
     ),

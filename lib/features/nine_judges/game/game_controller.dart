@@ -44,6 +44,7 @@ class NineJudgesController extends ChangeNotifier {
   late List<BoardSlot> board;
   late List<int> bonusDeck;
   late Map<Faction, bool> specialVerdictUsed;
+  late Map<Faction, bool> reverseActionUsed;
   final Map<Faction, Set<int>> knownAttributeSlots = {
     Faction.savior: <int>{},
     Faction.executor: <int>{},
@@ -84,6 +85,7 @@ class NineJudgesController extends ChangeNotifier {
   ActionType? lastCpuActionType;
   bool lastCpuWasJudgment = false;
   String? confirmationRevealMessage;
+  int? confirmationTargetIndex;
   List<CpuCandidateScore> lastCpuEvaluations = const [];
   bool _bonusRevealTriggeredThisTurn = false;
   Faction? _bonusViewerThisTurn;
@@ -92,8 +94,12 @@ class NineJudgesController extends ChangeNotifier {
   int get confirmedCount => board.where((s) => s.person.isConfirmed).length;
   int get judgedCount => confirmedCount;
   int get currentBonus => bonusDeck[bonusIndex];
-  List<int> get remainingBonuses =>
-      isFinished ? const [] : bonusDeck.sublist(bonusIndex);
+  List<int> get remainingBonuses {
+    if (isFinished) return const [];
+    final values = bonusDeck.sublist(bonusIndex).toList()..sort();
+    return values;
+  }
+
   bool get isFinished => _finished;
   bool get isCpuGame => settings.mode == GameMode.cpu;
   bool get isCpuTurn =>
@@ -117,6 +123,12 @@ class NineJudgesController extends ChangeNotifier {
   bool specialVerdictAvailable(Faction faction) =>
       !specialVerdictUsed[faction]!;
 
+  bool reverseActionAvailable(Faction faction) => !reverseActionUsed[faction]!;
+
+  bool isReverseAction(ActionType action, Faction actor) =>
+      (actor == Faction.savior && action == ActionType.death) ||
+      (actor == Faction.executor && action == ActionType.life);
+
   String specialVerdictStatus(Faction faction) {
     if (specialVerdictUsed[faction]!) return '使用済み';
     if (_legalTargets(ActionType.specialVerdict, faction).isNotEmpty) {
@@ -131,6 +143,7 @@ class NineJudgesController extends ChangeNotifier {
     board = NineJudgesRules.createBoard(_random);
     bonusDeck = NineJudgesRules.createBonusDeck(_random);
     specialVerdictUsed = {Faction.savior: false, Faction.executor: false};
+    reverseActionUsed = {Faction.savior: false, Faction.executor: false};
     for (final knowledge in knownAttributeSlots.values) {
       knowledge.clear();
     }
@@ -142,6 +155,10 @@ class NineJudgesController extends ChangeNotifier {
       pendingBonusReveal[faction] = false;
       scores[faction] = 0;
     }
+    final humanOrSavior = isCpuGame ? humanFaction : Faction.savior;
+    final cpuOrExecutor = humanOrSavior.opponent;
+    knownAttributeSlots[humanOrSavior]!.addAll(const [6, 7, 8]);
+    knownAttributeSlots[cpuOrExecutor]!.addAll(const [0, 1, 2]);
     currentPlayer = settings.firstPlayer;
     turn = 1;
     bonusIndex = 0;
@@ -161,6 +178,7 @@ class NineJudgesController extends ChangeNotifier {
     lastCpuActionType = null;
     lastCpuWasJudgment = false;
     confirmationRevealMessage = null;
+    confirmationTargetIndex = null;
     lastCpuEvaluations = const [];
     _bonusRevealTriggeredThisTurn = false;
     _bonusViewerThisTurn = null;
@@ -187,7 +205,14 @@ class NineJudgesController extends ChangeNotifier {
             positionIndex: i,
           ),
       ],
-      initialKnowledge: const {},
+      initialKnowledge: {
+        for (final faction in Faction.values)
+          for (final index in knownAttributeSlots[faction]!)
+            '${faction.name}-$index': InitialKnowledgeLog(
+              personId: board[index].person.id,
+              attribute: board[index].person.attribute.name,
+            ),
+      },
       scoreVisible: false,
     );
     notifyListeners();
@@ -254,9 +279,8 @@ class NineJudgesController extends ChangeNotifier {
   }
 
   String positionLabel(int index) {
-    const rows = ['上', '中央', '下'];
-    const columns = ['左', '中央', '右'];
-    return '${rows[index ~/ 3]}${columns[index % 3]}';
+    const columns = ['A', 'B', 'C'];
+    return '${columns[index % 3]}${index ~/ 3 + 1}';
   }
 
   String bonusVisibilityLabel(Faction viewer) {
@@ -317,6 +341,8 @@ class NineJudgesController extends ChangeNotifier {
         actor: viewer,
         actorKnowsAttribute: knowsAttribute(board[i].person, viewer),
         specialVerdictUsed: specialVerdictUsed[viewer]!,
+        reverseActionUsed:
+            isReverseAction(action, viewer) && reverseActionUsed[viewer]!,
       ))
         i,
   ];
@@ -364,6 +390,7 @@ class NineJudgesController extends ChangeNotifier {
     final action = selectedAction!;
     final actor = currentPlayer;
     final actorKnewAttributeBefore = knowsAttribute(board[index].person, actor);
+    final reverseWasUsedBefore = reverseActionUsed[actor]!;
     final before = board[index].person;
     var after = before;
     if (action == ActionType.eye) {
@@ -373,6 +400,9 @@ class NineJudgesController extends ChangeNotifier {
       specialVerdictUsed[actor] = true;
       after = NineJudgesRules.applySpecialVerdict(person: before, actor: actor);
     } else {
+      if (isReverseAction(action, actor)) {
+        reverseActionUsed[actor] = true;
+      }
       after = NineJudgesRules.applyVerdictAction(
         person: before,
         action: action,
@@ -397,8 +427,10 @@ class NineJudgesController extends ChangeNotifier {
         ),
       );
       confirmationRevealMessage =
-          '${after.attribute.label}\n${after.verdictState.label}\n'
+          '${positionLabel(index)}\n${after.attribute.label}\n'
+          '${after.isAlive ? 'ALIVE' : 'DEAD'}\n'
           '審判ボーナス $bonus POINT\n${scorer.label} +$bonus';
+      confirmationTargetIndex = index;
       awaitingConfirmationReveal = true;
       knownAttributeSlots[Faction.savior]!.add(index);
       knownAttributeSlots[Faction.executor]!.add(index);
@@ -433,6 +465,7 @@ class NineJudgesController extends ChangeNotifier {
       before,
       after,
       actorKnewAttributeBefore: actorKnewAttributeBefore,
+      reverseWasUsedBefore: reverseWasUsedBefore,
     );
     _finishAction(detail, action: action, targetIndex: index);
   }
@@ -459,6 +492,7 @@ class NineJudgesController extends ChangeNotifier {
     PersonCard before,
     PersonCard after, {
     required bool actorKnewAttributeBefore,
+    required bool reverseWasUsedBefore,
   }) {
     session = session.copyWith(
       actions: [
@@ -486,15 +520,45 @@ class NineJudgesController extends ChangeNotifier {
           eyeResult: action == ActionType.eye ? before.attribute.name : null,
           actorHandBefore: {
             'specialVerdict': specialVerdictUsed[actor]! ? 0 : 1,
+            'reverseLife': actor == Faction.executor && !reverseWasUsedBefore
+                ? 1
+                : 0,
+            'reverseDeath': actor == Faction.savior && !reverseWasUsedBefore
+                ? 1
+                : 0,
           },
           actorHandAfter: {
             'specialVerdict': specialVerdictUsed[actor]! ? 0 : 1,
+            'reverseLife':
+                actor == Faction.executor && !reverseActionUsed[actor]! ? 1 : 0,
+            'reverseDeath':
+                actor == Faction.savior && !reverseActionUsed[actor]! ? 1 : 0,
           },
           opponentHandBefore: {
             'specialVerdict': specialVerdictUsed[actor.opponent]! ? 0 : 1,
+            'reverseLife':
+                actor.opponent == Faction.executor &&
+                    !reverseActionUsed[actor.opponent]!
+                ? 1
+                : 0,
+            'reverseDeath':
+                actor.opponent == Faction.savior &&
+                    !reverseActionUsed[actor.opponent]!
+                ? 1
+                : 0,
           },
           opponentHandAfter: {
             'specialVerdict': specialVerdictUsed[actor.opponent]! ? 0 : 1,
+            'reverseLife':
+                actor.opponent == Faction.executor &&
+                    !reverseActionUsed[actor.opponent]!
+                ? 1
+                : 0,
+            'reverseDeath':
+                actor.opponent == Faction.savior &&
+                    !reverseActionUsed[actor.opponent]!
+                ? 1
+                : 0,
           },
           timestamp: DateTime.now(),
           underReviewBefore: !before.isConfirmed,
@@ -535,6 +599,7 @@ class NineJudgesController extends ChangeNotifier {
           bonusRevealTriggered: _bonusRevealTriggeredThisTurn,
           bonusViewer: _bonusViewerThisTurn?.name,
           revealedBonus: _revealedBonusThisTurn,
+          wasReverseAction: isReverseAction(action, actor),
           cpuDecisionReason: action == ActionType.eye
               ? 'unknown attribute'
               : 'state and bonus evaluation',
@@ -580,6 +645,7 @@ class NineJudgesController extends ChangeNotifier {
   void confirmConfirmationReveal() {
     awaitingConfirmationReveal = false;
     confirmationRevealMessage = null;
+    confirmationTargetIndex = null;
     if (!awaitingHandoff) _beginCurrentTurn();
     notifyListeners();
   }
@@ -619,8 +685,13 @@ class NineJudgesController extends ChangeNotifier {
       endReason: endReason,
       actionsUsed: const {},
       actionsRemaining: {
-        for (final faction in Faction.values)
+        for (final faction in Faction.values) ...{
           faction.name: specialVerdictUsed[faction]! ? 0 : 1,
+          '${faction.name}.specialVerdict': specialVerdictUsed[faction]!
+              ? 0
+              : 1,
+          '${faction.name}.reverseAction': reverseActionUsed[faction]! ? 0 : 1,
+        },
       },
       finalBoard: [
         for (var i = 0; i < board.length; i++)
@@ -694,6 +765,7 @@ class NineJudgesController extends ChangeNotifier {
       },
       currentBonus: visibleBonusFor(faction),
       specialVerdictAvailable: specialVerdictAvailable(faction),
+      reverseActionAvailable: reverseActionAvailable(faction),
     );
   }
 
