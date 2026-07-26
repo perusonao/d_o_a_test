@@ -3,16 +3,19 @@ import 'package:flutter/material.dart';
 
 import 'theme.dart';
 
-class DeadOrAliveApp extends StatelessWidget {
-  const DeadOrAliveApp({super.key});
+class NineVerdictsApp extends StatelessWidget {
+  const NineVerdictsApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: '9人の審判',
+      title: '9人の審判 / Nine Verdicts',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.build(),
       home: const NineJudgesGameScreen(),
     );
   }
 }
+
+@Deprecated('Use NineVerdictsApp. Kept to avoid breaking existing tests.')
+typedef DeadOrAliveApp = NineVerdictsApp;
