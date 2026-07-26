@@ -134,6 +134,7 @@ class GameActionLog {
     this.bonusRevealTriggered = false,
     this.bonusViewer,
     this.revealedBonus,
+    this.wasReverseAction = false,
   });
 
   final int actionIndex;
@@ -183,6 +184,7 @@ class GameActionLog {
   final bool bonusRevealTriggered;
   final String? bonusViewer;
   final int? revealedBonus;
+  final bool wasReverseAction;
 
   Map<String, dynamic> toJson() => {
     'actionIndex': actionIndex,
@@ -232,6 +234,7 @@ class GameActionLog {
     'bonusRevealTriggered': bonusRevealTriggered,
     'bonusViewer': bonusViewer,
     'revealedBonus': revealedBonus,
+    'wasReverseAction': wasReverseAction,
   };
 
   factory GameActionLog.fromJson(Map<String, dynamic> json) => GameActionLog(
@@ -285,6 +288,7 @@ class GameActionLog {
     bonusRevealTriggered: json['bonusRevealTriggered'] as bool? ?? false,
     bonusViewer: json['bonusViewer'] as String?,
     revealedBonus: json['revealedBonus'] as int?,
+    wasReverseAction: json['wasReverseAction'] as bool? ?? false,
   );
 }
 

@@ -27,6 +27,7 @@ class BoardGrid extends StatelessWidget {
       final viewer = controller.uiViewer;
       return PersonCardWidget(
         person: person,
+        coordinate: controller.positionLabel(index),
         attributeVisible: controller.knowsAttribute(person, viewer),
         viewerEyeKnown: controller.eyeKnowsAttribute(index, viewer),
         opponentEyeKnown: controller.eyeKnowsAttribute(index, viewer.opponent),

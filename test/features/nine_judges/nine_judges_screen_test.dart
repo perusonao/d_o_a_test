@@ -23,12 +23,18 @@ void main() {
     expect(find.byKey(const Key('current-bonus')), findsOneWidget);
     expect(find.byKey(const Key('bonus-history')), findsOneWidget);
     expect(find.byKey(const Key('faction-savior')), findsOneWidget);
-    expect(find.text('0'), findsNWidgets(2));
+    expect(find.text('0 POINT'), findsNWidgets(2));
     expect(find.byKey(const Key('action-life')), findsOneWidget);
     expect(find.byKey(const Key('action-eye')), findsOneWidget);
     expect(find.byKey(const Key('action-specialVerdict')), findsOneWidget);
-    expect(find.byKey(const Key('action-death')), findsNothing);
+    expect(find.text('JUDGE'), findsOneWidget);
+    expect(find.text('TURN'), findsNothing);
+    expect(find.textContaining('TURN 1'), findsOneWidget);
+    expect(find.byKey(const Key('coordinate-A1')), findsOneWidget);
+    expect(find.byKey(const Key('coordinate-C3')), findsOneWidget);
+    expect(find.byKey(const Key('action-death')), findsOneWidget);
     expect(find.textContaining('SAVE'), findsNothing);
+    expect(find.byKey(const Key('debug-button')), findsNothing);
     expect(find.text('人物とアクションを選択してください'), findsNothing);
     expect(find.byKey(const Key('verdict-status-savior')), findsOneWidget);
     expect(find.byKey(const Key('verdict-status-executor')), findsOneWidget);
@@ -47,7 +53,7 @@ void main() {
     expect(find.byKey(const Key('bonus-history-current')), findsOneWidget);
     expect(find.byKey(const Key('remaining-bonuses')), findsOneWidget);
     expect(find.text('使用済み'), findsOneWidget);
-    expect(find.text('残り'), findsOneWidget);
+    expect(find.text('残り候補'), findsOneWidget);
   });
 
   testWidgets('CPU対戦であなた・CPU・現在手番を明示する', (tester) async {
@@ -93,7 +99,12 @@ void main() {
     await tester.tap(find.byType(PersonCardWidget).first);
     await tester.pump();
     expect(find.byKey(const Key('confirmation-reveal')), findsOneWidget);
-    expect(find.textContaining('POINT'), findsOneWidget);
+    expect(find.byKey(const Key('nine-judges-board')), findsOneWidget);
+    expect(find.text('JUDGEMENT'), findsOneWidget);
+    expect(find.textContaining('POINT'), findsWidgets);
+    await tester.tap(find.text('確認'));
+    await tester.pump();
+    expect(find.byKey(const Key('confirmation-reveal')), findsNothing);
   });
 
   testWidgets('EYE実施者をYOU/CPUで区別し属性は非表示にできる', (tester) async {
@@ -163,6 +174,77 @@ void main() {
     expect(find.text('生'), findsNWidgets(2));
     expect(find.text('死'), findsOneWidget);
     expect(find.byKey(const Key('confirmed-label')), findsOneWidget);
+    expect(
+      find.byKey(const Key('card-surface-aliveConfirmed')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('DEAD確定カードは専用状態面を表示する', (tester) async {
+    const person = PersonCard(
+      id: 'dead',
+      attribute: PersonAttribute.evil,
+      verdictState: VerdictState.deadConfirmed,
+      awardedBonus: 4,
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 140,
+            height: 140,
+            child: PersonCardWidget(
+              person: person,
+              attributeVisible: true,
+              viewerEyeKnown: false,
+              opponentEyeKnown: false,
+              viewerLabel: 'YOU',
+              opponentLabel: 'CPU',
+              selected: false,
+              cpuHighlighted: false,
+              enabled: false,
+              onTap: () {},
+            ),
+          ),
+        ),
+      ),
+    );
+    expect(find.byKey(const Key('card-surface-deadConfirmed')), findsOneWidget);
+    expect(find.textContaining('DEAD'), findsWidgets);
+  });
+
+  testWidgets('善人・悪人・中立は形の異なるアイコンで表示する', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Row(
+            children: [
+              for (final attribute in PersonAttribute.values)
+                Expanded(
+                  child: PersonCardWidget(
+                    person: PersonCard(
+                      id: attribute.name,
+                      attribute: attribute,
+                    ),
+                    attributeVisible: true,
+                    viewerEyeKnown: false,
+                    opponentEyeKnown: false,
+                    viewerLabel: 'YOU',
+                    opponentLabel: 'CPU',
+                    selected: false,
+                    cpuHighlighted: false,
+                    enabled: false,
+                    onTap: () {},
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+    expect(find.byKey(const Key('attribute-icon-good')), findsOneWidget);
+    expect(find.byKey(const Key('attribute-icon-evil')), findsOneWidget);
+    expect(find.byKey(const Key('attribute-icon-neutral')), findsOneWidget);
   });
 
   for (final size in [

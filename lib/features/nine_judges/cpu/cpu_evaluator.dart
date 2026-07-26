@@ -17,7 +17,7 @@ abstract final class CpuEvaluator {
     final known = slot.knownAttribute;
     final wantsAlive = known == null ? null : prefersAlive(view.faction, known);
     final bonus = (view.currentBonus ?? 5).toDouble();
-    return switch (action) {
+    final base = switch (action) {
       ActionType.eye => known == null ? 12 : -100,
       ActionType.specialVerdict =>
         wantsAlive == null
@@ -38,5 +38,14 @@ abstract final class CpuEvaluator {
             ? 7 + bonus / 2
             : 1,
     };
+    final reverse =
+        (view.faction == Faction.savior && action == ActionType.death) ||
+        (view.faction == Faction.executor && action == ActionType.life);
+    if (!reverse) return base.toDouble();
+    final nearConfirmation = slot.person.verdictActionCount >= 1;
+    final tacticalPremium = known != null && nearConfirmation && bonus >= 6
+        ? 3.0
+        : 0.0;
+    return base.toDouble() - 3 + tacticalPremium;
   }
 }

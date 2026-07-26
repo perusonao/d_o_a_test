@@ -21,11 +21,12 @@ abstract final class NineJudgesRules {
     required Faction actor,
     required bool actorKnowsAttribute,
     required bool specialVerdictUsed,
+    bool reverseActionUsed = false,
   }) {
     if (person.isConfirmed) return false;
     return switch (action) {
-      ActionType.life => actor == Faction.savior,
-      ActionType.death => actor == Faction.executor,
+      ActionType.life => actor == Faction.savior || !reverseActionUsed,
+      ActionType.death => actor == Faction.executor || !reverseActionUsed,
       ActionType.eye => !actorKnowsAttribute,
       ActionType.specialVerdict =>
         !specialVerdictUsed &&

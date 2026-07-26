@@ -19,6 +19,7 @@ class CpuGameView {
     required this.legalTargets,
     required this.currentBonus,
     required this.specialVerdictAvailable,
+    this.reverseActionAvailable = true,
   });
 
   final Faction faction;
@@ -26,6 +27,7 @@ class CpuGameView {
   final Map<ActionType, List<int>> legalTargets;
   final int? currentBonus;
   final bool specialVerdictAvailable;
+  final bool reverseActionAvailable;
 }
 
 class CpuDecision {

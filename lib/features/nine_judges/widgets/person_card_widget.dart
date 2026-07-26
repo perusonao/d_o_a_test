@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 class PersonCardWidget extends StatelessWidget {
   const PersonCardWidget({
     required this.person,
+    this.coordinate = '',
     required this.attributeVisible,
     required this.viewerEyeKnown,
     required this.opponentEyeKnown,
@@ -17,6 +18,7 @@ class PersonCardWidget extends StatelessWidget {
     super.key,
   });
   final PersonCard person;
+  final String coordinate;
   final bool attributeVisible;
   final bool viewerEyeKnown;
   final bool opponentEyeKnown;
@@ -32,7 +34,9 @@ class PersonCardWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final confirmed = person.isConfirmed;
     final border = confirmed
-        ? const Color(0xFFB9BDC5)
+        ? person.isAlive
+              ? const Color(0xFF68D893)
+              : const Color(0xFFF0645A)
         : selected || cpuHighlighted
         ? const Color(0xFFFFD76A)
         : enabled
@@ -45,11 +49,14 @@ class PersonCardWidget extends StatelessWidget {
         key: Key('person-${person.id}'),
         onTap: enabled ? onTap : null,
         child: AnimatedContainer(
+          key: Key('card-surface-${person.verdictState.name}'),
           duration: const Duration(milliseconds: 160),
-          padding: const EdgeInsets.all(6),
+          padding: const EdgeInsets.all(5),
           decoration: BoxDecoration(
             color: confirmed
-                ? const Color(0xFF17181B)
+                ? person.isAlive
+                      ? const Color(0xFF13291B)
+                      : const Color(0xFF2C1515)
                 : const Color(0xFF222019),
             borderRadius: BorderRadius.circular(8),
             border: Border.all(color: border, width: confirmed ? 2.5 : 1.3),
@@ -75,6 +82,16 @@ class PersonCardWidget extends StatelessWidget {
                       ),
                     ),
                   ),
+                  if (coordinate.isNotEmpty)
+                    Text(
+                      coordinate,
+                      key: Key('coordinate-$coordinate'),
+                      style: const TextStyle(
+                        fontSize: 8,
+                        color: Colors.white54,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
                   if (!confirmed)
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
@@ -94,7 +111,24 @@ class PersonCardWidget extends StatelessWidget {
                 ],
               ),
               const Spacer(),
-              const Icon(Icons.person, size: 27),
+              Icon(
+                attributeVisible
+                    ? switch (person.attribute) {
+                        PersonAttribute.good => Icons.wb_sunny_outlined,
+                        PersonAttribute.evil => Icons.theater_comedy_outlined,
+                        PersonAttribute.neutral => Icons.balance_outlined,
+                      }
+                    : Icons.person_outline,
+                key: Key(
+                  attributeVisible
+                      ? 'attribute-icon-${person.attribute.name}'
+                      : 'attribute-icon-hidden',
+                ),
+                size: 24,
+                color: attributeVisible
+                    ? _attributeColor(person.attribute)
+                    : Colors.white70,
+              ),
               Text(
                 person.verdictState.label,
                 key: Key('verdict-${person.verdictState.name}'),
@@ -108,7 +142,7 @@ class PersonCardWidget extends StatelessWidget {
                 ),
               ),
               SizedBox(
-                height: 18,
+                height: 16,
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -156,10 +190,11 @@ class PersonCardWidget extends StatelessWidget {
               const Spacer(),
               if (confirmed)
                 Text(
-                  '確定 ${person.awardedBonus}点',
+                  '${person.isAlive ? 'ALIVE' : 'DEAD'} '
+                  '${person.awardedBonus} POINT',
                   key: const Key('confirmed-label'),
                   style: const TextStyle(
-                    fontSize: 9,
+                    fontSize: 8,
                     fontWeight: FontWeight.bold,
                   ),
                 )
