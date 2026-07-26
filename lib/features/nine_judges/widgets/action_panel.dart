@@ -17,18 +17,8 @@ class ActionPanel extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (controller.phase == TurnPhase.selectingActionTarget)
-          SizedBox(
-            height: 25,
-            child: TextButton.icon(
-              key: const Key('cancel-action'),
-              onPressed: controller.cancelActionSelection,
-              icon: const Icon(Icons.close, size: 14),
-              label: const Text('選択をキャンセル'),
-            ),
-          ),
         SizedBox(
-          height: 62,
+          height: 56,
           child: Row(
             children: [
               for (var i = 0; i < actions.length; i++) ...[
@@ -38,6 +28,20 @@ class ActionPanel extends StatelessWidget {
             ],
           ),
         ),
+        if (controller.phase == TurnPhase.selectingActionTarget)
+          SizedBox(
+            height: 24,
+            child: TextButton.icon(
+              key: const Key('cancel-action'),
+              onPressed: controller.cancelActionSelection,
+              style: TextButton.styleFrom(
+                padding: EdgeInsets.zero,
+                visualDensity: VisualDensity.compact,
+              ),
+              icon: const Icon(Icons.close, size: 13),
+              label: const Text('選択解除', style: TextStyle(fontSize: 10)),
+            ),
+          ),
       ],
     );
   }
@@ -51,10 +55,9 @@ class ActionPanel extends StatelessWidget {
       ActionType.life => '生を与える',
       ActionType.death => '死を与える',
       ActionType.eye => '属性を調査',
-      ActionType.specialVerdict =>
-        controller.specialVerdictAvailable(controller.currentPlayer)
-            ? '残り1'
-            : '使用済み',
+      ActionType.specialVerdict => controller.specialVerdictStatus(
+        controller.currentPlayer,
+      ),
     };
     return Material(
       color: selected ? const Color(0xFF493B1D) : const Color(0xFF201D18),

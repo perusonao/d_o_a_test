@@ -19,21 +19,19 @@ class BoardGrid extends StatelessWidget {
       crossAxisCount: 3,
       crossAxisSpacing: 5,
       mainAxisSpacing: 5,
-      childAspectRatio: .88,
+      childAspectRatio: 1.08,
     ),
     itemCount: 9,
     itemBuilder: (context, index) {
       final person = controller.board[index].person;
+      final viewer = controller.uiViewer;
       return PersonCardWidget(
         person: person,
-        attributeVisible: controller.knowsAttribute(
-          person,
-          controller.currentPlayer,
-        ),
-        attributeEyeKnown: controller.eyeKnowsAttribute(
-          index,
-          controller.currentPlayer,
-        ),
+        attributeVisible: controller.knowsAttribute(person, viewer),
+        viewerEyeKnown: controller.eyeKnowsAttribute(index, viewer),
+        opponentEyeKnown: controller.eyeKnowsAttribute(index, viewer.opponent),
+        viewerLabel: controller.isCpuGame ? 'YOU' : viewer.label,
+        opponentLabel: controller.isCpuGame ? 'CPU' : viewer.opponent.label,
         selected: controller.selectedSlot == index,
         cpuHighlighted: controller.lastCpuTargetIndex == index,
         enabled: controller.canTarget(index),

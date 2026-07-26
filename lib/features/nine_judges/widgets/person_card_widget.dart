@@ -5,7 +5,10 @@ class PersonCardWidget extends StatelessWidget {
   const PersonCardWidget({
     required this.person,
     required this.attributeVisible,
-    required this.attributeEyeKnown,
+    required this.viewerEyeKnown,
+    required this.opponentEyeKnown,
+    required this.viewerLabel,
+    required this.opponentLabel,
     required this.selected,
     required this.cpuHighlighted,
     required this.enabled,
@@ -15,7 +18,10 @@ class PersonCardWidget extends StatelessWidget {
   });
   final PersonCard person;
   final bool attributeVisible;
-  final bool attributeEyeKnown;
+  final bool viewerEyeKnown;
+  final bool opponentEyeKnown;
+  final String viewerLabel;
+  final String opponentLabel;
   final bool selected;
   final bool cpuHighlighted;
   final bool enabled;
@@ -29,6 +35,8 @@ class PersonCardWidget extends StatelessWidget {
         ? const Color(0xFFB9BDC5)
         : selected || cpuHighlighted
         ? const Color(0xFFFFD76A)
+        : enabled
+        ? const Color(0xFFC9A84E)
         : const Color(0xFF66552E);
     return AnimatedScale(
       scale: cpuHighlighted ? 1.04 : 1,
@@ -67,11 +75,21 @@ class PersonCardWidget extends StatelessWidget {
                       ),
                     ),
                   ),
-                  if (attributeEyeKnown && !confirmed)
-                    const Icon(
-                      Icons.visibility,
-                      size: 12,
-                      color: Color(0xFFB49CF2),
+                  if (!confirmed)
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        if (viewerEyeKnown)
+                          _EyeMark(
+                            label: viewerLabel,
+                            color: const Color(0xFF69BDF2),
+                          ),
+                        if (opponentEyeKnown)
+                          _EyeMark(
+                            label: opponentLabel,
+                            color: const Color(0xFFF0645A),
+                          ),
+                      ],
                     ),
                 ],
               ),
@@ -89,9 +107,51 @@ class PersonCardWidget extends StatelessWidget {
                   fontWeight: FontWeight.w900,
                 ),
               ),
-              Text(
-                '介入 ${person.verdictActionCount}/3',
-                style: const TextStyle(fontSize: 8, color: Colors.white54),
+              SizedBox(
+                height: 18,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    for (
+                      var historyIndex = 0;
+                      historyIndex < person.verdictHistory.length;
+                      historyIndex++
+                    )
+                      Container(
+                        key: Key(
+                          'verdict-chip-$historyIndex-'
+                          '${person.verdictHistory[historyIndex].name}',
+                        ),
+                        margin: const EdgeInsets.symmetric(horizontal: 1),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 5,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color:
+                              person.verdictHistory[historyIndex] ==
+                                  VerdictActionType.life
+                              ? const Color(0xFF173723)
+                              : const Color(0xFF421D1D),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color:
+                                person.verdictHistory[historyIndex] ==
+                                    VerdictActionType.life
+                                ? const Color(0xFF68D893)
+                                : const Color(0xFFF0645A),
+                          ),
+                        ),
+                        child: Text(
+                          person.verdictHistory[historyIndex].label,
+                          style: const TextStyle(
+                            fontSize: 8,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
               ),
               const Spacer(),
               if (confirmed)
@@ -103,10 +163,20 @@ class PersonCardWidget extends StatelessWidget {
                     fontWeight: FontWeight.bold,
                   ),
                 )
-              else
+              else if (selected)
                 const Text(
-                  '操作可能',
-                  style: TextStyle(fontSize: 8, color: Colors.white38),
+                  '選択中',
+                  key: Key('selected-label'),
+                  style: TextStyle(
+                    fontSize: 9,
+                    color: Color(0xFFFFD76A),
+                    fontWeight: FontWeight.w900,
+                  ),
+                )
+              else if (enabled)
+                const Text(
+                  '選択可能',
+                  style: TextStyle(fontSize: 8, color: Color(0xFFD6B25E)),
                 ),
               if (scoreDetail case final detail?)
                 Text(
@@ -125,4 +195,26 @@ class PersonCardWidget extends StatelessWidget {
     PersonAttribute.evil => const Color(0xFFF0645A),
     PersonAttribute.neutral => const Color(0xFFC8C3B8),
   };
+}
+
+class _EyeMark extends StatelessWidget {
+  const _EyeMark({required this.label, required this.color});
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Icon(Icons.visibility, size: 9, color: color),
+      Text(
+        label,
+        style: TextStyle(
+          fontSize: 6,
+          color: color,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    ],
+  );
 }

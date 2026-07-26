@@ -44,6 +44,14 @@ enum ActionType {
   final String label;
 }
 
+enum VerdictActionType {
+  life('生'),
+  death('死');
+
+  const VerdictActionType(this.label);
+  final String label;
+}
+
 enum TurnPhase { selectingAction, selectingActionTarget }
 
 enum FactionSelection { savior, executor, random }
@@ -110,6 +118,7 @@ class PersonCard {
     required this.attribute,
     this.verdictState = VerdictState.deliberating,
     this.verdictActionCount = 0,
+    this.verdictHistory = const [],
     this.confirmedBy,
     this.scoringFaction,
     this.awardedBonus,
@@ -119,6 +128,7 @@ class PersonCard {
   final PersonAttribute attribute;
   final VerdictState verdictState;
   final int verdictActionCount;
+  final List<VerdictActionType> verdictHistory;
   final Faction? confirmedBy;
   final Faction? scoringFaction;
   final int? awardedBonus;
@@ -129,6 +139,7 @@ class PersonCard {
   PersonCard copyWith({
     VerdictState? verdictState,
     int? verdictActionCount,
+    List<VerdictActionType>? verdictHistory,
     Faction? confirmedBy,
     Faction? scoringFaction,
     int? awardedBonus,
@@ -137,6 +148,7 @@ class PersonCard {
     attribute: attribute,
     verdictState: verdictState ?? this.verdictState,
     verdictActionCount: verdictActionCount ?? this.verdictActionCount,
+    verdictHistory: verdictHistory ?? this.verdictHistory,
     confirmedBy: confirmedBy ?? this.confirmedBy,
     scoringFaction: scoringFaction ?? this.scoringFaction,
     awardedBonus: awardedBonus ?? this.awardedBonus,
@@ -156,11 +168,23 @@ class GameLogEntry {
     required this.turn,
     required this.player,
     required this.message,
+    required this.action,
+    required this.targetIndex,
+    this.confirmedAttribute,
+    this.confirmedState,
+    this.verdictBonus,
+    this.scoringFaction,
   });
 
   final int turn;
   final Faction player;
   final String message;
+  final ActionType action;
+  final int targetIndex;
+  final PersonAttribute? confirmedAttribute;
+  final VerdictState? confirmedState;
+  final int? verdictBonus;
+  final Faction? scoringFaction;
 }
 
 class ScoreResult {
