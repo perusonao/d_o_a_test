@@ -16,6 +16,9 @@ class LoggedPerson {
     this.scoreValue,
     this.eyeSeenBySavior = false,
     this.eyeSeenByExecutor = false,
+    this.verdictState,
+    this.verdictActionCount = 0,
+    this.awardedBonus,
   });
 
   final String personId;
@@ -32,6 +35,9 @@ class LoggedPerson {
   final int? scoreValue;
   final bool eyeSeenBySavior;
   final bool eyeSeenByExecutor;
+  final String? verdictState;
+  final int verdictActionCount;
+  final int? awardedBonus;
 
   Map<String, dynamic> toJson() => {
     'personId': personId,
@@ -48,6 +54,9 @@ class LoggedPerson {
     'scoreValue': scoreValue,
     'eyeSeenBySavior': eyeSeenBySavior,
     'eyeSeenByExecutor': eyeSeenByExecutor,
+    'verdictState': verdictState,
+    'verdictActionCount': verdictActionCount,
+    'awardedBonus': awardedBonus,
   };
 
   factory LoggedPerson.fromJson(Map<String, dynamic> json) => LoggedPerson(
@@ -65,6 +74,9 @@ class LoggedPerson {
     scoreValue: json['scoreValue'] as int?,
     eyeSeenBySavior: json['eyeSeenBySavior'] as bool? ?? false,
     eyeSeenByExecutor: json['eyeSeenByExecutor'] as bool? ?? false,
+    verdictState: json['verdictState'] as String?,
+    verdictActionCount: json['verdictActionCount'] as int? ?? 0,
+    awardedBonus: json['awardedBonus'] as int?,
   );
 }
 
@@ -101,6 +113,12 @@ class GameActionLog {
     this.scoreVisible = true,
     this.judgeWasAvailable = false,
     this.judgeAvailableFromTurn = 0,
+    this.verdictActionCountBefore = 0,
+    this.verdictActionCountAfter = 0,
+    this.confirmedBy,
+    this.scoringFaction,
+    this.verdictBonus,
+    this.nextBonusViewer,
   });
 
   final int actionIndex;
@@ -134,6 +152,12 @@ class GameActionLog {
   final bool scoreVisible;
   final bool judgeWasAvailable;
   final int judgeAvailableFromTurn;
+  final int verdictActionCountBefore;
+  final int verdictActionCountAfter;
+  final String? confirmedBy;
+  final String? scoringFaction;
+  final int? verdictBonus;
+  final String? nextBonusViewer;
 
   Map<String, dynamic> toJson() => {
     'actionIndex': actionIndex,
@@ -167,6 +191,12 @@ class GameActionLog {
     'scoreVisible': scoreVisible,
     'judgeWasAvailable': judgeWasAvailable,
     'judgeAvailableFromTurn': judgeAvailableFromTurn,
+    'verdictActionCountBefore': verdictActionCountBefore,
+    'verdictActionCountAfter': verdictActionCountAfter,
+    'confirmedBy': confirmedBy,
+    'scoringFaction': scoringFaction,
+    'verdictBonus': verdictBonus,
+    'nextBonusViewer': nextBonusViewer,
   };
 
   factory GameActionLog.fromJson(Map<String, dynamic> json) => GameActionLog(
@@ -202,6 +232,12 @@ class GameActionLog {
     scoreVisible: json['scoreVisible'] as bool? ?? true,
     judgeWasAvailable: json['judgeWasAvailable'] as bool? ?? false,
     judgeAvailableFromTurn: json['judgeAvailableFromTurn'] as int? ?? 0,
+    verdictActionCountBefore: json['verdictActionCountBefore'] as int? ?? 0,
+    verdictActionCountAfter: json['verdictActionCountAfter'] as int? ?? 0,
+    confirmedBy: json['confirmedBy'] as String?,
+    scoringFaction: json['scoringFaction'] as String?,
+    verdictBonus: json['verdictBonus'] as int?,
+    nextBonusViewer: json['nextBonusViewer'] as String?,
   );
 }
 

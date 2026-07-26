@@ -176,9 +176,10 @@ class PlayLogDetailScreen extends StatelessWidget {
         Text(
           session.initialBoard
               .map(
-                (p) =>
-                    '${p.positionIndex + 1}: ${p.attribute}${p.rank} '
-                    '${p.initialAlive ? '生' : '死'}',
+                (p) => session.rulesVersion == '1.0'
+                    ? '${p.positionIndex + 1}: ${p.personId} / ${p.attribute} / 審議中'
+                    : '${p.positionIndex + 1}: ${p.attribute}${p.rank} '
+                          '${p.initialAlive ? '生' : '死'}',
               )
               .join('\n'),
         ),
@@ -187,10 +188,13 @@ class PlayLogDetailScreen extends StatelessWidget {
         Text(
           session.finalBoard
               .map(
-                (p) =>
-                    '${p.attribute}${p.rank} ${p.finalAlive == true ? '生' : '死'} '
-                    '${p.judged == true ? '判決済み' : '未判決'} '
-                    '${p.scoringFaction} +${p.scoreValue}',
+                (p) => session.rulesVersion == '1.0'
+                    ? '${p.attribute} ${p.verdictState} '
+                          '介入${p.verdictActionCount}回 / '
+                          '${p.scoringFaction} +${p.awardedBonus}'
+                    : '${p.attribute}${p.rank} ${p.finalAlive == true ? '生' : '死'} '
+                          '${p.judged == true ? '判決済み' : '未判決'} '
+                          '${p.scoringFaction} +${p.scoreValue}',
               )
               .join('\n'),
         ),
@@ -225,6 +229,33 @@ class _GameAnalysis extends StatelessWidget {
   Widget build(BuildContext context) {
     int uses(String type) =>
         session.actions.where((a) => a.actionType == type).length;
+    if (session.rulesVersion == '1.0') {
+      final confirmations = session.actions
+          .where((action) => action.judgedAfter && !action.judgedBefore)
+          .toList();
+      final eyeFollowUps = session.actions.where((eye) {
+        if (eye.actionType != 'eye') return false;
+        return session.actions.any(
+          (action) =>
+              action.actionIndex > eye.actionIndex &&
+              action.targetPersonId == eye.targetPersonId &&
+              action.actionType != 'eye',
+        );
+      }).length;
+      return Container(
+        margin: const EdgeInsets.symmetric(vertical: 8),
+        padding: const EdgeInsets.all(8),
+        color: Colors.white10,
+        child: Text(
+          '使用 LIFE ${uses('life')} / DEATH ${uses('death')} / '
+          'EYE ${uses('eye')} / 審判 ${uses('specialVerdict')}\n'
+          '確定 ${confirmations.length}/9 / EYE後の介入 $eyeFollowUps\n'
+          '獲得ボーナス合計 '
+          '${(session.saviorScore ?? 0) + (session.executorScore ?? 0)}/45',
+          style: const TextStyle(fontSize: 11),
+        ),
+      );
+    }
     final judges = session.actions
         .where((a) => a.actionType == 'judge')
         .toList();

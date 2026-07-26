@@ -1,6 +1,5 @@
 import 'package:dead_or_alive/features/nine_judges/cpu/cpu_evaluator.dart';
 import 'package:dead_or_alive/features/nine_judges/cpu/cpu_strategy.dart';
-import 'package:dead_or_alive/features/nine_judges/models/judge_models.dart';
 
 class BasicCpuStrategy implements CpuStrategy {
   const BasicCpuStrategy();
@@ -14,7 +13,6 @@ class BasicCpuStrategy implements CpuStrategy {
       action: selected.action,
       targetIndex: selected.targetIndex,
       score: selected.score,
-      eyeInformation: selected.eyeInformation,
     );
   }
 
@@ -26,9 +24,6 @@ class BasicCpuStrategy implements CpuStrategy {
           action: entry.key,
           targetIndex: target,
           score: CpuEvaluator.actionScore(view, entry.key, view.slots[target]),
-          eyeInformation: entry.key == ActionType.eye
-              ? CpuEvaluator.preferredEyeInformation(view.slots[target])
-              : null,
         ),
   ];
 }

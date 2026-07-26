@@ -10,31 +10,41 @@ enum Faction {
 }
 
 enum PersonAttribute {
-  good('GOOD'),
-  evil('EVIL'),
-  neutral('NEUTRAL');
+  good('善人'),
+  evil('悪人'),
+  neutral('中立');
 
   const PersonAttribute(this.label);
   final String label;
+}
+
+enum VerdictState {
+  deliberating('審議中'),
+  alive('生'),
+  dead('死'),
+  aliveConfirmed('生確定'),
+  deadConfirmed('死確定');
+
+  const VerdictState(this.label);
+  final String label;
+
+  bool get isConfirmed =>
+      this == VerdictState.aliveConfirmed || this == VerdictState.deadConfirmed;
+  bool get isAlive =>
+      this == VerdictState.alive || this == VerdictState.aliveConfirmed;
 }
 
 enum ActionType {
   life('LIFE'),
   death('DEATH'),
   eye('EYE'),
-  judge('JUDGE');
+  specialVerdict('審判');
 
   const ActionType(this.label);
   final String label;
 }
 
-enum TurnPhase {
-  selectingAction,
-  selectingActionTarget,
-  selectingEyeInformation,
-}
-
-enum EyeInformation { attribute }
+enum TurnPhase { selectingAction, selectingActionTarget }
 
 enum FactionSelection { savior, executor, random }
 
@@ -62,7 +72,6 @@ class NineJudgesGameSettings {
     this.cpuLevel = CpuLevel.basic,
     this.skipCpuDelays = false,
     this.showCpuEvaluations = false,
-    this.scoreVisible = true,
   });
 
   final GameMode mode;
@@ -73,7 +82,6 @@ class NineJudgesGameSettings {
   final CpuLevel cpuLevel;
   final bool skipCpuDelays;
   final bool showCpuEvaluations;
-  final bool scoreVisible;
 
   NineJudgesGameSettings copyWith({
     GameMode? mode,
@@ -84,7 +92,6 @@ class NineJudgesGameSettings {
     CpuLevel? cpuLevel,
     bool? skipCpuDelays,
     bool? showCpuEvaluations,
-    bool? scoreVisible,
   }) => NineJudgesGameSettings(
     mode: mode ?? this.mode,
     cpuFaction: cpuFaction ?? this.cpuFaction,
@@ -94,7 +101,6 @@ class NineJudgesGameSettings {
     cpuLevel: cpuLevel ?? this.cpuLevel,
     skipCpuDelays: skipCpuDelays ?? this.skipCpuDelays,
     showCpuEvaluations: showCpuEvaluations ?? this.showCpuEvaluations,
-    scoreVisible: scoreVisible ?? this.scoreVisible,
   );
 }
 
@@ -102,117 +108,47 @@ class PersonCard {
   const PersonCard({
     required this.id,
     required this.attribute,
-    required this.rank,
-    required this.isAlive,
-    this.isJudged = false,
-    this.hasLifeShield = false,
-    this.isUnderReview = false,
-    this.lastStateChangedBy,
-    this.lastStateChangedTurn,
-    this.judgeAvailableFromTurn = 0,
+    this.verdictState = VerdictState.deliberating,
+    this.verdictActionCount = 0,
+    this.confirmedBy,
+    this.scoringFaction,
+    this.awardedBonus,
   });
 
   final String id;
   final PersonAttribute attribute;
-  final int rank;
-  final bool isAlive;
-  final bool isJudged;
-  final bool hasLifeShield;
-  final bool isUnderReview;
-  final Faction? lastStateChangedBy;
-  final int? lastStateChangedTurn;
-  final int judgeAvailableFromTurn;
+  final VerdictState verdictState;
+  final int verdictActionCount;
+  final Faction? confirmedBy;
+  final Faction? scoringFaction;
+  final int? awardedBonus;
 
-  bool get hidesAttributeWhenDead => rank == 3 && !isAlive;
+  bool get isConfirmed => verdictState.isConfirmed;
+  bool get isAlive => verdictState.isAlive;
 
   PersonCard copyWith({
-    bool? isAlive,
-    bool? isJudged,
-    bool? hasLifeShield,
-    bool? isUnderReview,
-    Faction? lastStateChangedBy,
-    int? lastStateChangedTurn,
-    int? judgeAvailableFromTurn,
+    VerdictState? verdictState,
+    int? verdictActionCount,
+    Faction? confirmedBy,
+    Faction? scoringFaction,
+    int? awardedBonus,
   }) => PersonCard(
     id: id,
     attribute: attribute,
-    rank: rank,
-    isAlive: isAlive ?? this.isAlive,
-    isJudged: isJudged ?? this.isJudged,
-    hasLifeShield: hasLifeShield ?? this.hasLifeShield,
-    isUnderReview: isUnderReview ?? this.isUnderReview,
-    lastStateChangedBy: lastStateChangedBy ?? this.lastStateChangedBy,
-    lastStateChangedTurn: lastStateChangedTurn ?? this.lastStateChangedTurn,
-    judgeAvailableFromTurn:
-        judgeAvailableFromTurn ?? this.judgeAvailableFromTurn,
+    verdictState: verdictState ?? this.verdictState,
+    verdictActionCount: verdictActionCount ?? this.verdictActionCount,
+    confirmedBy: confirmedBy ?? this.confirmedBy,
+    scoringFaction: scoringFaction ?? this.scoringFaction,
+    awardedBonus: awardedBonus ?? this.awardedBonus,
   );
 }
 
 class BoardSlot {
-  const BoardSlot({required this.person, this.hiddenNumber = 0});
-
+  const BoardSlot({required this.person});
   final PersonCard person;
-  final int hiddenNumber;
 
   BoardSlot copyWith({PersonCard? person}) =>
-      BoardSlot(person: person ?? this.person, hiddenNumber: hiddenNumber);
-}
-
-class ActionInventory {
-  const ActionInventory({
-    required this.life,
-    required this.death,
-    required this.eye,
-    this.judge = 3,
-  });
-
-  final int life;
-  final int death;
-  final int eye;
-  final int judge;
-
-  int get total => life + death + eye + judge;
-
-  int remaining(ActionType action) => switch (action) {
-    ActionType.life => life,
-    ActionType.death => death,
-    ActionType.eye => eye,
-    ActionType.judge => judge,
-  };
-
-  ActionInventory consume(ActionType action) => switch (action) {
-    ActionType.life => ActionInventory(
-      life: life - 1,
-      death: death,
-      eye: eye,
-      judge: judge,
-    ),
-    ActionType.death => ActionInventory(
-      life: life,
-      death: death - 1,
-      eye: eye,
-      judge: judge,
-    ),
-    ActionType.eye => ActionInventory(
-      life: life,
-      death: death,
-      eye: eye - 1,
-      judge: judge,
-    ),
-    ActionType.judge => ActionInventory(
-      life: life,
-      death: death,
-      eye: eye,
-      judge: judge - 1,
-    ),
-  };
-
-  Map<String, int> toJson() => {
-    'life': life,
-    'death': death,
-    'eye': eye,
-    'judge': judge,
-  };
+      BoardSlot(person: person ?? this.person);
 }
 
 class GameLogEntry {

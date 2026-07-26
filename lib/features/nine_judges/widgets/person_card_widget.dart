@@ -3,234 +3,119 @@ import 'package:flutter/material.dart';
 
 class PersonCardWidget extends StatelessWidget {
   const PersonCardWidget({
-    required this.slot,
+    required this.person,
     required this.attributeVisible,
-    required this.numberVisible,
+    required this.attributeEyeKnown,
     required this.selected,
+    required this.cpuHighlighted,
     required this.enabled,
     required this.onTap,
-    this.attributeEyeKnown = false,
-    this.attributeInitiallyKnown = false,
-    this.numberEyeKnown = false,
-    this.cpuHighlighted = false,
     this.scoreDetail,
     super.key,
   });
-
-  final BoardSlot slot;
+  final PersonCard person;
   final bool attributeVisible;
-  final bool numberVisible;
+  final bool attributeEyeKnown;
   final bool selected;
+  final bool cpuHighlighted;
   final bool enabled;
   final VoidCallback onTap;
-  final bool attributeEyeKnown;
-  final bool attributeInitiallyKnown;
-  final bool numberEyeKnown;
-  final bool cpuHighlighted;
   final ({Faction faction, int points})? scoreDetail;
 
   @override
   Widget build(BuildContext context) {
-    final person = slot.person;
-    final borderColor = person.isJudged
-        ? const Color(0xFF8A8F98)
-        : cpuHighlighted
-        ? const Color(0xFFFFE08A)
-        : selected
+    final confirmed = person.isConfirmed;
+    final border = confirmed
+        ? const Color(0xFFB9BDC5)
+        : selected || cpuHighlighted
         ? const Color(0xFFFFD76A)
-        : person.isUnderReview
-        ? const Color(0xFFD6B25E)
-        : enabled
-        ? const Color(0xFF8DA4BD)
-        : const Color(0xFF45484E);
-    return GestureDetector(
-      onTap: enabled || selected ? onTap : null,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final compact = constraints.maxHeight < 105;
-          return AnimatedScale(
-            key: cpuHighlighted ? const Key('cpu-target-highlight') : null,
-            scale: cpuHighlighted ? 1.035 : 1,
-            duration: const Duration(milliseconds: 120),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 120),
-              padding: EdgeInsets.all(compact ? 3 : 5),
-              decoration: BoxDecoration(
-                color: person.isJudged
-                    ? const Color(0xFF101114)
-                    : person.isUnderReview
-                    ? const Color(0xFF221E16)
-                    : enabled
-                    ? const Color(0xFF202329)
-                    : const Color(0xFF181A1E),
-                borderRadius: BorderRadius.circular(7),
-                border: Border.all(
-                  color: borderColor,
-                  width: cpuHighlighted
-                      ? 3
-                      : selected || person.isJudged
-                      ? 2
-                      : 1,
-                ),
-                boxShadow: cpuHighlighted
-                    ? const [
-                        BoxShadow(
-                          color: Color(0x99FFD76A),
-                          blurRadius: 10,
-                          spreadRadius: 2,
-                        ),
-                      ]
-                    : selected
-                    ? const [
-                        BoxShadow(
-                          color: Color(0x66FFD76A),
-                          blurRadius: 7,
-                          spreadRadius: 1,
-                        ),
-                      ]
-                    : null,
-              ),
-              child: Stack(
+        : const Color(0xFF66552E);
+    return AnimatedScale(
+      scale: cpuHighlighted ? 1.04 : 1,
+      duration: const Duration(milliseconds: 160),
+      child: InkWell(
+        key: Key('person-${person.id}'),
+        onTap: enabled ? onTap : null,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: confirmed
+                ? const Color(0xFF17181B)
+                : const Color(0xFF222019),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: border, width: confirmed ? 2.5 : 1.3),
+          ),
+          child: Column(
+            children: [
+              Row(
                 children: [
-                  Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      SizedBox(height: compact ? 10 : 15),
-                      Icon(
-                        Icons.person,
-                        size: compact ? 22 : 29,
-                        color: person.isJudged
-                            ? Colors.white30
+                  Expanded(
+                    child: Text(
+                      attributeVisible ? person.attribute.label : '正体不明',
+                      key: Key(
+                        attributeVisible
+                            ? 'attribute-known'
+                            : 'attribute-hidden',
+                      ),
+                      style: TextStyle(
+                        color: attributeVisible
+                            ? _attributeColor(person.attribute)
                             : Colors.white54,
-                      ),
-                      Text(
-                        person.isAlive ? '生' : '死',
-                        key: Key('life-state-${person.id}'),
-                        style: TextStyle(
-                          color: person.isAlive
-                              ? const Color(0xFF62B9F3)
-                              : const Color(0xFFF0645A),
-                          fontSize: compact ? 18 : 22,
-                          height: 1,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      const Spacer(),
-                      if (!person.isJudged)
-                        Text(
-                          person.isUnderReview
-                              ? '審議中'
-                              : attributeEyeKnown
-                              ? 'EYE確認済み'
-                              : '未審議',
-                          key: person.isUnderReview
-                              ? const Key('under-review-label')
-                              : const Key('not-reviewed-label'),
-                          style: TextStyle(
-                            fontSize: compact ? 7 : 9,
-                            color: person.isUnderReview
-                                ? const Color(0xFFD6B25E)
-                                : attributeEyeKnown
-                                ? const Color(0xFFB49CF2)
-                                : Colors.white38,
-                          ),
-                        ),
-                      if (scoreDetail != null)
-                        Text(
-                          '${scoreDetail!.faction.label} +${scoreDetail!.points}',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Color(0xFFD6B25E),
-                            fontSize: 9,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      if (person.hasLifeShield || person.isJudged)
-                        SizedBox(height: compact ? 13 : 16),
-                    ],
-                  ),
-                  Positioned(
-                    left: 0,
-                    top: 0,
-                    child: Row(
-                      children: [
-                        Text(
-                          attributeVisible ? person.attribute.label : '?',
-                          style: TextStyle(
-                            color: attributeVisible
-                                ? _attributeColor(person.attribute)
-                                : Colors.white70,
-                            fontSize: compact ? 9 : 10,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                        if (attributeEyeKnown)
-                          const Icon(
-                            Icons.visibility,
-                            size: 9,
-                            color: Color(0xFFD6B25E),
-                          ),
-                        if (attributeInitiallyKnown)
-                          const Icon(
-                            Icons.diamond_outlined,
-                            size: 9,
-                            color: Color(0xFFD6B25E),
-                          ),
-                      ],
-                    ),
-                  ),
-                  Positioned(
-                    right: 0,
-                    top: 0,
-                    child: Container(
-                      width: compact ? 19 : 22,
-                      height: compact ? 19 : 22,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: const Color(0xFF111216),
-                        border: Border.all(color: const Color(0xFFD6B25E)),
-                      ),
-                      child: Text(
-                        numberVisible ? '${person.rank}' : '?',
-                        key: Key(numberVisible ? 'rank-known' : 'rank-hidden'),
-                        style: TextStyle(
-                          fontSize: compact ? 10 : 11,
-                          fontWeight: FontWeight.w900,
-                        ),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
                       ),
                     ),
                   ),
-                  if (person.hasLifeShield)
-                    Positioned(
-                      left: 0,
-                      bottom: 0,
-                      child: _StatusBadge(
-                        key: const Key('life-shield'),
-                        icon: Icons.shield_outlined,
-                        label: 'LIFE',
-                        color: const Color(0xFF62D58A),
-                        compact: compact,
-                      ),
-                    ),
-                  if (person.isJudged)
-                    Positioned(
-                      right: 0,
-                      bottom: 0,
-                      child: _StatusBadge(
-                        key: const Key('judged-label'),
-                        icon: Icons.balance,
-                        label: '判定済',
-                        color: const Color(0xFFB6BBC4),
-                        compact: compact,
-                      ),
+                  if (attributeEyeKnown && !confirmed)
+                    const Icon(
+                      Icons.visibility,
+                      size: 12,
+                      color: Color(0xFFB49CF2),
                     ),
                 ],
               ),
-            ),
-          );
-        },
+              const Spacer(),
+              const Icon(Icons.person, size: 27),
+              Text(
+                person.verdictState.label,
+                key: Key('verdict-${person.verdictState.name}'),
+                style: TextStyle(
+                  color: person.isAlive
+                      ? const Color(0xFF68D893)
+                      : person.verdictState == VerdictState.deliberating
+                      ? const Color(0xFFD6B25E)
+                      : const Color(0xFFF0645A),
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              Text(
+                '介入 ${person.verdictActionCount}/3',
+                style: const TextStyle(fontSize: 8, color: Colors.white54),
+              ),
+              const Spacer(),
+              if (confirmed)
+                Text(
+                  '確定 ${person.awardedBonus}点',
+                  key: const Key('confirmed-label'),
+                  style: const TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.bold,
+                  ),
+                )
+              else
+                const Text(
+                  '操作可能',
+                  style: TextStyle(fontSize: 8, color: Colors.white38),
+                ),
+              if (scoreDetail case final detail?)
+                Text(
+                  '${detail.faction.label} +${detail.points}',
+                  style: const TextStyle(fontSize: 8),
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -240,46 +125,4 @@ class PersonCardWidget extends StatelessWidget {
     PersonAttribute.evil => const Color(0xFFF0645A),
     PersonAttribute.neutral => const Color(0xFFC8C3B8),
   };
-}
-
-class _StatusBadge extends StatelessWidget {
-  const _StatusBadge({
-    required this.icon,
-    required this.label,
-    required this.color,
-    required this.compact,
-    super.key,
-  });
-
-  final IconData icon;
-  final String label;
-  final Color color;
-  final bool compact;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: compact ? 2 : 4, vertical: 1),
-      decoration: BoxDecoration(
-        color: const Color(0xE6111215),
-        borderRadius: BorderRadius.circular(3),
-        border: Border.all(color: color),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: compact ? 8 : 10, color: color),
-          const SizedBox(width: 2),
-          Text(
-            label,
-            style: TextStyle(
-              color: color,
-              fontSize: compact ? 7 : 8,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }

@@ -56,7 +56,8 @@ void main() {
     await tester.ensureVisible(find.byKey(const Key('start-game')));
     await tester.tap(find.byKey(const Key('start-game')));
     await tester.pump();
-    expect(find.byKey(const Key('judge-slot-0')), findsOneWidget);
-    expect(find.byKey(const Key('judge-button')), findsOneWidget);
+    expect(find.byKey(const Key('nine-judges-board')), findsOneWidget);
+    expect(find.byKey(const Key('action-life')), findsOneWidget);
+    expect(find.byKey(const Key('action-specialVerdict')), findsOneWidget);
   });
 }

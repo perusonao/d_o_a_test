@@ -1,103 +1,77 @@
 import 'dart:math';
 
-import 'package:dead_or_alive/features/nine_judges/game/game_config.dart';
 import 'package:dead_or_alive/features/nine_judges/models/judge_models.dart';
 
 abstract final class NineJudgesRules {
-  static List<BoardSlot> createBoard(
-    Random random, {
-    bool scoreVisible = true,
-  }) {
-    final columns = <List<PersonCard>>[
-      for (var rank = 1; rank <= 3; rank++)
-        [
-          for (final attribute in PersonAttribute.values)
-            PersonCard(
-              id: '${attribute.name}-$rank',
-              attribute: attribute,
-              rank: rank,
-              isAlive: NineJudgesConfig.initialAliveByRank[rank]!,
-            ),
-        ]..shuffle(random),
-    ];
-    final fixedColumns = [
-      for (var row = 0; row < 3; row++)
-        for (var column = 0; column < 3; column++)
-          BoardSlot(person: columns[column][row]),
-    ];
-    if (scoreVisible) return fixedColumns;
-    final shuffled = [...fixedColumns]..shuffle(random);
-    return shuffled;
+  static List<BoardSlot> createBoard(Random random) {
+    final people = [
+      for (final attribute in PersonAttribute.values)
+        for (var number = 1; number <= 3; number++)
+          PersonCard(id: '${attribute.name}-$number', attribute: attribute),
+    ]..shuffle(random);
+    return [for (final person in people) BoardSlot(person: person)];
   }
 
-  static bool isAttributeVisible(
-    PersonCard person, {
-    required bool revealAll,
-  }) => revealAll || !person.hidesAttributeWhenDead;
+  static List<int> createBonusDeck(Random random) =>
+      List<int>.generate(9, (index) => index + 1)..shuffle(random);
 
   static bool canUseAction({
     required ActionType action,
     required PersonCard person,
-    required bool viewerKnowsNumber,
-    bool viewerKnowsAttribute = false,
-    bool viewerKnowsRank = true,
-    int currentTurn = 0,
-    Faction? viewer,
+    required Faction actor,
+    required bool actorKnowsAttribute,
+    required bool specialVerdictUsed,
   }) {
-    if (person.isJudged) return false;
+    if (person.isConfirmed) return false;
     return switch (action) {
-      ActionType.life => !person.isAlive || !person.hasLifeShield,
-      ActionType.death => true,
-      ActionType.eye => !viewerKnowsAttribute || !viewerKnowsRank,
-      ActionType.judge =>
-        person.isUnderReview &&
-            (person.lastStateChangedBy != viewer ||
-                currentTurn >= person.judgeAvailableFromTurn),
+      ActionType.life => actor == Faction.savior,
+      ActionType.death => actor == Faction.executor,
+      ActionType.eye => !actorKnowsAttribute,
+      ActionType.specialVerdict =>
+        !specialVerdictUsed &&
+            person.verdictState == VerdictState.deliberating &&
+            person.verdictActionCount == 0,
     };
   }
 
-  static PersonAttribute? inferRank3Attribute({
-    required List<PersonCard> rankThreePeople,
-    required Set<String> knownPersonIds,
-    required String targetPersonId,
+  static PersonCard applyVerdictAction({
+    required PersonCard person,
+    required ActionType action,
+    required Faction actor,
   }) {
-    if (knownPersonIds.contains(targetPersonId)) {
-      return rankThreePeople
-          .firstWhere((person) => person.id == targetPersonId)
-          .attribute;
-    }
-    final known = rankThreePeople
-        .where((person) => knownPersonIds.contains(person.id))
-        .map((person) => person.attribute)
-        .toSet();
-    if (known.length != 2) return null;
-    return PersonAttribute.values.firstWhere(
-      (attribute) => !known.contains(attribute),
+    assert(action == ActionType.life || action == ActionType.death);
+    final desired = action == ActionType.life
+        ? VerdictState.alive
+        : VerdictState.dead;
+    final sameState = person.verdictState == desired;
+    final count = person.verdictActionCount + 1;
+    final confirm = sameState || count >= 3;
+    return person.copyWith(
+      verdictState: confirm
+          ? (desired == VerdictState.alive
+                ? VerdictState.aliveConfirmed
+                : VerdictState.deadConfirmed)
+          : desired,
+      verdictActionCount: count,
+      confirmedBy: confirm ? actor : null,
     );
   }
 
+  static PersonCard applySpecialVerdict({
+    required PersonCard person,
+    required Faction actor,
+  }) => person.copyWith(
+    verdictState: actor == Faction.savior
+        ? VerdictState.aliveConfirmed
+        : VerdictState.deadConfirmed,
+    confirmedBy: actor,
+  );
+
   static Faction scoringFaction(PersonCard person) {
+    assert(person.isConfirmed);
     final saviorScores =
-        (person.attribute == PersonAttribute.good && person.isAlive) ||
-        (person.attribute == PersonAttribute.neutral && person.isAlive) ||
+        (person.attribute != PersonAttribute.evil && person.isAlive) ||
         (person.attribute == PersonAttribute.evil && !person.isAlive);
     return saviorScores ? Faction.savior : Faction.executor;
-  }
-
-  static ScoreResult calculateScore(List<BoardSlot> board) {
-    var savior = 0;
-    var executor = 0;
-    final details = <String, ({Faction faction, int points})>{};
-    for (final slot in board) {
-      final faction = scoringFaction(slot.person);
-      final points = slot.person.rank;
-      details[slot.person.id] = (faction: faction, points: points);
-      if (faction == Faction.savior) {
-        savior += points;
-      } else {
-        executor += points;
-      }
-    }
-    return ScoreResult(savior: savior, executor: executor, slotScores: details);
   }
 }
