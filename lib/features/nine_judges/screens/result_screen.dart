@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:dead_or_alive/features/nine_judges/game/game_controller.dart';
 import 'package:dead_or_alive/features/nine_judges/widgets/board_grid.dart';
 import 'package:dead_or_alive/features/nine_judges/screens/play_log_screen.dart';
+import 'package:dead_or_alive/features/nine_judges/services/firebase_bootstrap.dart';
+import 'package:dead_or_alive/features/nine_judges/services/firebase_playtest_repository.dart';
 
 class ResultScreen extends StatelessWidget {
   const ResultScreen({required this.controller, super.key});
@@ -110,6 +112,9 @@ class ResultScreen extends StatelessWidget {
     var reading = controller.session.readingRating ?? 3;
     var luck = controller.session.luckRating ?? 3;
     var tempo = controller.session.tempoRating ?? 3;
+    var clarity = 3;
+    var sending = false;
+    String? sendError;
     await showDialog<void>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
@@ -119,6 +124,12 @@ class ResultScreen extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                const Text(
+                  '送信を選んだ場合のみ、匿名ID・対戦ログ・以下の評価を'
+                  'ゲーム改善目的でFirebaseへ送信します。個人情報は入力不要です。',
+                  style: TextStyle(fontSize: 12),
+                ),
+                const SizedBox(height: 8),
                 TextField(
                   controller: notes,
                   maxLines: 4,
@@ -128,6 +139,12 @@ class ResultScreen extends StatelessWidget {
                 _rating('読み合い', reading, (v) => setState(() => reading = v)),
                 _rating('運要素', luck, (v) => setState(() => luck = v)),
                 _rating('テンポ', tempo, (v) => setState(() => tempo = v)),
+                _rating('分かりやすさ', clarity, (v) => setState(() => clarity = v)),
+                if (sendError != null)
+                  Text(
+                    sendError!,
+                    style: const TextStyle(color: Colors.red, fontSize: 12),
+                  ),
               ],
             ),
           ),
@@ -148,6 +165,46 @@ class ResultScreen extends StatelessWidget {
                 if (dialogContext.mounted) Navigator.pop(dialogContext);
               },
               child: const Text('保存'),
+            ),
+            FilledButton(
+              key: const Key('send-playtest-data'),
+              onPressed: !FirebaseBootstrap.available || sending
+                  ? null
+                  : () async {
+                      setState(() {
+                        sending = true;
+                        sendError = null;
+                      });
+                      try {
+                        await controller.updatePlaytestFeedback(
+                          notes: notes.text,
+                          fun: fun,
+                          reading: reading,
+                          luck: luck,
+                          tempo: tempo,
+                        );
+                        await const FirebasePlaytestRepository().send(
+                          session: controller.session,
+                          ratings: {
+                            'fun': fun,
+                            'reading': reading,
+                            'luck': luck,
+                            'tempo': tempo,
+                            'clarity': clarity,
+                          },
+                          notes: notes.text,
+                        );
+                        if (dialogContext.mounted) {
+                          Navigator.pop(dialogContext);
+                        }
+                      } catch (_) {
+                        setState(() {
+                          sending = false;
+                          sendError = '送信できませんでした。ローカル結果は保持されています。';
+                        });
+                      }
+                    },
+              child: const Text('プレイデータを送信'),
             ),
           ],
         ),
