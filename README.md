@@ -37,6 +37,20 @@ flutter test
 flutter build web --release --base-href /nine-verdicts/ --no-web-resources-cdn
 ```
 
+## スマホ向け配布物
+
+ホームの「ガイド・動画をダウンロード」から、以下を開いて保存できます。
+
+- 実際の遊び方: `downloads/nine-verdicts-how-to-play.pdf`
+- 操作チュートリアル: `downloads/nine-verdicts-tutorial.pdf`
+- プレイ動画: `downloads/nine-verdicts-gameplay.mp4`
+
+配布物を更新する場合は、PDF/動画生成環境で次を実行します。
+
+```bash
+python tool/generate_download_media.py
+```
+
 `lib/features/game/` などは旧プロトタイプであり、現行ルールの正規実装ではありません。
 
 ## 外部テスト版

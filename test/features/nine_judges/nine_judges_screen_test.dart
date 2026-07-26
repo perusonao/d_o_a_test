@@ -1,10 +1,26 @@
 import 'package:dead_or_alive/features/nine_judges/models/judge_models.dart';
 import 'package:dead_or_alive/features/nine_judges/screens/game_screen.dart';
+import 'package:dead_or_alive/features/nine_judges/screens/mode_select_screen.dart';
 import 'package:dead_or_alive/features/nine_judges/widgets/person_card_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  testWidgets('ホームから3種類の配布物へ移動できる', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      MaterialApp(home: NineJudgesModeSelectScreen(onStart: (_) {})),
+    );
+    await tester.tap(find.byKey(const Key('open-downloads')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('download-how-to')), findsOneWidget);
+    expect(find.byKey(const Key('download-tutorial')), findsOneWidget);
+    expect(find.byKey(const Key('download-gameplay')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('救済者画面は3×3、得点、ボーナス、LIFE/EYE/審判を表示', (tester) async {
     tester.view.physicalSize = const Size(360, 640);
     tester.view.devicePixelRatio = 1;

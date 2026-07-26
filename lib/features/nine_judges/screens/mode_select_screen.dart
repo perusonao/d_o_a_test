@@ -1,6 +1,7 @@
 import 'package:dead_or_alive/features/nine_judges/models/judge_models.dart';
 import 'package:dead_or_alive/features/nine_judges/online/online_lobby_screen.dart';
 import 'package:dead_or_alive/features/nine_judges/rules/rules_guide_screen.dart';
+import 'package:dead_or_alive/features/nine_judges/screens/download_center_screen.dart';
 import 'package:dead_or_alive/features/nine_judges/tutorial/tutorial_screen.dart';
 import 'package:flutter/material.dart';
 
@@ -219,6 +220,17 @@ class _NineJudgesModeSelectScreenState
                         ),
                       ),
                     ],
+                  ),
+                  TextButton.icon(
+                    key: const Key('open-downloads'),
+                    onPressed: () => Navigator.push<void>(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const DownloadCenterScreen(),
+                      ),
+                    ),
+                    icon: const Icon(Icons.download_outlined),
+                    label: const Text('ガイド・動画をダウンロード'),
                   ),
                   TextButton.icon(
                     key: const Key('open-play-logs'),
