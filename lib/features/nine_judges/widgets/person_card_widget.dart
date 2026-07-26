@@ -14,6 +14,7 @@ class PersonCardWidget extends StatelessWidget {
     required this.selected,
     required this.cpuHighlighted,
     required this.enabled,
+    this.targeting = false,
     required this.onTap,
     this.scoreDetail,
     super.key,
@@ -29,6 +30,7 @@ class PersonCardWidget extends StatelessWidget {
   final bool selected;
   final bool cpuHighlighted;
   final bool enabled;
+  final bool targeting;
   final VoidCallback onTap;
   final ({Faction faction, int points})? scoreDetail;
 
@@ -50,128 +52,134 @@ class PersonCardWidget extends StatelessWidget {
           '$coordinate ${attributeVisible ? person.attribute.label : '正体不明'} '
           '${person.verdictState.label}',
       button: enabled,
-      child: AnimatedScale(
-        scale: cpuHighlighted ? 1.035 : 1,
-        duration: const Duration(milliseconds: 180),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            key: Key('person-${person.id}'),
-            borderRadius: BorderRadius.circular(10),
-            onTap: enabled ? onTap : null,
-            child: AnimatedContainer(
-              key: Key('card-surface-${person.verdictState.name}'),
-              duration: const Duration(milliseconds: 180),
-              padding: const EdgeInsets.fromLTRB(5, 4, 5, 4),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: _cardColors(confirmed),
-                ),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: stateAccent,
-                  width: confirmed || selected || cpuHighlighted ? 2.2 : 1.1,
-                ),
-                boxShadow: [
-                  if (selected || cpuHighlighted || confirmed)
-                    BoxShadow(
-                      color: stateAccent.withValues(alpha: .33),
-                      blurRadius: 9,
-                      spreadRadius: .5,
-                    ),
-                ],
-              ),
-              child: LayoutBuilder(
-                builder: (context, constraints) => Column(
-                  children: [
-                    _CardHeader(
-                      coordinate: coordinate,
-                      attributeVisible: attributeVisible,
-                      attribute: person.attribute,
-                      viewerEyeKnown: viewerEyeKnown,
-                      opponentEyeKnown: opponentEyeKnown,
-                      viewerLabel: viewerLabel,
-                      opponentLabel: opponentLabel,
-                      confirmed: confirmed,
-                    ),
-                    Expanded(
-                      child: _CharacterPortrait(
-                        person: person,
-                        attributeVisible: attributeVisible,
-                        compact: constraints.maxHeight < 115,
-                      ),
-                    ),
-                    Text(
-                      person.verdictState.label,
-                      key: Key('verdict-${person.verdictState.name}'),
-                      maxLines: 1,
-                      style: TextStyle(
-                        color: _stateColor(person.verdictState),
-                        fontSize: constraints.maxHeight < 115 ? 9 : 11,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    SizedBox(
-                      height: 17,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          for (var i = 0; i < 3; i++)
-                            _VerdictChip(
-                              index: i,
-                              action: i < person.verdictHistory.length
-                                  ? person.verdictHistory[i]
-                                  : null,
-                            ),
-                        ],
-                      ),
-                    ),
-                    if (confirmed)
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            person.isAlive ? Icons.check_circle : Icons.cancel,
-                            size: 10,
-                            color: stateAccent,
-                          ),
-                          const SizedBox(width: 2),
-                          Flexible(
-                            child: Text(
-                              person.isAlive ? 'ALIVE 生存確定' : 'DEAD 死亡確定',
-                              key: const Key('confirmed-label'),
-                              maxLines: 1,
-                              style: TextStyle(
-                                color: stateAccent,
-                                fontSize: 8,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                          ),
-                        ],
-                      )
-                    else if (selected)
-                      const Text(
-                        '選択中',
-                        key: Key('selected-label'),
-                        style: TextStyle(
-                          color: Color(0xFFFFD76A),
-                          fontSize: 8,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      )
-                    else
-                      const SizedBox(height: 10),
-                    if (scoreDetail case final detail?)
-                      Text(
-                        '${detail.faction.label} +${detail.points} POINT',
-                        maxLines: 1,
-                        style: const TextStyle(fontSize: 7),
+      child: AnimatedOpacity(
+        opacity: targeting && !enabled ? .42 : 1,
+        duration: const Duration(milliseconds: 140),
+        child: AnimatedScale(
+          scale: selected || cpuHighlighted ? 1.025 : 1,
+          duration: const Duration(milliseconds: 140),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              key: Key('person-${person.id}'),
+              borderRadius: BorderRadius.circular(10),
+              onTap: enabled ? onTap : null,
+              child: AnimatedContainer(
+                key: Key('card-surface-${person.verdictState.name}'),
+                duration: const Duration(milliseconds: 180),
+                padding: const EdgeInsets.fromLTRB(5, 4, 5, 4),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: _cardColors(confirmed),
+                  ),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: stateAccent,
+                    width: confirmed || selected || cpuHighlighted ? 2.2 : 1.1,
+                  ),
+                  boxShadow: [
+                    if (selected || cpuHighlighted || confirmed)
+                      BoxShadow(
+                        color: stateAccent.withValues(alpha: .33),
+                        blurRadius: 9,
+                        spreadRadius: .5,
                       ),
                   ],
+                ),
+                child: LayoutBuilder(
+                  builder: (context, constraints) => Column(
+                    children: [
+                      _CardHeader(
+                        coordinate: coordinate,
+                        attributeVisible: attributeVisible,
+                        attribute: person.attribute,
+                        viewerEyeKnown: viewerEyeKnown,
+                        opponentEyeKnown: opponentEyeKnown,
+                        viewerLabel: viewerLabel,
+                        opponentLabel: opponentLabel,
+                        confirmed: confirmed,
+                      ),
+                      Expanded(
+                        child: _CharacterPortrait(
+                          person: person,
+                          attributeVisible: attributeVisible,
+                          compact: constraints.maxHeight < 115,
+                        ),
+                      ),
+                      Text(
+                        person.verdictState.label,
+                        key: Key('verdict-${person.verdictState.name}'),
+                        maxLines: 1,
+                        style: TextStyle(
+                          color: _stateColor(person.verdictState),
+                          fontSize: constraints.maxHeight < 115 ? 9 : 11,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      SizedBox(
+                        height: 17,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            for (var i = 0; i < 3; i++)
+                              _VerdictChip(
+                                index: i,
+                                action: i < person.verdictHistory.length
+                                    ? person.verdictHistory[i]
+                                    : null,
+                              ),
+                          ],
+                        ),
+                      ),
+                      if (confirmed)
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              person.isAlive
+                                  ? Icons.check_circle
+                                  : Icons.cancel,
+                              size: 10,
+                              color: stateAccent,
+                            ),
+                            const SizedBox(width: 2),
+                            Flexible(
+                              child: Text(
+                                person.isAlive ? 'ALIVE 生存確定' : 'DEAD 死亡確定',
+                                key: const Key('confirmed-label'),
+                                maxLines: 1,
+                                style: TextStyle(
+                                  color: stateAccent,
+                                  fontSize: 8,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ),
+                          ],
+                        )
+                      else if (selected)
+                        const Text(
+                          '選択中',
+                          key: Key('selected-label'),
+                          style: TextStyle(
+                            color: Color(0xFFFFD76A),
+                            fontSize: 8,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        )
+                      else
+                        const SizedBox(height: 10),
+                      if (scoreDetail case final detail?)
+                        Text(
+                          '${detail.faction.label} +${detail.points} POINT',
+                          maxLines: 1,
+                          style: const TextStyle(fontSize: 7),
+                        ),
+                    ],
+                  ),
                 ),
               ),
             ),

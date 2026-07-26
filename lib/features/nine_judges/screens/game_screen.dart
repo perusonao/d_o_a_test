@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dead_or_alive/app/theme.dart';
 import 'package:dead_or_alive/features/nine_judges/game/game_controller.dart';
 import 'package:dead_or_alive/features/nine_judges/logging/game_log_repository.dart';
@@ -159,7 +161,11 @@ class _GameBoard extends StatelessWidget {
                       child: Stack(
                         alignment: Alignment.center,
                         children: [
-                          BoardGrid(controller: controller),
+                          BoardGrid(
+                            controller: controller,
+                            onTargetTap: (index) =>
+                                _handleTargetTap(context, index),
+                          ),
                           if (controller.lastCpuActionMessage != null)
                             _CpuMessage(controller: controller),
                         ],
@@ -178,6 +184,45 @@ class _GameBoard extends StatelessWidget {
       ],
     ),
   );
+
+  Future<void> _handleTargetTap(BuildContext context, int index) async {
+    if (controller.selectedAction != ActionType.specialVerdict) {
+      controller.selectSlot(index);
+      return;
+    }
+    final person = controller.board[index].person;
+    final viewer = controller.uiViewer;
+    final known = controller.knowsAttribute(person, viewer);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        key: const Key('judge-confirm-dialog'),
+        icon: const Icon(Icons.balance, color: AppTheme.accent, size: 32),
+        title: const Text('JUDGEを使用しますか？'),
+        content: Text(
+          '対象: ${controller.positionLabel(index)}\n'
+          '正体: ${known ? person.attribute.label : '正体不明'}\n\n'
+          'この人物を即時裁定します。',
+          textAlign: TextAlign.center,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('キャンセル'),
+          ),
+          FilledButton.icon(
+            key: const Key('confirm-judge'),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            icon: const Icon(Icons.balance),
+            label: const Text('JUDGE'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && controller.canTarget(index)) {
+      controller.selectSlot(index);
+    }
+  }
 }
 
 class _Header extends StatelessWidget {
@@ -407,7 +452,9 @@ class _Header extends StatelessWidget {
                 const Text('まだありません', style: TextStyle(fontSize: 12)),
               for (final result in controller.bonusHistory)
                 Text(
-                  '${result.order}　${result.bonus} POINT　'
+                  '${result.order}回目　'
+                  '${controller.positionLabel(result.targetIndex)}　'
+                  '${result.bonus} POINT　'
                   '${result.attribute.label} / ${result.finalState.label}　'
                   '${result.scoringFaction.label}',
                   key: Key('used-bonus-${result.order}'),
@@ -683,9 +730,35 @@ class _CpuMessage extends StatelessWidget {
   );
 }
 
-class _ConfirmationOverlay extends StatelessWidget {
+class _ConfirmationOverlay extends StatefulWidget {
   const _ConfirmationOverlay({required this.controller});
   final NineJudgesController controller;
+
+  @override
+  State<_ConfirmationOverlay> createState() => _ConfirmationOverlayState();
+}
+
+class _ConfirmationOverlayState extends State<_ConfirmationOverlay> {
+  Timer? _timer;
+
+  NineJudgesController get controller => widget.controller;
+
+  @override
+  void initState() {
+    super.initState();
+    if (!controller.settings.skipCpuDelays) {
+      _timer = Timer(
+        const Duration(milliseconds: 1400),
+        controller.confirmConfirmationReveal,
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -735,10 +808,13 @@ class _ConfirmationOverlay extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 12),
-                FilledButton(
-                  style: FilledButton.styleFrom(backgroundColor: accent),
-                  onPressed: controller.confirmConfirmationReveal,
-                  child: const Text('確認'),
+                Text(
+                  'タップで閉じる',
+                  style: TextStyle(
+                    color: accent.withValues(alpha: .8),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ],
             ),

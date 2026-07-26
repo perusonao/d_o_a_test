@@ -99,13 +99,34 @@ void main() {
     await tester.pump();
     await tester.tap(find.byType(PersonCardWidget).first);
     await tester.pump();
+    expect(find.byKey(const Key('judge-confirm-dialog')), findsOneWidget);
+    expect(find.text('JUDGEを使用しますか？'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('confirm-judge')));
+    await tester.pump();
     expect(find.byKey(const Key('confirmation-reveal')), findsOneWidget);
     expect(find.byKey(const Key('nine-judges-board')), findsOneWidget);
     expect(find.text('JUDGEMENT'), findsOneWidget);
     expect(find.textContaining('POINT'), findsWidgets);
-    await tester.tap(find.text('確認'));
+    await tester.tap(find.byKey(const Key('confirmation-reveal')));
     await tester.pump();
     expect(find.byKey(const Key('confirmation-reveal')), findsNothing);
+  });
+
+  testWidgets('JUDGE確認をキャンセルすると人物を確定しない', (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: NineJudgesGameScreen(initialSettings: NineJudgesGameSettings()),
+      ),
+    );
+    await tester.tap(find.byKey(const Key('action-specialVerdict')));
+    await tester.pump();
+    await tester.tap(find.byType(PersonCardWidget).first);
+    await tester.pump();
+    expect(find.byKey(const Key('judge-confirm-dialog')), findsOneWidget);
+    await tester.tap(find.text('キャンセル'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('confirmation-reveal')), findsNothing);
+    expect(find.byKey(const Key('verdict-deliberating')), findsNWidgets(9));
   });
 
   testWidgets('EYE実施者をYOU/CPUで区別し属性は非表示にできる', (tester) async {

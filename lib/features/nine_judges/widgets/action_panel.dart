@@ -10,7 +10,7 @@ class ActionPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final actions = [
+    final primaryActions = [
       if (controller.currentPlayer == Faction.savior) ...[
         ActionType.life,
         ActionType.death,
@@ -19,7 +19,6 @@ class ActionPanel extends StatelessWidget {
         ActionType.life,
       ],
       ActionType.eye,
-      ActionType.specialVerdict,
     ];
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -54,14 +53,24 @@ class ActionPanel extends StatelessWidget {
             ),
           ),
         SizedBox(
-          height: 62,
+          height: 58,
           child: Row(
             children: [
-              for (var i = 0; i < actions.length; i++) ...[
+              for (var i = 0; i < primaryActions.length; i++) ...[
                 if (i > 0) const SizedBox(width: 5),
-                Expanded(child: _ActionButton(controller, actions[i])),
+                Expanded(child: _ActionButton(controller, primaryActions[i])),
               ],
             ],
+          ),
+        ),
+        const SizedBox(height: 4),
+        SizedBox(
+          height: 34,
+          width: double.infinity,
+          child: _ActionButton(
+            controller,
+            ActionType.specialVerdict,
+            compact: true,
           ),
         ),
       ],
@@ -70,10 +79,11 @@ class ActionPanel extends StatelessWidget {
 }
 
 class _ActionButton extends StatelessWidget {
-  const _ActionButton(this.controller, this.action);
+  const _ActionButton(this.controller, this.action, {this.compact = false});
 
   final NineJudgesController controller;
   final ActionType action;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -146,31 +156,56 @@ class _ActionButton extends StatelessWidget {
               opacity: enabled || selected ? 1 : .38,
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 2),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(_icon(action), size: 17, color: colors.accent),
-                    Text(
-                      action.label,
-                      maxLines: 1,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: .3,
+                child: compact
+                    ? Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(_icon(action), size: 17, color: colors.accent),
+                          const SizedBox(width: 7),
+                          Text(
+                            action.label,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: .8,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Text(
+                            '即時裁定  •  $subtitle',
+                            style: TextStyle(
+                              color: used ? Colors.white54 : colors.accent,
+                              fontSize: 8,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      )
+                    : Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(_icon(action), size: 17, color: colors.accent),
+                          Text(
+                            action.label,
+                            maxLines: 1,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: .3,
+                            ),
+                          ),
+                          Text(
+                            subtitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: used ? Colors.white54 : colors.accent,
+                              fontSize: 7,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                    Text(
-                      subtitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: used ? Colors.white54 : colors.accent,
-                        fontSize: 7,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
               ),
             ),
           ),

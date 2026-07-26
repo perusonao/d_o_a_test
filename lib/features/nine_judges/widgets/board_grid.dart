@@ -1,4 +1,5 @@
 import 'package:dead_or_alive/features/nine_judges/game/game_controller.dart';
+import 'package:dead_or_alive/features/nine_judges/models/judge_models.dart';
 import 'package:dead_or_alive/features/nine_judges/widgets/person_card_widget.dart';
 import 'package:flutter/material.dart';
 
@@ -6,10 +7,12 @@ class BoardGrid extends StatelessWidget {
   const BoardGrid({
     required this.controller,
     this.showScores = false,
+    this.onTargetTap,
     super.key,
   });
   final NineJudgesController controller;
   final bool showScores;
+  final ValueChanged<int>? onTargetTap;
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
@@ -55,7 +58,8 @@ class BoardGrid extends StatelessWidget {
                 selected: controller.selectedSlot == index,
                 cpuHighlighted: controller.lastCpuTargetIndex == index,
                 enabled: controller.canTarget(index),
-                onTap: () => controller.selectSlot(index),
+                targeting: controller.phase == TurnPhase.selectingActionTarget,
+                onTap: () => (onTargetTap ?? controller.selectSlot).call(index),
                 scoreDetail: showScores
                     ? controller.score.slotScores[person.id]
                     : null,
