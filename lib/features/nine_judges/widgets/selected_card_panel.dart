@@ -1,4 +1,5 @@
 import 'package:dead_or_alive/features/nine_judges/game/game_controller.dart';
+import 'package:dead_or_alive/features/nine_judges/models/judge_models.dart';
 import 'package:flutter/material.dart';
 
 class SelectedCardPanel extends StatelessWidget {
@@ -12,10 +13,11 @@ class SelectedCardPanel extends StatelessWidget {
       height: 23,
       child: Center(
         child: Text(
-          index == null
-              ? '人物を選択してください'
-              : '${controller.board[index].person.verdictState.label} / '
-                    '介入${controller.board[index].person.verdictActionCount}回',
+          controller.phase == TurnPhase.selectingActionTarget
+              ? '${controller.selectedAction!.label}の対象を選択中'
+              : index == null
+              ? '人物とアクションを選択してください'
+              : '${controller.positionLabel(index)}の人物を選択中',
           style: const TextStyle(fontSize: 9, color: Colors.white54),
         ),
       ),

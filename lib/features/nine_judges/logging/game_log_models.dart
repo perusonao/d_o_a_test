@@ -19,6 +19,7 @@ class LoggedPerson {
     this.verdictState,
     this.verdictActionCount = 0,
     this.awardedBonus,
+    this.verdictHistory = const [],
   });
 
   final String personId;
@@ -38,6 +39,7 @@ class LoggedPerson {
   final String? verdictState;
   final int verdictActionCount;
   final int? awardedBonus;
+  final List<String> verdictHistory;
 
   Map<String, dynamic> toJson() => {
     'personId': personId,
@@ -57,6 +59,7 @@ class LoggedPerson {
     'verdictState': verdictState,
     'verdictActionCount': verdictActionCount,
     'awardedBonus': awardedBonus,
+    'verdictHistory': verdictHistory,
   };
 
   factory LoggedPerson.fromJson(Map<String, dynamic> json) => LoggedPerson(
@@ -77,6 +80,8 @@ class LoggedPerson {
     verdictState: json['verdictState'] as String?,
     verdictActionCount: json['verdictActionCount'] as int? ?? 0,
     awardedBonus: json['awardedBonus'] as int?,
+    verdictHistory:
+        (json['verdictHistory'] as List?)?.cast<String>() ?? const [],
   );
 }
 
@@ -119,6 +124,9 @@ class GameActionLog {
     this.scoringFaction,
     this.verdictBonus,
     this.nextBonusViewer,
+    this.verdictHistoryBefore = const [],
+    this.verdictHistoryAfter = const [],
+    this.bonusViewerState,
   });
 
   final int actionIndex;
@@ -158,6 +166,9 @@ class GameActionLog {
   final String? scoringFaction;
   final int? verdictBonus;
   final String? nextBonusViewer;
+  final List<String> verdictHistoryBefore;
+  final List<String> verdictHistoryAfter;
+  final String? bonusViewerState;
 
   Map<String, dynamic> toJson() => {
     'actionIndex': actionIndex,
@@ -197,6 +208,9 @@ class GameActionLog {
     'scoringFaction': scoringFaction,
     'verdictBonus': verdictBonus,
     'nextBonusViewer': nextBonusViewer,
+    'verdictHistoryBefore': verdictHistoryBefore,
+    'verdictHistoryAfter': verdictHistoryAfter,
+    'bonusViewerState': bonusViewerState,
   };
 
   factory GameActionLog.fromJson(Map<String, dynamic> json) => GameActionLog(
@@ -238,6 +252,11 @@ class GameActionLog {
     scoringFaction: json['scoringFaction'] as String?,
     verdictBonus: json['verdictBonus'] as int?,
     nextBonusViewer: json['nextBonusViewer'] as String?,
+    verdictHistoryBefore:
+        (json['verdictHistoryBefore'] as List?)?.cast<String>() ?? const [],
+    verdictHistoryAfter:
+        (json['verdictHistoryAfter'] as List?)?.cast<String>() ?? const [],
+    bonusViewerState: json['bonusViewerState'] as String?,
   );
 }
 

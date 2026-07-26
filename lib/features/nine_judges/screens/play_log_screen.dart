@@ -190,7 +190,7 @@ class PlayLogDetailScreen extends StatelessWidget {
               .map(
                 (p) => session.rulesVersion == '1.0'
                     ? '${p.attribute} ${p.verdictState} '
-                          '介入${p.verdictActionCount}回 / '
+                          '履歴[${p.verdictHistory.join(' → ')}] / '
                           '${p.scoringFaction} +${p.awardedBonus}'
                     : '${p.attribute}${p.rank} ${p.finalAlive == true ? '生' : '死'} '
                           '${p.judged == true ? '判決済み' : '未判決'} '

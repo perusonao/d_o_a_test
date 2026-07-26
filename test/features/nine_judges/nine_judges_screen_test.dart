@@ -21,13 +21,34 @@ void main() {
     );
     expect(find.byKey(const Key('nine-judges-board')), findsOneWidget);
     expect(find.byKey(const Key('current-bonus')), findsOneWidget);
-    expect(find.textContaining('救済者 0'), findsOneWidget);
+    expect(find.byKey(const Key('faction-savior')), findsOneWidget);
+    expect(find.text('0'), findsNWidgets(2));
     expect(find.byKey(const Key('action-life')), findsOneWidget);
     expect(find.byKey(const Key('action-eye')), findsOneWidget);
     expect(find.byKey(const Key('action-specialVerdict')), findsOneWidget);
     expect(find.byKey(const Key('action-death')), findsNothing);
     expect(find.textContaining('SAVE'), findsNothing);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('CPU対戦であなた・CPU・現在手番を明示する', (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: NineJudgesGameScreen(
+          initialSettings: NineJudgesGameSettings(
+            mode: GameMode.cpu,
+            cpuFaction: Faction.executor,
+            firstPlayer: Faction.savior,
+          ),
+        ),
+      ),
+    );
+    expect(find.text('あなた'), findsOneWidget);
+    expect(find.text('CPU'), findsOneWidget);
+    expect(find.textContaining('あなた（救済者）の手番'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('recent-history')));
+    await tester.pumpAndSettle();
+    expect(find.text('直近の履歴'), findsOneWidget);
   });
 
   testWidgets('人物状態は審議中・生・確定を別ラベルで表示する', (tester) async {
@@ -55,4 +76,97 @@ void main() {
     expect(find.byKey(const Key('confirmation-reveal')), findsOneWidget);
     expect(find.textContaining('POINT'), findsOneWidget);
   });
+
+  testWidgets('EYE実施者をYOU/CPUで区別し属性は非表示にできる', (tester) async {
+    const person = PersonCard(id: 'test', attribute: PersonAttribute.evil);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 120,
+            height: 120,
+            child: PersonCardWidget(
+              person: person,
+              attributeVisible: false,
+              viewerEyeKnown: false,
+              opponentEyeKnown: true,
+              viewerLabel: 'YOU',
+              opponentLabel: 'CPU',
+              selected: false,
+              cpuHighlighted: false,
+              enabled: false,
+              onTap: () {},
+            ),
+          ),
+        ),
+      ),
+    );
+    expect(find.text('CPU'), findsOneWidget);
+    expect(find.text('正体不明'), findsOneWidget);
+    expect(find.text('悪人'), findsNothing);
+  });
+
+  testWidgets('生死チップを順番通り最大3個、確定後も表示する', (tester) async {
+    const person = PersonCard(
+      id: 'history',
+      attribute: PersonAttribute.good,
+      verdictState: VerdictState.aliveConfirmed,
+      verdictActionCount: 3,
+      verdictHistory: [
+        VerdictActionType.life,
+        VerdictActionType.death,
+        VerdictActionType.life,
+      ],
+      awardedBonus: 9,
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 140,
+            height: 140,
+            child: PersonCardWidget(
+              person: person,
+              attributeVisible: true,
+              viewerEyeKnown: false,
+              opponentEyeKnown: false,
+              viewerLabel: 'YOU',
+              opponentLabel: 'CPU',
+              selected: false,
+              cpuHighlighted: false,
+              enabled: false,
+              onTap: () {},
+            ),
+          ),
+        ),
+      ),
+    );
+    expect(find.text('生'), findsNWidgets(2));
+    expect(find.text('死'), findsOneWidget);
+    expect(find.byKey(const Key('confirmed-label')), findsOneWidget);
+  });
+
+  for (final size in [
+    const Size(360, 640),
+    const Size(390, 844),
+    const Size(430, 932),
+  ]) {
+    testWidgets('${size.width.toInt()}x${size.height.toInt()}でoverflowしない', (
+      tester,
+    ) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: NineJudgesGameScreen(initialSettings: NineJudgesGameSettings()),
+        ),
+      );
+      expect(find.byKey(const Key('nine-judges-board')), findsOneWidget);
+      expect(find.byKey(const Key('action-life')), findsOneWidget);
+      expect(find.byKey(const Key('action-eye')), findsOneWidget);
+      expect(find.byKey(const Key('action-specialVerdict')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
 }

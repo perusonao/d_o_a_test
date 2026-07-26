@@ -45,6 +45,12 @@ abstract final class NineJudgesRules {
         : VerdictState.dead;
     final sameState = person.verdictState == desired;
     final count = person.verdictActionCount + 1;
+    final history = [
+      ...person.verdictHistory,
+      action == ActionType.life
+          ? VerdictActionType.life
+          : VerdictActionType.death,
+    ];
     final confirm = sameState || count >= 3;
     return person.copyWith(
       verdictState: confirm
@@ -53,6 +59,7 @@ abstract final class NineJudgesRules {
                 : VerdictState.deadConfirmed)
           : desired,
       verdictActionCount: count,
+      verdictHistory: history,
       confirmedBy: confirm ? actor : null,
     );
   }

@@ -48,6 +48,10 @@ class NineJudgesController extends ChangeNotifier {
     Faction.savior: <int>{},
     Faction.executor: <int>{},
   };
+  final Map<Faction, Set<int>> eyeSeenSlots = {
+    Faction.savior: <int>{},
+    Faction.executor: <int>{},
+  };
   final Map<Faction, int?> privateBonusKnowledge = {
     Faction.savior: null,
     Faction.executor: null,
@@ -95,6 +99,7 @@ class NineJudgesController extends ChangeNotifier {
       !awaitingBonusReveal &&
       !awaitingHandoff;
   Faction get humanFaction => settings.cpuFaction.opponent;
+  Faction get uiViewer => isCpuGame ? humanFaction : currentPlayer;
   ScoreResult get score => ScoreResult(
     savior: scores[Faction.savior]!,
     executor: scores[Faction.executor]!,
@@ -108,6 +113,15 @@ class NineJudgesController extends ChangeNotifier {
   bool specialVerdictAvailable(Faction faction) =>
       !specialVerdictUsed[faction]!;
 
+  String specialVerdictStatus(Faction faction) {
+    if (specialVerdictUsed[faction]!) return '使用済み';
+    if (_legalTargets(ActionType.specialVerdict, faction).isNotEmpty) {
+      return '残り1';
+    }
+    if (board.every((slot) => slot.person.isConfirmed)) return '対象なし';
+    return '生死履歴なしのみ';
+  }
+
   void reset() {
     _resolveRandomSettings();
     board = NineJudgesRules.createBoard(_random);
@@ -115,6 +129,9 @@ class NineJudgesController extends ChangeNotifier {
     specialVerdictUsed = {Faction.savior: false, Faction.executor: false};
     for (final knowledge in knownAttributeSlots.values) {
       knowledge.clear();
+    }
+    for (final seen in eyeSeenSlots.values) {
+      seen.clear();
     }
     for (final faction in Faction.values) {
       privateBonusKnowledge[faction] = bonusDeck.first;
@@ -206,7 +223,7 @@ class NineJudgesController extends ChangeNotifier {
   }
 
   bool eyeKnowsAttribute(int index, Faction viewer) =>
-      knownAttributeSlots[viewer]!.contains(index);
+      eyeSeenSlots[viewer]!.contains(index);
   bool initiallyKnowsAttribute(int index, Faction viewer) => false;
   bool knowsNumber(int index, Faction viewer) => false;
   bool eyeKnowsNumber(int index, Faction viewer) => false;
@@ -216,6 +233,68 @@ class NineJudgesController extends ChangeNotifier {
     if (debugMode || isFinished || bonusIndex == 0) return currentBonus;
     return privateBonusKnowledge[viewer] == currentBonus ? currentBonus : null;
   }
+
+  String roleLabel(Faction faction) {
+    if (!isCpuGame) return faction.label;
+    return faction == humanFaction
+        ? 'あなた（${faction.label}）'
+        : 'CPU（${faction.label}）';
+  }
+
+  String actorLabel(Faction faction) {
+    if (!isCpuGame) return faction.label;
+    return faction == humanFaction ? 'あなた' : 'CPU';
+  }
+
+  String positionLabel(int index) {
+    const rows = ['上', '中央', '下'];
+    const columns = ['左', '中央', '右'];
+    return '${rows[index ~/ 3]}${columns[index % 3]}';
+  }
+
+  String bonusVisibilityLabel(Faction viewer) {
+    if (bonusIndex == 0) return '最初のボーナス・両者に公開';
+    if (privateBonusKnowledge[viewer] == currentBonus) {
+      return isCpuGame ? 'あなたのみ確認' : '${viewer.label}のみ確認';
+    }
+    if (privateBonusKnowledge[viewer.opponent] == currentBonus) {
+      final owner = isCpuGame
+          ? (viewer.opponent == settings.cpuFaction ? 'CPU' : 'あなた')
+          : viewer.opponent.label;
+      return '$ownerのみ確認済み';
+    }
+    if (pendingBonusReveal[viewer]!) {
+      return isCpuGame ? 'あなたは手番終了後に確認できます' : '${viewer.label}は手番終了後に確認';
+    }
+    if (pendingBonusReveal[viewer.opponent]!) {
+      final owner = isCpuGame
+          ? (viewer.opponent == settings.cpuFaction ? 'CPU' : 'あなた')
+          : viewer.opponent.label;
+      return '$ownerは次の手番終了後に確認';
+    }
+    return 'まだ確認できません';
+  }
+
+  String publicLogText(GameLogEntry log, Faction viewer) {
+    final actor = actorLabel(log.player);
+    final target = positionLabel(log.targetIndex);
+    if (log.action == ActionType.eye) {
+      final ownResult = log.player == viewer
+          ? '（${board[log.targetIndex].person.attribute.label}を確認）'
+          : '';
+      return '$actor：$targetをEYE $ownResult';
+    }
+    if (log.confirmedState != null) {
+      return '$actor：$targetに${log.action.label}\n'
+          '→ ${log.confirmedAttribute!.label} / '
+          '${log.confirmedState!.label} / '
+          '${log.scoringFaction!.label} +${log.verdictBonus}';
+    }
+    return '$actor：$targetに${log.action.label} → ${log.message.split('→').last.trim()}';
+  }
+
+  String? lastPublicAction(Faction viewer) =>
+      logs.isEmpty ? null : publicLogText(logs.last, viewer);
 
   bool canSelectAction(ActionType action) =>
       humanInputEnabled &&
@@ -276,11 +355,13 @@ class NineJudgesController extends ChangeNotifier {
   void _applyAction(int index) {
     final action = selectedAction!;
     final actor = currentPlayer;
+    final actorKnewAttributeBefore = knowsAttribute(board[index].person, actor);
     final actorHadPendingReveal = pendingBonusReveal[actor]!;
     final before = board[index].person;
     var after = before;
     if (action == ActionType.eye) {
       knownAttributeSlots[actor]!.add(index);
+      eyeSeenSlots[actor]!.add(index);
     } else if (action == ActionType.specialVerdict) {
       specialVerdictUsed[actor] = true;
       after = NineJudgesRules.applySpecialVerdict(person: before, actor: actor);
@@ -313,8 +394,27 @@ class NineJudgesController extends ChangeNotifier {
     }
     board[index] = board[index].copyWith(person: after);
     final detail = _actionDetail(action, before, after);
-    logs.add(GameLogEntry(turn: turn, player: actor, message: detail));
-    _recordAction(action, index, actor, before, after);
+    logs.add(
+      GameLogEntry(
+        turn: turn,
+        player: actor,
+        message: detail,
+        action: action,
+        targetIndex: index,
+        confirmedAttribute: after.isConfirmed ? after.attribute : null,
+        confirmedState: after.isConfirmed ? after.verdictState : null,
+        verdictBonus: after.awardedBonus,
+        scoringFaction: after.scoringFaction,
+      ),
+    );
+    _recordAction(
+      action,
+      index,
+      actor,
+      before,
+      after,
+      actorKnewAttributeBefore: actorKnewAttributeBefore,
+    );
     _finishAction(
       detail,
       action: action,
@@ -326,10 +426,16 @@ class NineJudgesController extends ChangeNotifier {
   String _actionDetail(ActionType action, PersonCard before, PersonCard after) {
     if (action == ActionType.eye) return 'EYEで人物の属性を調査';
     if (after.isConfirmed) {
-      return '${action.label} → ${after.verdictState.label} / '
+      final reason =
+          after.verdictHistory.length == 3 &&
+              action != ActionType.specialVerdict
+          ? '3回目の判定により'
+          : '審判確定';
+      return '$reason ${action.label} → ${after.verdictState.label} / '
           '${after.attribute.label} / ${after.scoringFaction!.label} +${after.awardedBonus}';
     }
-    return '${action.label} → ${after.verdictState.label}';
+    return '${action.label}を与えました / 状態：'
+        '${before.verdictState.label} → ${after.verdictState.label}';
   }
 
   void _recordAction(
@@ -337,8 +443,9 @@ class NineJudgesController extends ChangeNotifier {
     int index,
     Faction actor,
     PersonCard before,
-    PersonCard after,
-  ) {
+    PersonCard after, {
+    required bool actorKnewAttributeBefore,
+  }) {
     session = session.copyWith(
       actions: [
         ...session.actions,
@@ -352,7 +459,7 @@ class NineJudgesController extends ChangeNotifier {
           actionType: action.name,
           targetPersonId: before.id,
           targetRank: 0,
-          visibleTargetAttributeAtTime: knowsAttribute(before, actor)
+          visibleTargetAttributeAtTime: actorKnewAttributeBefore
               ? before.attribute.name
               : null,
           actualTargetAttribute: before.attribute.name,
@@ -390,6 +497,13 @@ class NineJudgesController extends ChangeNotifier {
           scoringFaction: after.scoringFaction?.name,
           verdictBonus: after.awardedBonus,
           nextBonusViewer: after.isConfirmed ? actor.opponent.name : null,
+          verdictHistoryBefore: [
+            for (final item in before.verdictHistory) item.name,
+          ],
+          verdictHistoryAfter: [
+            for (final item in after.verdictHistory) item.name,
+          ],
+          bonusViewerState: bonusVisibilityLabel(actor),
           cpuDecisionReason: action == ActionType.eye
               ? 'unknown attribute'
               : 'state and bonus evaluation',
@@ -485,13 +599,14 @@ class NineJudgesController extends ChangeNotifier {
             judgedBy: board[i].person.confirmedBy?.name,
             scoringFaction: board[i].person.scoringFaction?.name,
             scoreValue: board[i].person.awardedBonus ?? 0,
-            eyeSeenBySavior: knownAttributeSlots[Faction.savior]!.contains(i),
-            eyeSeenByExecutor: knownAttributeSlots[Faction.executor]!.contains(
-              i,
-            ),
+            eyeSeenBySavior: eyeSeenSlots[Faction.savior]!.contains(i),
+            eyeSeenByExecutor: eyeSeenSlots[Faction.executor]!.contains(i),
             verdictState: board[i].person.verdictState.name,
             verdictActionCount: board[i].person.verdictActionCount,
             awardedBonus: board[i].person.awardedBonus,
+            verdictHistory: [
+              for (final item in board[i].person.verdictHistory) item.name,
+            ],
           ),
       ],
     );

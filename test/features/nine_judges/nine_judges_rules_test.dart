@@ -33,6 +33,7 @@ void main() {
       expect(game.score.executor, 0);
       expect(game.visibleBonusFor(Faction.savior), game.currentBonus);
       expect(game.visibleBonusFor(Faction.executor), game.currentBonus);
+      expect(game.bonusVisibilityLabel(Faction.savior), contains('両者に公開'));
     });
   });
 
@@ -51,12 +52,17 @@ void main() {
         actor: Faction.savior,
       );
       expect(alive.verdictState, VerdictState.alive);
+      expect(alive.verdictHistory, [VerdictActionType.life]);
       final dead = NineJudgesRules.applyVerdictAction(
         person: alive,
         action: ActionType.death,
         actor: Faction.executor,
       );
       expect(dead.verdictState, VerdictState.dead);
+      expect(dead.verdictHistory, [
+        VerdictActionType.life,
+        VerdictActionType.death,
+      ]);
       final aliveAgain = NineJudgesRules.applyVerdictAction(
         person: person(VerdictState.dead, 1),
         action: ActionType.life,
@@ -78,6 +84,8 @@ void main() {
       );
       expect(alive.verdictState, VerdictState.aliveConfirmed);
       expect(dead.verdictState, VerdictState.deadConfirmed);
+      expect(alive.verdictHistory.last, VerdictActionType.life);
+      expect(dead.verdictHistory.last, VerdictActionType.death);
     });
 
     test('3回目は現在状態で強制確定', () {
@@ -104,7 +112,10 @@ void main() {
       game.selectSlot(0);
       expect(game.knowsAttribute(before, Faction.savior), isTrue);
       expect(game.knowsAttribute(before, Faction.executor), isFalse);
+      expect(game.eyeSeenSlots[Faction.savior], contains(0));
+      expect(game.eyeSeenSlots[Faction.executor], isNot(contains(0)));
       expect(game.board[0].person.verdictState, VerdictState.deliberating);
+      expect(game.session.actions.single.visibleTargetAttributeAtTime, isNull);
       expect(
         NineJudgesRules.canUseAction(
           action: ActionType.eye,
@@ -115,6 +126,24 @@ void main() {
         ),
         isFalse,
       );
+    });
+
+    test('相手のEYEだけでは属性を知らず、LIFE/DEATHでも公開されない', () {
+      final game = NineJudgesController(seed: 31);
+      game.chooseAction(ActionType.eye);
+      game.selectSlot(0);
+      expect(
+        game.knowsAttribute(game.board[0].person, Faction.executor),
+        isFalse,
+      );
+      game.confirmHandoff();
+      game.chooseAction(ActionType.death);
+      game.selectSlot(0);
+      expect(
+        game.knowsAttribute(game.board[0].person, Faction.executor),
+        isFalse,
+      );
+      expect(game.knowsAttribute(game.board[0].person, Faction.savior), isTrue);
     });
 
     test('特殊審判は未介入人物だけ、陣営の状態で即確定し1回のみ', () {
@@ -192,6 +221,8 @@ void main() {
       expect(game.privateBonusKnowledge[Faction.executor], nextBonus);
       expect(game.privateBonusKnowledge[Faction.savior], isNull);
       expect(game.awaitingBonusReveal, isTrue);
+      expect(game.bonusVisibilityLabel(Faction.executor), contains('のみ確認'));
+      expect(game.bonusVisibilityLabel(Faction.savior), contains('執行者のみ確認済み'));
     });
 
     test('確定者と得点者を分離しログ保存する', () async {
@@ -208,6 +239,8 @@ void main() {
       expect(person.awardedBonus, isNotNull);
       expect(game.session.actions.single.actionType, 'specialVerdict');
       expect(game.session.rulesVersion, '1.0');
+      expect(game.session.actions.single.verdictHistoryBefore, isEmpty);
+      expect(game.session.actions.single.confirmedBy, 'savior');
     });
 
     test('9人確定で終了し、9枚のボーナス合計45・引き分けなし', () {
