@@ -4,33 +4,25 @@ import 'package:dead_or_alive/features/nine_judges/models/judge_models.dart';
 /// board mockup. Keeping every asset path here means the card, action and
 /// header widgets stay free of hard-coded file names.
 abstract final class CardAssets {
-  static const _characters = 'assets/characters';
+  static const _persons = 'assets/images/persons';
   static const _icons = 'assets/icons';
 
-  static const _portraitPools = <PersonAttribute, List<String>>{
-    PersonAttribute.good: ['good_1', 'good_2'],
-    PersonAttribute.evil: ['evil_1', 'evil_2'],
-    PersonAttribute.neutral: ['neutral_1'],
+  static const goodPortrait = '$_persons/good.png';
+  static const evilPortrait = '$_persons/evil.png';
+  static const neutralPortrait = '$_persons/neutral.png';
+  static const concealedPortrait = '$_persons/unknown.png';
+
+  /// Centralized so nine individual portraits can be introduced later without
+  /// changing PersonCardWidget or any visibility rule.
+  static String portrait(PersonCard person) => switch (person.attribute) {
+    PersonAttribute.good => goodPortrait,
+    PersonAttribute.evil => evilPortrait,
+    PersonAttribute.neutral => neutralPortrait,
   };
-  static const _unknownPortraits = ['unknown_1', 'unknown_2', 'unknown_3'];
 
-  /// A stable index derived from a person id (e.g. `good-2` -> 1) so the same
-  /// person always shows the same face.
-  static int _slotOf(String personId) {
-    final dash = personId.lastIndexOf('-');
-    final n = dash >= 0 ? int.tryParse(personId.substring(dash + 1)) : null;
-    return (n ?? 1) - 1;
-  }
-
-  /// Portrait shown once the attribute is known/confirmed.
-  static String portrait(PersonCard person) {
-    final pool = _portraitPools[person.attribute]!;
-    return '$_characters/${pool[_slotOf(person.id) % pool.length]}.png';
-  }
-
-  /// Hooded portrait used while the attribute is still secret.
-  static String unknownPortrait(String personId) =>
-      '$_characters/${_unknownPortraits[_slotOf(personId) % _unknownPortraits.length]}.png';
+  /// Every concealed person deliberately shares one neutral hooded portrait;
+  /// no face, gender or true attribute can be inferred before knowledge exists.
+  static String unknownPortrait(String personId) => concealedPortrait;
 
   static String attributeBadge(PersonAttribute attribute) =>
       switch (attribute) {
@@ -39,7 +31,6 @@ abstract final class CardAssets {
         PersonAttribute.neutral => '$_icons/badge_neutral.png',
       };
 
-  static const unknownBadge = '$_icons/badge_unknown.png';
   static const eyeBadge = '$_icons/badge_eye.png';
 
   static const crestSavior = '$_icons/crest_savior.png';

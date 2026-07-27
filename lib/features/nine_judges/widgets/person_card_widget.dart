@@ -296,15 +296,9 @@ class _Corners extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                _AssetBadge(
-                  asset: attributeVisible
-                      ? CardAssets.attributeBadge(attribute)
-                      : CardAssets.unknownBadge,
-                  badgeKey: Key(
-                    attributeVisible
-                        ? 'attribute-icon-${attribute.name}'
-                        : 'attribute-icon-hidden',
-                  ),
+                _PersonAttributeBadge(
+                  attribute: attribute,
+                  revealed: attributeVisible,
                 ),
                 const SizedBox(width: 3),
                 Container(
@@ -405,11 +399,14 @@ class _EyeMark extends StatelessWidget {
   );
 }
 
-class _AssetBadge extends StatelessWidget {
-  const _AssetBadge({required this.asset, this.badgeKey});
+class _PersonAttributeBadge extends StatelessWidget {
+  const _PersonAttributeBadge({
+    required this.attribute,
+    required this.revealed,
+  });
 
-  final String asset;
-  final Key? badgeKey;
+  final PersonAttribute attribute;
+  final bool revealed;
 
   @override
   Widget build(BuildContext context) => SizedBox(
@@ -417,19 +414,42 @@ class _AssetBadge extends StatelessWidget {
     width: 24,
     height: 24,
     child: Center(
-      child: SizedBox(
+      child: Container(
         width: 22,
         height: 22,
-        child: ClipOval(
-          child: Image.asset(
-            asset,
-            key: badgeKey,
-            fit: BoxFit.contain,
-            alignment: Alignment.center,
-            gaplessPlayback: true,
-            errorBuilder: (_, _, _) => const SizedBox.shrink(),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.black.withValues(alpha: .58),
+          border: Border.all(
+            color: revealed
+                ? _attributeColor(attribute).withValues(alpha: .8)
+                : const Color(0xFF8B8378),
           ),
         ),
+        child: revealed
+            ? Padding(
+                padding: const EdgeInsets.all(1),
+                child: Image.asset(
+                  CardAssets.attributeBadge(attribute),
+                  key: Key('attribute-icon-${attribute.name}'),
+                  fit: BoxFit.contain,
+                  alignment: Alignment.center,
+                  gaplessPlayback: true,
+                  errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                ),
+              )
+            : const Text(
+                '?',
+                key: Key('attribute-icon-hidden'),
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  height: 1,
+                  color: Color(0xFFE0DAD0),
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
       ),
     ),
   );

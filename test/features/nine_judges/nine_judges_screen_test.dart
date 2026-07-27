@@ -4,6 +4,7 @@ import 'package:dead_or_alive/features/nine_judges/models/judge_models.dart';
 import 'package:dead_or_alive/features/nine_judges/screens/game_screen.dart';
 import 'package:dead_or_alive/features/nine_judges/screens/mode_select_screen.dart';
 import 'package:dead_or_alive/features/nine_judges/widgets/action_panel.dart';
+import 'package:dead_or_alive/features/nine_judges/widgets/card_assets.dart';
 import 'package:dead_or_alive/features/nine_judges/widgets/game_style.dart';
 import 'package:dead_or_alive/features/nine_judges/widgets/person_card_widget.dart';
 import 'package:flutter/material.dart';
@@ -516,6 +517,64 @@ void main() {
     expect(find.byKey(const Key('attribute-icon-evil')), findsNothing);
     expect(find.text('正体不明'), findsOneWidget);
     expect(find.text('悪人'), findsNothing);
+    final portraitAssets = tester
+        .widgetList<Image>(find.byType(Image))
+        .map((image) => (image.image as AssetImage).assetName);
+    expect(portraitAssets, contains(CardAssets.concealedPortrait));
+    expect(portraitAssets, isNot(contains(CardAssets.evilPortrait)));
+  });
+
+  testWidgets('属性判明時だけ対応人物へ切り替え、全badge領域を共通化', (tester) async {
+    const people = [
+      PersonCard(id: 'good', attribute: PersonAttribute.good),
+      PersonCard(id: 'evil', attribute: PersonAttribute.evil),
+      PersonCard(id: 'neutral', attribute: PersonAttribute.neutral),
+      PersonCard(id: 'hidden', attribute: PersonAttribute.evil),
+    ];
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Row(
+            children: [
+              for (var i = 0; i < people.length; i++)
+                Expanded(
+                  child: PersonCardWidget(
+                    person: people[i],
+                    attributeVisible: i < 3,
+                    viewerEyeKnown: false,
+                    opponentEyeKnown: false,
+                    viewerLabel: 'YOU',
+                    opponentLabel: 'CPU',
+                    selected: false,
+                    cpuHighlighted: false,
+                    enabled: false,
+                    onTap: _noop,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    final badgeAreas = tester
+        .elementList(find.byKey(const Key('attribute-icon-area')))
+        .map((element) => tester.getSize(find.byWidget(element.widget)))
+        .toList();
+    expect(badgeAreas, hasLength(4));
+    expect(badgeAreas.toSet(), {const Size(24, 24)});
+    expect(find.byKey(const Key('attribute-icon-good')), findsOneWidget);
+    expect(find.byKey(const Key('attribute-icon-evil')), findsOneWidget);
+    expect(find.byKey(const Key('attribute-icon-neutral')), findsOneWidget);
+    expect(find.byKey(const Key('attribute-icon-hidden')), findsOneWidget);
+
+    final portraitAssets = tester
+        .widgetList<Image>(find.byType(Image))
+        .map((image) => (image.image as AssetImage).assetName);
+    expect(portraitAssets, contains(CardAssets.goodPortrait));
+    expect(portraitAssets, contains(CardAssets.evilPortrait));
+    expect(portraitAssets, contains(CardAssets.neutralPortrait));
+    expect(portraitAssets, contains(CardAssets.concealedPortrait));
   });
 
   testWidgets('JUDGEボタンはJUDGEと残り1回を別々の切れないテキストで表示', (tester) async {

@@ -69,6 +69,7 @@ flutter:
     - assets/branding/
     - assets/backgrounds/
     - assets/characters/
+    - assets/images/persons/
     - assets/icons/
     - assets/decorations/
 
