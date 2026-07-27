@@ -10,6 +10,7 @@ import 'package:dead_or_alive/features/nine_judges/screens/play_log_screen.dart'
 import 'package:dead_or_alive/features/nine_judges/screens/result_screen.dart';
 import 'package:dead_or_alive/features/nine_judges/widgets/action_panel.dart';
 import 'package:dead_or_alive/features/nine_judges/widgets/board_grid.dart';
+import 'package:dead_or_alive/features/nine_judges/widgets/card_assets.dart';
 import 'package:flutter/material.dart';
 
 class NineJudgesGameScreen extends StatefulWidget {
@@ -171,6 +172,8 @@ class _GameBoard extends StatelessWidget {
                         ],
                       ),
                     ),
+                    const SizedBox(height: 3),
+                    const _Legend(),
                     const SizedBox(height: 3),
                     ActionPanel(controller: controller),
                   ],
@@ -569,10 +572,22 @@ class _FactionScore extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(
-            faction == Faction.savior ? Icons.air : Icons.balance,
-            color: factionColor,
-            size: 20,
+          Container(
+            width: 26,
+            height: 26,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: factionColor.withValues(alpha: .7)),
+            ),
+            child: ClipOval(
+              child: Image.asset(
+                CardAssets.crest(faction),
+                fit: BoxFit.cover,
+                gaplessPlayback: true,
+                errorBuilder: (_, _, _) =>
+                    Icon(Icons.balance, color: factionColor, size: 18),
+              ),
+            ),
           ),
           const SizedBox(width: 5),
           Expanded(
@@ -666,6 +681,40 @@ class _DebugDialog extends StatelessWidget {
         child: const Text('閉じる'),
       ),
     ],
+  );
+}
+
+class _Legend extends StatelessWidget {
+  const _Legend();
+
+  @override
+  Widget build(BuildContext context) => const SizedBox(
+    height: 16,
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        _LegendItem(text: '生 LIFE履歴', color: AppTheme.alive),
+        SizedBox(width: 12),
+        _LegendItem(text: '死 DEATH履歴', color: AppTheme.dead),
+        SizedBox(width: 12),
+        _LegendItem(
+          text: '\u{1F441} EYE確認済',
+          color: AppTheme.eye,
+        ),
+      ],
+    ),
+  );
+}
+
+class _LegendItem extends StatelessWidget {
+  const _LegendItem({required this.text, required this.color});
+  final String text;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Text(
+    text,
+    style: TextStyle(fontSize: 8, color: color, fontWeight: FontWeight.w700),
   );
 }
 

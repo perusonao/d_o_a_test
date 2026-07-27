@@ -1,7 +1,11 @@
 import 'package:dead_or_alive/app/theme.dart';
 import 'package:dead_or_alive/features/nine_judges/models/judge_models.dart';
+import 'package:dead_or_alive/features/nine_judges/widgets/card_assets.dart';
 import 'package:flutter/material.dart';
 
+/// A single board card rendered in the dark-fantasy style of the mockup:
+/// a full-bleed character portrait, corner badges for attribute and EYE, and a
+/// scrimmed footer carrying the verdict state and the LIFE/DEATH history pips.
 class PersonCardWidget extends StatelessWidget {
   const PersonCardWidget({
     required this.person,
@@ -37,11 +41,10 @@ class PersonCardWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final confirmed = person.isConfirmed;
-    final stateAccent = confirmed
-        ? person.isAlive
-              ? AppTheme.alive
-              : AppTheme.dead
-        : selected || cpuHighlighted
+    final highlighted = selected || cpuHighlighted;
+    final accent = confirmed
+        ? (person.isAlive ? AppTheme.alive : AppTheme.dead)
+        : highlighted
         ? const Color(0xFFFFD76A)
         : enabled
         ? AppTheme.accent
@@ -53,132 +56,71 @@ class PersonCardWidget extends StatelessWidget {
           '${person.verdictState.label}',
       button: enabled,
       child: AnimatedOpacity(
-        opacity: targeting && !enabled ? .42 : 1,
+        opacity: targeting && !enabled ? .5 : 1,
         duration: const Duration(milliseconds: 140),
         child: AnimatedScale(
-          scale: selected || cpuHighlighted ? 1.025 : 1,
+          scale: highlighted ? 1.03 : 1,
           duration: const Duration(milliseconds: 140),
           child: Material(
             color: Colors.transparent,
             child: InkWell(
               key: Key('person-${person.id}'),
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(12),
               onTap: enabled ? onTap : null,
               child: AnimatedContainer(
                 key: Key('card-surface-${person.verdictState.name}'),
                 duration: const Duration(milliseconds: 180),
-                padding: const EdgeInsets.fromLTRB(5, 4, 5, 4),
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: _cardColors(confirmed),
-                  ),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: stateAccent,
-                    width: confirmed || selected || cpuHighlighted ? 2.2 : 1.1,
+                    color: accent,
+                    width: confirmed || highlighted ? 2.2 : 1.1,
                   ),
                   boxShadow: [
-                    if (selected || cpuHighlighted || confirmed)
+                    if (highlighted || confirmed)
                       BoxShadow(
-                        color: stateAccent.withValues(alpha: .33),
-                        blurRadius: 9,
+                        color: accent.withValues(alpha: .4),
+                        blurRadius: 10,
                         spreadRadius: .5,
                       ),
                   ],
                 ),
-                child: LayoutBuilder(
-                  builder: (context, constraints) => Column(
-                    children: [
-                      _CardHeader(
-                        coordinate: coordinate,
-                        attributeVisible: attributeVisible,
-                        attribute: person.attribute,
-                        viewerEyeKnown: viewerEyeKnown,
-                        opponentEyeKnown: opponentEyeKnown,
-                        viewerLabel: viewerLabel,
-                        opponentLabel: opponentLabel,
-                        confirmed: confirmed,
-                      ),
-                      Expanded(
-                        child: _CharacterPortrait(
-                          person: person,
-                          attributeVisible: attributeVisible,
-                          compact: constraints.maxHeight < 115,
-                        ),
-                      ),
-                      Text(
-                        person.verdictState.label,
-                        key: Key('verdict-${person.verdictState.name}'),
-                        maxLines: 1,
-                        style: TextStyle(
-                          color: _stateColor(person.verdictState),
-                          fontSize: constraints.maxHeight < 115 ? 9 : 11,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      SizedBox(
-                        height: 17,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            for (var i = 0; i < 3; i++)
-                              _VerdictChip(
-                                index: i,
-                                action: i < person.verdictHistory.length
-                                    ? person.verdictHistory[i]
-                                    : null,
-                              ),
-                          ],
-                        ),
-                      ),
-                      if (confirmed)
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              person.isAlive
-                                  ? Icons.check_circle
-                                  : Icons.cancel,
-                              size: 10,
-                              color: stateAccent,
-                            ),
-                            const SizedBox(width: 2),
-                            Flexible(
-                              child: Text(
-                                person.isAlive ? 'ALIVE 生存確定' : 'DEAD 死亡確定',
-                                key: const Key('confirmed-label'),
-                                maxLines: 1,
-                                style: TextStyle(
-                                  color: stateAccent,
-                                  fontSize: 8,
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
-                            ),
-                          ],
-                        )
-                      else if (selected)
-                        const Text(
-                          '選択中',
-                          key: Key('selected-label'),
-                          style: TextStyle(
-                            color: Color(0xFFFFD76A),
-                            fontSize: 8,
-                            fontWeight: FontWeight.w900,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(10.5),
+                  child: LayoutBuilder(
+                    builder: (context, c) {
+                      final compact = c.maxHeight < 150;
+                      return Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          _Portrait(
+                            person: person,
+                            attributeVisible: attributeVisible,
+                            dimmed: !enabled && !confirmed && !highlighted,
                           ),
-                        )
-                      else
-                        const SizedBox(height: 10),
-                      if (scoreDetail case final detail?)
-                        Text(
-                          '${detail.faction.label} +${detail.points} POINT',
-                          maxLines: 1,
-                          style: const TextStyle(fontSize: 7),
-                        ),
-                    ],
+                          const _Scrim(),
+                          _Corners(
+                            coordinate: coordinate,
+                            attributeVisible: attributeVisible,
+                            attribute: person.attribute,
+                            viewerEyeKnown: viewerEyeKnown,
+                            opponentEyeKnown: opponentEyeKnown,
+                            accent: accent,
+                          ),
+                          Align(
+                            alignment: Alignment.bottomCenter,
+                            child: _Footer(
+                              person: person,
+                              attributeVisible: attributeVisible,
+                              accent: accent,
+                              selected: selected,
+                              compact: compact,
+                              scoreDetail: scoreDetail,
+                            ),
+                          ),
+                        ],
+                      );
+                    },
                   ),
                 ),
               ),
@@ -188,25 +130,71 @@ class PersonCardWidget extends StatelessWidget {
       ),
     );
   }
+}
 
-  List<Color> _cardColors(bool confirmed) {
-    if (!confirmed) return const [Color(0xF523211C), Color(0xF5121216)];
-    return person.isAlive
-        ? const [Color(0xE6254936), Color(0xF5102119)]
-        : const [Color(0xE64A2322), Color(0xF5221012)];
+class _Portrait extends StatelessWidget {
+  const _Portrait({
+    required this.person,
+    required this.attributeVisible,
+    required this.dimmed,
+  });
+
+  final PersonCard person;
+  final bool attributeVisible;
+  final bool dimmed;
+
+  @override
+  Widget build(BuildContext context) {
+    final image = Image.asset(
+      attributeVisible
+          ? CardAssets.portrait(person)
+          : CardAssets.unknownPortrait(person.id),
+      fit: BoxFit.cover,
+      alignment: Alignment.topCenter,
+      gaplessPlayback: true,
+      errorBuilder: (_, _, _) => const ColoredBox(color: Color(0xFF15131B)),
+    );
+    return dimmed
+        ? ColorFiltered(
+            colorFilter: const ColorFilter.mode(
+              Color(0x88101015),
+              BlendMode.darken,
+            ),
+            child: image,
+          )
+        : image;
   }
 }
 
-class _CardHeader extends StatelessWidget {
-  const _CardHeader({
+class _Scrim extends StatelessWidget {
+  const _Scrim();
+
+  @override
+  Widget build(BuildContext context) => const DecoratedBox(
+    decoration: BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        stops: [0, .42, .72, 1],
+        colors: [
+          Color(0x22000000),
+          Color(0x00000000),
+          Color(0xC0090910),
+          Color(0xF6070709),
+        ],
+      ),
+    ),
+  );
+}
+
+class _Corners extends StatelessWidget {
+  const _Corners({
     required this.coordinate,
     required this.attributeVisible,
     required this.attribute,
     required this.viewerEyeKnown,
     required this.opponentEyeKnown,
-    required this.viewerLabel,
-    required this.opponentLabel,
-    required this.confirmed,
+    required this.accent,
   });
 
   final String coordinate;
@@ -214,106 +202,202 @@ class _CardHeader extends StatelessWidget {
   final PersonAttribute attribute;
   final bool viewerEyeKnown;
   final bool opponentEyeKnown;
-  final String viewerLabel;
-  final String opponentLabel;
-  final bool confirmed;
+  final Color accent;
 
   @override
-  Widget build(BuildContext context) => Row(
-    children: [
-      Container(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-        decoration: BoxDecoration(
-          color: Colors.black45,
-          borderRadius: BorderRadius.circular(5),
-          border: Border.all(color: Colors.white24),
-        ),
-        child: Text(
-          coordinate,
-          key: Key('coordinate-$coordinate'),
-          style: const TextStyle(fontSize: 8, fontWeight: FontWeight.w900),
-        ),
-      ),
-      const SizedBox(width: 3),
-      Expanded(
-        child: Text(
-          attributeVisible ? attribute.label : '正体不明',
-          key: Key(attributeVisible ? 'attribute-known' : 'attribute-hidden'),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            color: attributeVisible
-                ? _attributeColor(attribute)
-                : Colors.white60,
-            fontSize: 9,
-            fontWeight: FontWeight.w900,
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.all(3),
+    child: Align(
+      alignment: Alignment.topCenter,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _AssetBadge(
+            asset: attributeVisible
+                ? CardAssets.attributeBadge(attribute)
+                : CardAssets.unknownBadge,
+            badgeKey: Key(
+              attributeVisible
+                  ? 'attribute-icon-${attribute.name}'
+                  : 'attribute-icon-hidden',
+            ),
           ),
-        ),
+          const SizedBox(width: 3),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: .5),
+              borderRadius: BorderRadius.circular(5),
+              border: Border.all(color: accent.withValues(alpha: .6)),
+            ),
+            child: Text(
+              coordinate,
+              key: Key('coordinate-$coordinate'),
+              style: const TextStyle(
+                fontSize: 8,
+                fontWeight: FontWeight.w900,
+                color: Color(0xFFEAD9A4),
+              ),
+            ),
+          ),
+          const Spacer(),
+          _AssetBadge(
+            asset: CardAssets.eyeBadge,
+            dim: !viewerEyeKnown,
+            ring: opponentEyeKnown ? AppTheme.executor : null,
+          ),
+        ],
       ),
-      if (!confirmed) ...[
-        if (viewerEyeKnown) _EyeMark(label: viewerLabel, color: AppTheme.eye),
-        if (opponentEyeKnown)
-          _EyeMark(label: opponentLabel, color: AppTheme.executor),
-      ],
-    ],
+    ),
   );
 }
 
-class _CharacterPortrait extends StatelessWidget {
-  const _CharacterPortrait({
+class _AssetBadge extends StatelessWidget {
+  const _AssetBadge({
+    required this.asset,
+    this.dim = false,
+    this.ring,
+    this.badgeKey,
+  });
+
+  final String asset;
+  final bool dim;
+  final Color? ring;
+  final Key? badgeKey;
+
+  @override
+  Widget build(BuildContext context) => Opacity(
+    opacity: dim ? .35 : 1,
+    child: Container(
+      width: 22,
+      height: 22,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: ring == null ? null : Border.all(color: ring!, width: 1.4),
+      ),
+      child: ClipOval(
+        child: Image.asset(
+          asset,
+          key: badgeKey,
+          fit: BoxFit.cover,
+          gaplessPlayback: true,
+          errorBuilder: (_, _, _) => const SizedBox.shrink(),
+        ),
+      ),
+    ),
+  );
+}
+
+class _Footer extends StatelessWidget {
+  const _Footer({
     required this.person,
     required this.attributeVisible,
+    required this.accent,
+    required this.selected,
     required this.compact,
+    required this.scoreDetail,
   });
 
   final PersonCard person;
   final bool attributeVisible;
+  final Color accent;
+  final bool selected;
   final bool compact;
+  final ({Faction faction, int points})? scoreDetail;
 
   @override
   Widget build(BuildContext context) {
-    final color = attributeVisible
-        ? _attributeColor(person.attribute)
-        : Colors.blueGrey;
-    final icon = attributeVisible
-        ? switch (person.attribute) {
-            PersonAttribute.good => Icons.air,
-            PersonAttribute.evil => Icons.local_fire_department,
-            PersonAttribute.neutral => Icons.balance,
-          }
-        : Icons.person;
-    return Stack(
-      alignment: Alignment.center,
-      children: [
-        Positioned.fill(
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: RadialGradient(
-                colors: [color.withValues(alpha: .24), Colors.transparent],
-              ),
+    final confirmed = person.isConfirmed;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 2, 4, 4),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            attributeVisible ? person.attribute.label : '正体不明',
+            key: Key(attributeVisible ? 'attribute-known' : 'attribute-hidden'),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: attributeVisible
+                  ? _attributeColor(person.attribute)
+                  : const Color(0xFFCBC3B4),
+              fontSize: compact ? 9 : 11,
+              fontWeight: FontWeight.w900,
             ),
           ),
-        ),
-        Icon(
-          icon,
-          key: Key(
-            attributeVisible
-                ? 'attribute-icon-${person.attribute.name}'
-                : 'attribute-icon-hidden',
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Flexible(
+                child: Text(
+                  person.verdictState.label,
+                  key: Key('verdict-${person.verdictState.name}'),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: _stateColor(person.verdictState),
+                    fontSize: compact ? 8 : 10,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              if (confirmed) ...[
+                const SizedBox(width: 2),
+                Icon(
+                  person.isAlive ? Icons.check_circle : Icons.cancel,
+                  key: const Key('confirmed-label'),
+                  size: compact ? 10 : 12,
+                  color: accent,
+                ),
+              ],
+            ],
           ),
-          size: compact ? 22 : 30,
-          color: color,
-        ),
-      ],
+          const SizedBox(height: 2),
+          _HistoryPips(history: person.verdictHistory),
+          if (scoreDetail case final detail?)
+            Padding(
+              padding: const EdgeInsets.only(top: 1),
+              child: Text(
+                '${detail.faction.label} +${detail.points}',
+                maxLines: 1,
+                style: const TextStyle(fontSize: 7, color: Color(0xFFE7DBC0)),
+              ),
+            )
+          else if (selected)
+            const Text(
+              '選択中',
+              key: Key('selected-label'),
+              style: TextStyle(
+                color: Color(0xFFFFD76A),
+                fontSize: 7,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
 
-class _VerdictChip extends StatelessWidget {
-  const _VerdictChip({required this.index, required this.action});
+class _HistoryPips extends StatelessWidget {
+  const _HistoryPips({required this.history});
+  final List<VerdictActionType> history;
 
-  final int index;
+  @override
+  Widget build(BuildContext context) => Row(
+    mainAxisAlignment: MainAxisAlignment.center,
+    children: [
+      for (var i = 0; i < 3; i++)
+        _Pip(action: i < history.length ? history[i] : null, index: i),
+    ],
+  );
+}
+
+class _Pip extends StatelessWidget {
+  const _Pip({required this.action, required this.index});
   final VerdictActionType? action;
+  final int index;
 
   @override
   Widget build(BuildContext context) {
@@ -327,14 +411,14 @@ class _VerdictChip extends StatelessWidget {
       key: action == null
           ? Key('verdict-chip-$index-empty')
           : Key('verdict-chip-$index-${action!.name}'),
-      width: 20,
-      height: 15,
-      margin: const EdgeInsets.symmetric(horizontal: 1),
+      width: 16,
+      height: 16,
+      margin: const EdgeInsets.symmetric(horizontal: 1.5),
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: action == null ? Colors.black26 : color.withValues(alpha: .2),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color),
+        color: action == null ? Colors.black26 : color.withValues(alpha: .22),
+        shape: BoxShape.circle,
+        border: Border.all(color: color, width: 1.2),
       ),
       child: Text(
         action?.label ?? '',
@@ -346,37 +430,6 @@ class _VerdictChip extends StatelessWidget {
       ),
     );
   }
-}
-
-class _EyeMark extends StatelessWidget {
-  const _EyeMark({required this.label, required this.color});
-
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    margin: const EdgeInsets.only(left: 2),
-    padding: const EdgeInsets.symmetric(horizontal: 2),
-    decoration: BoxDecoration(
-      color: color.withValues(alpha: .13),
-      borderRadius: BorderRadius.circular(4),
-    ),
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(Icons.visibility, size: 8, color: color),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 5,
-            color: color,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-      ],
-    ),
-  );
 }
 
 Color _attributeColor(PersonAttribute attribute) => switch (attribute) {
