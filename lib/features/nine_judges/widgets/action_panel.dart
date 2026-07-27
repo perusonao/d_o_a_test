@@ -50,7 +50,7 @@ class ActionPanel extends StatelessWidget {
             ),
           ),
         SizedBox(
-          height: 60,
+          height: 64,
           child: Row(
             children: [
               for (final action in const [
@@ -134,7 +134,7 @@ class _ActionButton extends StatelessWidget {
         ? Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _Glyph(iconAsset, size: 18),
+              _Glyph(iconAsset, size: 22),
               const SizedBox(width: 7),
               Flexible(
                 child: Text(
@@ -166,7 +166,7 @@ class _ActionButton extends StatelessWidget {
         : Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _Glyph(iconAsset, size: 24),
+              _Glyph(iconAsset, size: 26),
               Text(
                 title,
                 maxLines: 1,
