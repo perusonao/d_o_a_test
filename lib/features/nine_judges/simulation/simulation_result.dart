@@ -12,7 +12,12 @@ class SimulationActionRecord {
     required this.stateAfter,
     required this.historyBefore,
     required this.historyAfter,
+    required this.targetAttribute,
+    required this.currentBonusValue,
+    required this.currentBonusKnown,
     this.verdictBonus,
+    this.scoringFaction,
+    this.confirmationOrder,
   });
 
   final int turn;
@@ -25,7 +30,15 @@ class SimulationActionRecord {
   final VerdictState stateAfter;
   final List<VerdictActionType> historyBefore;
   final List<VerdictActionType> historyAfter;
+  final PersonAttribute targetAttribute;
+  final int currentBonusValue;
+  final bool currentBonusKnown;
   final int? verdictBonus;
+  final Faction? scoringFaction;
+  final int? confirmationOrder;
+
+  bool get confirmedThisAction =>
+      !stateBefore.isConfirmed && stateAfter.isConfirmed;
 }
 
 class SimulationResult {

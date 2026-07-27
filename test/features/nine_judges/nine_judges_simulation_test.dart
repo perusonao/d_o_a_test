@@ -62,5 +62,77 @@ void main() {
     final json = jsonDecode(SimulationExporter.summaryJson(run));
     expect(json['config']['gameCount'], 10);
     expect(json['statistics']['gameCount'], 10);
+    expect(json['firstSecondAnalysis']['games'], 10);
+  });
+
+  test('turn-order detail aggregates reconcile with action records', () {
+    final run = const SimulationRunner().run(config);
+    final analysis = run.firstSecondAnalysis.toJson();
+    final firstSecond = analysis['firstSecond']! as Map<String, Object>;
+    final first = firstSecond['first']! as Map<String, Object>;
+    final second = firstSecond['second']! as Map<String, Object>;
+    expect((first['wins']! as int) + (second['wins']! as int), 10);
+
+    final firstScoreTotal = run.results.fold<int>(0, (sum, result) {
+      return sum +
+          (result.firstPlayer == Faction.savior
+              ? result.saviorScore
+              : result.executorScore);
+    });
+    final secondScoreTotal = run.results.fold<int>(
+      0,
+      (sum, result) =>
+          sum +
+          (result.firstPlayer == Faction.savior
+              ? result.executorScore
+              : result.saviorScore),
+    );
+    expect(firstScoreTotal + secondScoreTotal, 10 * 45);
+
+    final order = analysis['confirmationOrder']! as Map<String, Object>;
+    expect(
+      order.values.fold<int>(
+        0,
+        (sum, value) => sum + ((value as Map<String, Object>)['total']! as int),
+      ),
+      10 * 9,
+    );
+
+    final third = analysis['threeActionConfirmation']! as Map<String, Object>;
+    final loggedThird = run.results
+        .expand((result) => result.actions)
+        .where(
+          (action) =>
+              action.confirmedThisAction &&
+              action.action != ActionType.specialVerdict &&
+              action.historyAfter.length == 3,
+        )
+        .length;
+    expect(third['total'], loggedThird);
+
+    final eye = analysis['eyeTiming']! as Map<String, Object>;
+    expect(
+      (eye['turnBands']! as Map<String, Object>).values.fold<int>(
+        0,
+        (sum, value) => sum + (value as int),
+      ),
+      eye['total'],
+    );
+    final reverse = analysis['reverseTiming']! as Map<String, Object>;
+    expect(
+      (reverse['turnBands']! as Map<String, Object>).values.fold<int>(
+        0,
+        (sum, value) => sum + (value as int),
+      ),
+      reverse['total'],
+    );
+    final judge = analysis['judgeAnalysis']! as Map<String, Object>;
+    expect(
+      (judge['bonusCounts']! as Map<String, Object>).values.fold<int>(
+        0,
+        (sum, value) => sum + (value as int),
+      ),
+      judge['total'],
+    );
   });
 }

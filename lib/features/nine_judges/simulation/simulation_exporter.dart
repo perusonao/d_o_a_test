@@ -65,5 +65,18 @@ abstract final class SimulationExporter {
         },
         'elapsedMilliseconds': run.elapsed.inMilliseconds,
         'statistics': run.statistics.toJson(),
+        'firstSecondAnalysis': run.firstSecondAnalysis.toJson(),
+      });
+
+  static String firstSecondAnalysisJson(SimulationRun run) =>
+      const JsonEncoder.withIndent('  ').convert({
+        'config': {
+          'gameCount': run.config.gameCount,
+          'baseSeed': run.config.baseSeed,
+          'saviorDifficulty': run.config.saviorDifficulty.name,
+          'executorDifficulty': run.config.executorDifficulty.name,
+          'firstPlayer': run.config.firstPlayer.name,
+        },
+        ...run.firstSecondAnalysis.toJson(),
       });
 }

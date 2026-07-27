@@ -41,6 +41,14 @@ void main(List<String> arguments) {
     _write(path, SimulationExporter.summaryJson(run));
     print('JSON: $path');
   }
+  if (options.containsKey('export-analysis')) {
+    final path = _outputPath(
+      options['export-analysis'],
+      'first_second_analysis_$games.json',
+    );
+    _write(path, SimulationExporter.firstSecondAnalysisJson(run));
+    print('Analysis: $path');
+  }
 }
 
 Map<String, String?> _parse(List<String> arguments) {

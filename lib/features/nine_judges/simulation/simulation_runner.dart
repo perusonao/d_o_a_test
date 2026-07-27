@@ -5,6 +5,7 @@ import 'package:dead_or_alive/features/nine_judges/cpu/cpu_strategy.dart';
 import 'package:dead_or_alive/features/nine_judges/game/game_rules.dart';
 import 'package:dead_or_alive/features/nine_judges/models/judge_models.dart';
 import 'package:dead_or_alive/features/nine_judges/simulation/simulation_config.dart';
+import 'package:dead_or_alive/features/nine_judges/simulation/first_second_analysis.dart';
 import 'package:dead_or_alive/features/nine_judges/simulation/simulation_result.dart';
 import 'package:dead_or_alive/features/nine_judges/simulation/simulation_statistics.dart';
 
@@ -13,12 +14,14 @@ class SimulationRun {
     required this.config,
     required this.results,
     required this.statistics,
+    required this.firstSecondAnalysis,
     required this.elapsed,
   });
 
   final SimulationConfig config;
   final List<SimulationResult> results;
   final SimulationStatistics statistics;
+  final FirstSecondAnalysis firstSecondAnalysis;
   final Duration elapsed;
 }
 
@@ -35,6 +38,7 @@ class SimulationRunner {
       config: config,
       results: results,
       statistics: SimulationStatistics.fromResults(results, config),
+      firstSecondAnalysis: FirstSecondAnalysis.fromResults(results, config),
       elapsed: stopwatch.elapsed,
     );
   }
@@ -143,6 +147,8 @@ class SimulationRunner {
       final before = board[index].person;
       final knewBefore = before.isConfirmed || known[actor]!.contains(index);
       final wasReverse = _isReverse(decision.action, actor);
+      final currentBonusValue = bonuses[bonusIndex];
+      final currentBonusKnown = privateBonus[actor] == currentBonusValue;
       var after = before;
       if (decision.action == ActionType.eye) {
         known[actor]!.add(index);
@@ -161,9 +167,12 @@ class SimulationRunner {
         );
       }
       int? awardedBonus;
+      int? confirmationOrder;
       if (!before.isConfirmed && after.isConfirmed) {
         final scorer = NineJudgesRules.scoringFaction(after);
         awardedBonus = bonuses[bonusIndex];
+        confirmationOrder =
+            board.where((slot) => slot.person.isConfirmed).length + 1;
         scores[scorer] = scores[scorer]! + awardedBonus;
         after = after.copyWith(
           scoringFaction: scorer,
@@ -192,7 +201,12 @@ class SimulationRunner {
           stateAfter: after.verdictState,
           historyBefore: before.verdictHistory,
           historyAfter: after.verdictHistory,
+          targetAttribute: before.attribute,
+          currentBonusValue: currentBonusValue,
+          currentBonusKnown: currentBonusKnown,
           verdictBonus: awardedBonus,
+          scoringFaction: after.scoringFaction,
+          confirmationOrder: confirmationOrder,
         ),
       );
       actor = actor.opponent;
