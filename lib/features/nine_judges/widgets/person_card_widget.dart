@@ -90,13 +90,21 @@ class PersonCardWidget extends StatelessWidget {
                   child: LayoutBuilder(
                     builder: (context, c) {
                       final compact = c.maxHeight < 150;
+                      final footerHeight = compact ? 45.0 : 52.0;
                       return Stack(
                         fit: StackFit.expand,
                         children: [
-                          _Portrait(
-                            person: person,
-                            attributeVisible: attributeVisible,
-                            dimmed: !enabled && !confirmed && !highlighted,
+                          Positioned(
+                            key: const Key('portrait-area'),
+                            left: 0,
+                            right: 0,
+                            top: 0,
+                            bottom: footerHeight,
+                            child: _Portrait(
+                              person: person,
+                              attributeVisible: attributeVisible,
+                              dimmed: !enabled && !confirmed && !highlighted,
+                            ),
                           ),
                           if (confirmed)
                             DecoratedBox(
@@ -121,7 +129,13 @@ class PersonCardWidget extends StatelessWidget {
                                 ),
                               ),
                             ),
-                          const _Scrim(),
+                          Positioned(
+                            left: 0,
+                            right: 0,
+                            top: 0,
+                            bottom: footerHeight,
+                            child: const _Scrim(),
+                          ),
                           _Corners(
                             coordinate: coordinate,
                             attributeVisible: attributeVisible,
@@ -133,8 +147,12 @@ class PersonCardWidget extends StatelessWidget {
                             confirmed: confirmed,
                             accent: accent,
                           ),
-                          Align(
-                            alignment: Alignment.bottomCenter,
+                          Positioned(
+                            key: const Key('card-info-area'),
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            height: footerHeight,
                             child: _Footer(
                               person: person,
                               attributeVisible: attributeVisible,
@@ -171,24 +189,50 @@ class _Portrait extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final image = Image.asset(
+    final portrait = Image.asset(
       attributeVisible
           ? CardAssets.portrait(person)
           : CardAssets.unknownPortrait(person.id),
       fit: BoxFit.cover,
-      alignment: Alignment.topCenter,
+      alignment: const Alignment(0, -.18),
       gaplessPlayback: true,
       errorBuilder: (_, _, _) => const ColoredBox(color: Color(0xFF15131B)),
     );
-    return dimmed
-        ? ColorFiltered(
-            colorFilter: const ColorFilter.mode(
-              Color(0x88101015),
-              BlendMode.darken,
-            ),
-            child: image,
-          )
-        : image;
+    final normalized = attributeVisible
+        ? portrait
+        : ColorFiltered(
+            colorFilter: const ColorFilter.matrix(<double>[
+              .55,
+              .20,
+              .05,
+              0,
+              0,
+              .12,
+              .48,
+              .08,
+              0,
+              0,
+              .08,
+              .18,
+              .44,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+            ]),
+            child: portrait,
+          );
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        normalized,
+        if (!attributeVisible) const ColoredBox(color: Color(0x5005070C)),
+        if (dimmed) const ColoredBox(color: Color(0x66101015)),
+      ],
+    );
   }
 }
 
@@ -369,15 +413,23 @@ class _AssetBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => SizedBox(
-    width: 22,
-    height: 22,
-    child: ClipOval(
-      child: Image.asset(
-        asset,
-        key: badgeKey,
-        fit: BoxFit.cover,
-        gaplessPlayback: true,
-        errorBuilder: (_, _, _) => const SizedBox.shrink(),
+    key: const Key('attribute-icon-area'),
+    width: 24,
+    height: 24,
+    child: Center(
+      child: SizedBox(
+        width: 22,
+        height: 22,
+        child: ClipOval(
+          child: Image.asset(
+            asset,
+            key: badgeKey,
+            fit: BoxFit.contain,
+            alignment: Alignment.center,
+            gaplessPlayback: true,
+            errorBuilder: (_, _, _) => const SizedBox.shrink(),
+          ),
+        ),
       ),
     ),
   );
@@ -408,10 +460,11 @@ class _Footer extends StatelessWidget {
     // history > "審議中": every unconfirmed card used to shout "審議中" at the
     // same weight as a real verdict, so it's shrunk and muted here instead of
     // competing with the more useful information above and below it.
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 2, 4, 4),
+    return ColoredBox(
+      color: const Color(0xD908080C),
       child: Column(
-        mainAxisSize: MainAxisSize.min,
+        mainAxisSize: MainAxisSize.max,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text(
             attributeVisible ? person.attribute.label : '正体不明',

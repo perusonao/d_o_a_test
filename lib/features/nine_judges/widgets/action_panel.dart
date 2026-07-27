@@ -129,7 +129,7 @@ class _ActionButton extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  _Glyph(iconAsset, size: 15),
+                  _Glyph(iconAsset, action: action, size: 18),
                   const SizedBox(width: 5),
                   Flexible(
                     child: Text(
@@ -161,7 +161,7 @@ class _ActionButton extends StatelessWidget {
         : Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _Glyph(iconAsset, size: 26),
+              _Glyph(iconAsset, action: action, size: 28),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 mainAxisSize: MainAxisSize.min,
@@ -311,17 +311,36 @@ class _ActionButton extends StatelessWidget {
 }
 
 class _Glyph extends StatelessWidget {
-  const _Glyph(this.asset, {required this.size});
+  const _Glyph(this.asset, {required this.action, required this.size});
   final String asset;
+  final ActionType action;
   final double size;
 
   @override
-  Widget build(BuildContext context) => Image.asset(
-    asset,
+  Widget build(BuildContext context) => SizedBox(
+    key: Key('action-icon-area-${action.name}'),
     width: size,
     height: size,
-    fit: BoxFit.contain,
-    gaplessPlayback: true,
-    errorBuilder: (_, _, _) => Icon(Icons.circle, size: size),
+    child: Center(
+      // act_eye.png is already clipped at its source canvas' top edge. Use a
+      // complete vector eye in the same fixed stage rather than scaling a
+      // permanently truncated bitmap.
+      child: action == ActionType.eye
+          ? Icon(
+              Icons.visibility_outlined,
+              key: const Key('action-eye-icon-complete'),
+              size: size * .88,
+              color: AppTheme.eye,
+            )
+          : Image.asset(
+              asset,
+              width: size,
+              height: size,
+              fit: BoxFit.contain,
+              alignment: Alignment.center,
+              gaplessPlayback: true,
+              errorBuilder: (_, _, _) => Icon(Icons.circle, size: size),
+            ),
+    ),
   );
 }

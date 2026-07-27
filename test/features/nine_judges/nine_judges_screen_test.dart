@@ -693,4 +693,51 @@ void main() {
       AppTheme.dead,
     );
   });
+
+  testWidgets('陣営紋章・人物領域・アクションアイコンは共通サイズで揃う', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: NineJudgesGameScreen(initialSettings: NineJudgesGameSettings()),
+      ),
+    );
+
+    final saviorCrest = tester.getSize(
+      find.byKey(const Key('faction-crest-area-savior')),
+    );
+    final executorCrest = tester.getSize(
+      find.byKey(const Key('faction-crest-area-executor')),
+    );
+    expect(saviorCrest, executorCrest);
+    expect(saviorCrest, const Size(34, 34));
+
+    final portraitAreas = tester
+        .elementList(find.byKey(const Key('portrait-area')))
+        .map((element) => tester.getSize(find.byWidget(element.widget)))
+        .toList();
+    final infoAreas = tester
+        .elementList(find.byKey(const Key('card-info-area')))
+        .map((element) => tester.getSize(find.byWidget(element.widget)))
+        .toList();
+    expect(portraitAreas, hasLength(9));
+    expect(infoAreas, hasLength(9));
+    expect(portraitAreas.toSet(), hasLength(1));
+    expect(infoAreas.toSet(), hasLength(1));
+
+    for (final action in ['life', 'death', 'eye']) {
+      expect(
+        tester.getSize(find.byKey(Key('action-icon-area-$action'))),
+        const Size(28, 28),
+      );
+    }
+    expect(find.byKey(const Key('action-eye-icon-complete')), findsOneWidget);
+    final eyeIcon = tester.getSize(
+      find.byKey(const Key('action-eye-icon-complete')),
+    );
+    expect(eyeIcon.width, lessThanOrEqualTo(28));
+    expect(eyeIcon.height, lessThanOrEqualTo(28));
+    expect(tester.takeException(), isNull);
+  });
 }

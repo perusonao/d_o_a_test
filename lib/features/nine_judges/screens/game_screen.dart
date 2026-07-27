@@ -438,20 +438,32 @@ class _PlayerPanel extends StatelessWidget {
         ? (faction == controller.humanFaction ? 'あなた' : 'CPU')
         : faction.label;
 
-    final crest = Container(
-      width: 30,
-      height: 30,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(color: color.withValues(alpha: .7)),
-      ),
-      child: ClipOval(
-        child: Image.asset(
-          CardAssets.crest(faction),
-          fit: BoxFit.cover,
-          gaplessPlayback: true,
-          errorBuilder: (_, _, _) =>
-              Icon(Icons.balance, color: color, size: 18),
+    // Both source crests have different canvas ratios. A fixed square stage
+    // with contain-fit keeps their visual centres aligned instead of letting
+    // ClipOval + cover crop each source differently.
+    final crest = SizedBox(
+      key: Key('faction-crest-area-${faction.name}'),
+      width: 34,
+      height: 34,
+      child: Center(
+        child: Container(
+          width: 30,
+          height: 30,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: Colors.black.withValues(alpha: .18),
+            border: Border.all(color: color.withValues(alpha: .7)),
+          ),
+          padding: const EdgeInsets.all(2),
+          child: Image.asset(
+            CardAssets.crest(faction),
+            key: Key('faction-crest-${faction.name}'),
+            fit: BoxFit.contain,
+            alignment: Alignment.center,
+            gaplessPlayback: true,
+            errorBuilder: (_, _, _) =>
+                Icon(Icons.balance, color: color, size: 18),
+          ),
         ),
       ),
     );
