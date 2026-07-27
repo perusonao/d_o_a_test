@@ -19,7 +19,11 @@ MEDIA_SOURCES = ROOT / "tool" / "media_sources"
 APP_ICON = ROOT / "assets" / "branding" / "app_icon.png"
 GAME_SHOT = MEDIA_SOURCES / "media-game.png"
 TUTORIAL_SHOT = MEDIA_SOURCES / "media-tutorial.png"
-FONT_PATH = Path("C:/Windows/Fonts/YuGothM.ttc")
+FONT_PATH = Path(
+    "/usr/share/fonts/truetype/fonts-japanese-gothic.ttf"
+    if Path("/usr/share/fonts/truetype/fonts-japanese-gothic.ttf").exists()
+    else "C:/Windows/Fonts/YuGothM.ttc"
+)
 
 BG = "#0B0B10"
 GOLD = "#C8A34A"
@@ -149,9 +153,9 @@ def generate_how_to_play() -> None:
     )
     pdf.add_page(
         "5. 逆属性アクション",
-        "救済者はDEATHを1回だけ使用できます。\n"
-        "執行者はLIFEを1回だけ使用できます。\n\n"
-        "ボタンのSPECIAL ●1が残数です。使用後はSPECIAL ●0となります。",
+        "救済者は「SPECIAL DEATH」を1回だけ使用できます。\n"
+        "執行者は「SPECIAL LIFE」を1回だけ使用できます。\n\n"
+        "ボタンの「残り1回」が残数です。使用後は「使用済み」と表示されます。",
         accent=RED,
     )
     pdf.add_page(
