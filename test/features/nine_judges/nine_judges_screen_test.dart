@@ -13,6 +13,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(home: NineJudgesModeSelectScreen(onStart: (_) {})),
     );
+    await tester.ensureVisible(find.byKey(const Key('open-downloads')));
     await tester.tap(find.byKey(const Key('open-downloads')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('download-how-to')), findsOneWidget);

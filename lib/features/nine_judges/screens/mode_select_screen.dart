@@ -1,3 +1,4 @@
+import 'package:dead_or_alive/app/theme.dart';
 import 'package:dead_or_alive/features/nine_judges/models/judge_models.dart';
 import 'package:dead_or_alive/features/nine_judges/online/online_lobby_screen.dart';
 import 'package:dead_or_alive/features/nine_judges/rules/rules_guide_screen.dart';
@@ -23,7 +24,7 @@ class NineJudgesModeSelectScreen extends StatefulWidget {
 class _NineJudgesModeSelectScreenState
     extends State<NineJudgesModeSelectScreen> {
   GameMode mode = GameMode.cpu;
-  CpuLevel level = CpuLevel.basic;
+  CpuLevel level = CpuLevel.balanced;
   FactionSelection faction = FactionSelection.random;
   FirstPlayerSelection firstPlayer = FirstPlayerSelection.random;
 
@@ -35,208 +36,131 @@ class _NineJudgesModeSelectScreenState
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 430),
             child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+              padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Center(
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(18),
-                      child: Image.asset(
-                        'assets/branding/app_icon.png',
-                        width: 76,
-                        height: 76,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  const Text(
-                    '9人の審判',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Color(0xFFD6B25E),
-                      fontSize: 27,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const Text(
-                    'NINE VERDICTS',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Colors.white54,
-                      fontSize: 11,
-                      letterSpacing: 3,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 36),
-                  const Text('対戦モード', textAlign: TextAlign.center),
-                  const SizedBox(height: 10),
-                  SegmentedButton<GameMode>(
-                    key: const Key('game-mode-selector'),
-                    segments: const [
-                      ButtonSegment(
-                        value: GameMode.cpu,
-                        icon: Icon(Icons.smart_toy_outlined),
-                        label: Text('CPU対戦'),
-                      ),
-                      ButtonSegment(
-                        value: GameMode.hotseat,
-                        icon: Icon(Icons.people_outline),
-                        label: Text('2人対戦'),
-                      ),
-                    ],
-                    selected: {mode},
-                    onSelectionChanged: (value) =>
-                        setState(() => mode = value.first),
-                  ),
-                  if (mode == GameMode.cpu) ...[
-                    const SizedBox(height: 16),
-                    const Text('陣営', textAlign: TextAlign.center),
-                    SegmentedButton<FactionSelection>(
-                      key: const Key('faction-selector'),
-                      segments: const [
-                        ButtonSegment(
-                          value: FactionSelection.savior,
-                          label: Text('救済者'),
+                  const _Hero(),
+                  const SizedBox(height: 26),
+                  _SectionCard(
+                    title: 'はじめる',
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        SegmentedButton<GameMode>(
+                          key: const Key('game-mode-selector'),
+                          segments: const [
+                            ButtonSegment(
+                              value: GameMode.cpu,
+                              icon: Icon(Icons.smart_toy_outlined),
+                              label: Text('CPU対戦'),
+                            ),
+                            ButtonSegment(
+                              value: GameMode.hotseat,
+                              icon: Icon(Icons.people_outline),
+                              label: Text('2人対戦'),
+                            ),
+                          ],
+                          selected: {mode},
+                          onSelectionChanged: (value) =>
+                              setState(() => mode = value.first),
                         ),
-                        ButtonSegment(
-                          value: FactionSelection.executor,
-                          label: Text('執行者'),
+                        if (mode == GameMode.cpu) ...[
+                          const SizedBox(height: 18),
+                          _CpuOptions(
+                            faction: faction,
+                            firstPlayer: firstPlayer,
+                            level: level,
+                            onFaction: (v) => setState(() => faction = v),
+                            onFirstPlayer: (v) =>
+                                setState(() => firstPlayer = v),
+                            onLevel: (v) => setState(() => level = v),
+                          ),
+                        ],
+                        const SizedBox(height: 18),
+                        FilledButton.icon(
+                          key: const Key('start-game'),
+                          style: FilledButton.styleFrom(
+                            minimumSize: const Size(0, 52),
+                          ),
+                          onPressed: () => widget.onStart(
+                            NineJudgesGameSettings(
+                              mode: mode,
+                              cpuLevel: level,
+                              factionSelection: faction,
+                              firstPlayerSelection: firstPlayer,
+                            ),
+                          ),
+                          icon: const Icon(Icons.gavel),
+                          label: const Text('ゲーム開始'),
                         ),
-                        ButtonSegment(
-                          value: FactionSelection.random,
-                          label: Text('ランダム'),
-                        ),
-                      ],
-                      selected: {faction},
-                      onSelectionChanged: (v) =>
-                          setState(() => faction = v.first),
-                    ),
-                    const SizedBox(height: 10),
-                    const Text('先攻', textAlign: TextAlign.center),
-                    SegmentedButton<FirstPlayerSelection>(
-                      key: const Key('first-player-selector'),
-                      segments: const [
-                        ButtonSegment(
-                          value: FirstPlayerSelection.human,
-                          label: Text('自分'),
-                        ),
-                        ButtonSegment(
-                          value: FirstPlayerSelection.cpu,
-                          label: Text('CPU'),
-                        ),
-                        ButtonSegment(
-                          value: FirstPlayerSelection.random,
-                          label: Text('ランダム'),
-                        ),
-                      ],
-                      selected: {firstPlayer},
-                      onSelectionChanged: (v) =>
-                          setState(() => firstPlayer = v.first),
-                    ),
-                    const SizedBox(height: 14),
-                    const Text('CPUレベル', textAlign: TextAlign.center),
-                    const SizedBox(height: 10),
-                    SegmentedButton<CpuLevel>(
-                      key: const Key('cpu-level-selector'),
-                      segments: const [
-                        ButtonSegment(
-                          value: CpuLevel.random,
-                          label: Text('EASY'),
-                        ),
-                        ButtonSegment(
-                          value: CpuLevel.basic,
-                          label: Text('NORMAL'),
-                        ),
-                      ],
-                      selected: {level},
-                      onSelectionChanged: (value) =>
-                          setState(() => level = value.first),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      level == CpuLevel.random
-                          ? 'RANDOM：合法手からランダムに選択'
-                          : 'BASIC：人物価値と陣営目的で評価',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Colors.white60,
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 20),
-                  FilledButton(
-                    key: const Key('start-game'),
-                    onPressed: () => widget.onStart(
-                      NineJudgesGameSettings(
-                        mode: mode,
-                        cpuLevel: level,
-                        factionSelection: faction,
-                        firstPlayerSelection: firstPlayer,
-                      ),
-                    ),
-                    child: const Text('ゲーム開始'),
-                  ),
-                  OutlinedButton.icon(
-                    key: const Key('open-online'),
-                    onPressed: () => Navigator.push<void>(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const OnlineLobbyScreen(),
-                      ),
-                    ),
-                    icon: const Icon(Icons.public),
-                    label: const Text('オンライン対戦 β'),
-                  ),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextButton.icon(
-                          key: const Key('open-tutorial'),
+                        const SizedBox(height: 8),
+                        OutlinedButton.icon(
+                          key: const Key('open-online'),
                           onPressed: () => Navigator.push<void>(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => const TutorialScreen(),
+                              builder: (_) => const OnlineLobbyScreen(),
                             ),
                           ),
-                          icon: const Icon(Icons.school_outlined),
-                          label: const Text('チュートリアル'),
+                          icon: const Icon(Icons.public),
+                          label: const Text('オンライン対戦 β'),
                         ),
-                      ),
-                      Expanded(
-                        child: TextButton.icon(
-                          key: const Key('open-rules'),
-                          onPressed: () => Navigator.push<void>(
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  _SectionCard(
+                    title: 'メニュー',
+                    child: GridView.count(
+                      crossAxisCount: 2,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      crossAxisSpacing: 10,
+                      mainAxisSpacing: 10,
+                      childAspectRatio: 3.2,
+                      children: [
+                        _MenuTile(
+                          buttonKey: const Key('open-rules'),
+                          icon: Icons.menu_book_outlined,
+                          label: '遊び方',
+                          onTap: () => Navigator.push<void>(
                             context,
                             MaterialPageRoute(
                               builder: (_) => const RulesGuideScreen(),
                             ),
                           ),
-                          icon: const Icon(Icons.menu_book_outlined),
-                          label: const Text('遊び方'),
                         ),
-                      ),
-                    ],
-                  ),
-                  TextButton.icon(
-                    key: const Key('open-downloads'),
-                    onPressed: () => Navigator.push<void>(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const DownloadCenterScreen(),
-                      ),
+                        _MenuTile(
+                          buttonKey: const Key('open-tutorial'),
+                          icon: Icons.school_outlined,
+                          label: 'チュートリアル',
+                          onTap: () => Navigator.push<void>(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const TutorialScreen(),
+                            ),
+                          ),
+                        ),
+                        _MenuTile(
+                          buttonKey: const Key('open-downloads'),
+                          icon: Icons.download_outlined,
+                          label: 'ダウンロード',
+                          onTap: () => Navigator.push<void>(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const DownloadCenterScreen(),
+                            ),
+                          ),
+                        ),
+                        _MenuTile(
+                          buttonKey: const Key('open-play-logs'),
+                          icon: Icons.analytics_outlined,
+                          label: 'プレイログ',
+                          onTap: widget.onOpenLogs,
+                        ),
+                      ],
                     ),
-                    icon: const Icon(Icons.download_outlined),
-                    label: const Text('ガイド・動画をダウンロード'),
-                  ),
-                  TextButton.icon(
-                    key: const Key('open-play-logs'),
-                    onPressed: widget.onOpenLogs,
-                    icon: const Icon(Icons.analytics_outlined),
-                    label: const Text('プレイログ・分析'),
                   ),
                 ],
               ),
@@ -246,4 +170,204 @@ class _NineJudgesModeSelectScreenState
       ),
     );
   }
+}
+
+class _Hero extends StatelessWidget {
+  const _Hero();
+
+  @override
+  Widget build(BuildContext context) => Column(
+    children: [
+      ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Image.asset(
+          'assets/branding/app_icon.png',
+          width: 84,
+          height: 84,
+        ),
+      ),
+      const SizedBox(height: 12),
+      const Text(
+        '9人の審判',
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          color: Color(0xFFD6B25E),
+          fontSize: 28,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+      const Text(
+        'NINE VERDICTS',
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          color: Colors.white54,
+          fontSize: 11,
+          letterSpacing: 3,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    ],
+  );
+}
+
+/// Titled panel that groups related controls so the menu reads as a few tidy
+/// blocks instead of one long list.
+class _SectionCard extends StatelessWidget {
+  const _SectionCard({required this.title, required this.child});
+  final String title;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+    decoration: BoxDecoration(
+      color: const Color(0xE6141019),
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(color: AppTheme.accent.withValues(alpha: .28)),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12, left: 2),
+          child: Text(
+            title,
+            style: const TextStyle(
+              color: Color(0xFFD6B25E),
+              fontSize: 12,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 1.5,
+            ),
+          ),
+        ),
+        child,
+      ],
+    ),
+  );
+}
+
+class _CpuOptions extends StatelessWidget {
+  const _CpuOptions({
+    required this.faction,
+    required this.firstPlayer,
+    required this.level,
+    required this.onFaction,
+    required this.onFirstPlayer,
+    required this.onLevel,
+  });
+
+  final FactionSelection faction;
+  final FirstPlayerSelection firstPlayer;
+  final CpuLevel level;
+  final ValueChanged<FactionSelection> onFaction;
+  final ValueChanged<FirstPlayerSelection> onFirstPlayer;
+  final ValueChanged<CpuLevel> onLevel;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      const _FieldLabel('陣営'),
+      SegmentedButton<FactionSelection>(
+        key: const Key('faction-selector'),
+        showSelectedIcon: false,
+        segments: const [
+          ButtonSegment(value: FactionSelection.savior, label: Text('救済者')),
+          ButtonSegment(value: FactionSelection.executor, label: Text('執行者')),
+          ButtonSegment(value: FactionSelection.random, label: Text('ランダム')),
+        ],
+        selected: {faction},
+        onSelectionChanged: (v) => onFaction(v.first),
+      ),
+      const SizedBox(height: 12),
+      const _FieldLabel('先攻'),
+      SegmentedButton<FirstPlayerSelection>(
+        key: const Key('first-player-selector'),
+        showSelectedIcon: false,
+        segments: const [
+          ButtonSegment(value: FirstPlayerSelection.human, label: Text('自分')),
+          ButtonSegment(value: FirstPlayerSelection.cpu, label: Text('CPU')),
+          ButtonSegment(
+            value: FirstPlayerSelection.random,
+            label: Text('ランダム'),
+          ),
+        ],
+        selected: {firstPlayer},
+        onSelectionChanged: (v) => onFirstPlayer(v.first),
+      ),
+      const SizedBox(height: 12),
+      const _FieldLabel('思考パターン'),
+      Wrap(
+        key: const Key('cpu-level-selector'),
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          for (final option in CpuLevel.values)
+            ChoiceChip(
+              key: Key('cpu-level-${option.name}'),
+              label: Text(option.uiLabel),
+              selected: level == option,
+              onSelected: (_) => onLevel(option),
+            ),
+        ],
+      ),
+      const SizedBox(height: 8),
+      Text(
+        '${level.strategyLabel}：${level.description}',
+        key: const Key('cpu-level-description'),
+        style: const TextStyle(fontSize: 12, color: Colors.white60),
+      ),
+    ],
+  );
+}
+
+class _FieldLabel extends StatelessWidget {
+  const _FieldLabel(this.text);
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 6, left: 2),
+    child: Text(
+      text,
+      style: const TextStyle(
+        fontSize: 11,
+        color: Colors.white70,
+        fontWeight: FontWeight.w700,
+      ),
+    ),
+  );
+}
+
+class _MenuTile extends StatelessWidget {
+  const _MenuTile({
+    required this.buttonKey,
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final Key buttonKey;
+  final IconData icon;
+  final String label;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) => OutlinedButton.icon(
+    key: buttonKey,
+    onPressed: onTap,
+    style: OutlinedButton.styleFrom(
+      foregroundColor: const Color(0xFFE7DBC0),
+      side: BorderSide(color: AppTheme.accent.withValues(alpha: .4)),
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      alignment: Alignment.centerLeft,
+    ),
+    icon: Icon(icon, size: 18),
+    label: Text(
+      label,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+    ),
+  );
 }

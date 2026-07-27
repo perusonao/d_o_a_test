@@ -48,11 +48,14 @@ void main() {
         cpuFaction: Faction.executor,
         firstPlayer: Faction.executor,
         firstPlayerSelection: FirstPlayerSelection.cpu,
-        cpuLevel: CpuLevel.basic,
+        cpuLevel: CpuLevel.balanced,
       ),
     );
-    final decision = game.performCpuAction();
-    expect(decision!.action, ActionType.eye);
+    // 執行者(CPU)の手番。共有エンジン経由でスロット5(未知)へEYEを強制し、
+    // CPUメッセージ生成が属性を漏らさないことを決定論的に検証する。
+    final ok = game.performTutorialAction(ActionType.eye, 5);
+    expect(ok, isTrue);
+    expect(game.lastCpuActionType, ActionType.eye);
     expect(game.lastCpuActionMessage, isNotNull);
     expect(game.lastCpuActionMessage, isNot(contains('善人')));
     expect(game.lastCpuActionMessage, isNot(contains('悪人')));
