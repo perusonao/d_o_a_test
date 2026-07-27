@@ -40,7 +40,7 @@ void main() {
     expect(find.byKey(const Key('current-bonus')), findsOneWidget);
     expect(find.byKey(const Key('bonus-history')), findsOneWidget);
     expect(find.byKey(const Key('faction-savior')), findsOneWidget);
-    expect(find.text('0 POINT'), findsNWidgets(2));
+    expect(find.text('0'), findsNWidgets(2));
     expect(find.byKey(const Key('action-life')), findsOneWidget);
     expect(find.byKey(const Key('action-eye')), findsOneWidget);
     expect(find.byKey(const Key('action-specialVerdict')), findsOneWidget);
