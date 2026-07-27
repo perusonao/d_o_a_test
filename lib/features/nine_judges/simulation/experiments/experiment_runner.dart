@@ -108,9 +108,19 @@ class ExperimentSimulationRunner {
                     FirstPlayerBonusAction.reverseAction
             ? 1
             : 0);
+    int revokeBudget(Faction faction) => faction == firstPlayer
+        ? experiment.revokeBudgetFirstPlayer
+        : experiment.revokeBudgetSecondPlayer;
 
     final specialCount = <Faction, int>{Faction.savior: 0, Faction.executor: 0};
     final reverseCount = <Faction, int>{Faction.savior: 0, Faction.executor: 0};
+    final eyeUsedCount = <Faction, int>{Faction.savior: 0, Faction.executor: 0};
+    final revokeCount = <Faction, int>{Faction.savior: 0, Faction.executor: 0};
+    final revokeEvents = <Map<String, Object?>>[];
+    // Who placed each still-standing LIFE/DEATH mark on a slot, in order, so
+    // REVOKE can identify (and undo) only the most recent one and tell
+    // whether it was undoing the opponent's progress or its own.
+    final markActors = <int, List<Faction>>{};
     final scores = <Faction, int>{Faction.savior: 0, Faction.executor: 0};
     final privateBonus = <Faction, int?>{
       Faction.savior: bonuses.first,
@@ -193,6 +203,51 @@ class ExperimentSimulationRunner {
         }
       }
 
+      if (revokeCount[actor]! < revokeBudget(actor)) {
+        final revoke = _bestRevoke(actor, board, markActors, known);
+        if (revoke != null && revoke.score > 0) {
+          final targetIndex = revoke.targetIndex;
+          final before = board[targetIndex].person;
+          final removedType = before.verdictHistory.last;
+          final shortenedHistory = before.verdictHistory.sublist(
+            0,
+            before.verdictHistory.length - 1,
+          );
+          // Replay the shortened history through the same production state
+          // machine used for a real LIFE/DEATH action, so REVOKE can never
+          // drift from what "that mark never happened" actually means.
+          var replay = PersonCard(id: before.id, attribute: before.attribute);
+          for (final mark in shortenedHistory) {
+            replay = NineJudgesRules.applyVerdictAction(
+              person: replay,
+              action: mark == VerdictActionType.life
+                  ? ActionType.life
+                  : ActionType.death,
+              actor: actor, // confirmedBy is irrelevant pre-confirmation.
+            );
+          }
+          final wasContested =
+              markActors[targetIndex]!.toSet().length > 1;
+          markActors[targetIndex]!.removeLast();
+          board[targetIndex] = board[targetIndex].copyWith(person: replay);
+          revokeCount[actor] = revokeCount[actor]! + 1;
+          revokeEvents.add({
+            'turn': turn,
+            'faction': actor.name,
+            'targetIndex': targetIndex,
+            'removedAction': removedType.name,
+            'attribute': before.attribute.name,
+            'actorKnewAttribute':
+                before.isConfirmed || known[actor]!.contains(targetIndex),
+            'historyLengthBefore': before.verdictHistory.length,
+            'wasContestedSoFar': wasContested,
+          });
+          actor = actor.opponent;
+          turn++;
+          continue;
+        }
+      }
+
       final legalTargets = <ActionType, List<int>>{
         for (final action in ActionType.values)
           action: action == ActionType.specialVerdict &&
@@ -219,6 +274,11 @@ class ExperimentSimulationRunner {
                           action == ActionType.eye &&
                           experiment.eyeSharedSingleUse &&
                           eyeUsedSlots.contains(index),
+                      eyeLimitReached:
+                          action == ActionType.eye &&
+                          experiment.eyeMaxUsesPerPlayer != null &&
+                          eyeUsedCount[actor]! >=
+                              experiment.eyeMaxUsesPerPlayer!,
                       index: index,
                     ))
                       index,
@@ -259,6 +319,7 @@ class ExperimentSimulationRunner {
       if (decision.action == ActionType.eye) {
         known[actor]!.add(index);
         eyeUsedSlots.add(index);
+        eyeUsedCount[actor] = eyeUsedCount[actor]! + 1;
       } else if (decision.action == ActionType.specialVerdict) {
         specialCount[actor] = specialCount[actor]! + 1;
         after = NineJudgesRules.applySpecialVerdict(person: before, actor: actor);
@@ -269,6 +330,7 @@ class ExperimentSimulationRunner {
           action: decision.action,
           actor: actor,
         );
+        markActors.putIfAbsent(index, () => []).add(actor);
       }
       int? awardedBonus;
       int? confirmationOrder;
@@ -447,14 +509,43 @@ class ExperimentSimulationRunner {
                 entry.action == ActionType.eye,
           )
           .length;
-      final saviorCost = experiment.eyeScoreCost * saviorEyeCount;
-      final executorCost = experiment.eyeScoreCost * executorEyeCount;
+      int costFor(int count) => experiment.eyeFreeFirstUse
+          ? experiment.eyeScoreCost * max(0, count - 1)
+          : experiment.eyeScoreCost * count;
+      final saviorCost = costFor(saviorEyeCount);
+      final executorCost = costFor(executorEyeCount);
       extras['saviorScoreBeforeEyeCost'] = saviorScore;
       extras['executorScoreBeforeEyeCost'] = executorScore;
       extras['saviorEyeCost'] = saviorCost;
       extras['executorEyeCost'] = executorCost;
       saviorScore = max(0, saviorScore - saviorCost);
       executorScore = max(0, executorScore - executorCost);
+    }
+
+    if (revokeEvents.isNotEmpty) {
+      final touchedAfter = <bool>[];
+      final finalScorers = <String?>[];
+      final revokerGotCredit = <bool>[];
+      for (final event in revokeEvents) {
+        final targetIndex = event['targetIndex']! as int;
+        final turn = event['turn']! as int;
+        final faction = event['faction'] as String;
+        touchedAfter.add(
+          actions.any(
+            (action) => action.targetIndex == targetIndex && action.turn > turn,
+          ),
+        );
+        final finalPerson = board[targetIndex].person;
+        finalScorers.add(finalPerson.scoringFaction?.name);
+        revokerGotCredit.add(finalPerson.scoringFaction?.name == faction);
+      }
+      extras['revokeEvents'] = revokeEvents;
+      extras['revokeCount'] = revokeEvents.length;
+      extras['revokeTargetTouchedAgainAfter'] = touchedAfter;
+      extras['revokeTargetFinalScorer'] = finalScorers;
+      extras['revokeUserGotFinalCredit'] = revokerGotCredit;
+    } else {
+      extras['revokeCount'] = 0;
     }
 
     return ExperimentGameOutcome(
@@ -465,11 +556,57 @@ class ExperimentSimulationRunner {
         firstPlayer: firstPlayer,
         saviorScore: saviorScore,
         executorScore: executorScore,
+        totalTurns: turn - 1,
         board: board,
         actions: actions,
       ),
       extras: extras,
     );
+  }
+
+  /// Simulation-only greedy REVOKE evaluator (documented assumption: no
+  /// production CPU strategy reasons about removing a mark, so — exactly
+  /// like Experiment C's reversal — this is a small local heuristic, not
+  /// [CpuEvaluator]). It only ever considers undoing the *opponent's* most
+  /// recent mark, and only when the person's current attribute is known to
+  /// the actor and currently trending toward the opponent's favour; a blind
+  /// or self-inflicted-undo case never scores above zero.
+  ({int targetIndex, double score})? _bestRevoke(
+    Faction actor,
+    List<BoardSlot> board,
+    Map<int, List<Faction>> markActors,
+    Map<Faction, Set<int>> known,
+  ) {
+    ({int targetIndex, double score})? best;
+    for (var index = 0; index < board.length; index++) {
+      final person = board[index].person;
+      if (person.isConfirmed || person.verdictHistory.isEmpty) continue;
+      final actors = markActors[index];
+      if (actors == null || actors.isEmpty || actors.last == actor) {
+        continue; // Only ever undo the opponent's most recent mark.
+      }
+      final attributeKnown =
+          person.isConfirmed || known[actor]!.contains(index);
+      double score;
+      if (!attributeKnown) {
+        score = 1; // Same low, direction-blind value as a blind verdict.
+      } else {
+        // Reuse the production scoring rule on a hypothetical "confirmed
+        // right now" copy, purely to read which faction the current
+        // direction is trending toward — no new rule is added anywhere.
+        final trendingConfirmed = person.copyWith(
+          verdictState: person.verdictState == VerdictState.alive
+              ? VerdictState.aliveConfirmed
+              : VerdictState.deadConfirmed,
+        );
+        final trendingScorer = NineJudgesRules.scoringFaction(trendingConfirmed);
+        score = trendingScorer != actor ? 4 : -2;
+      }
+      if (best == null || score > best.score) {
+        best = (targetIndex: index, score: score);
+      }
+    }
+    return best;
   }
 
   ({int targetIndex, double score})? _bestReversal(
@@ -505,11 +642,13 @@ class ExperimentSimulationRunner {
     required bool reverseActionUsed,
     required bool inCenterZoneOnly,
     required bool eyeAlreadyUsedElsewhere,
+    required bool eyeLimitReached,
     required int index,
   }) {
     if (action == ActionType.eye) {
       if (inCenterZoneOnly && !_centerIndices.contains(index)) return false;
       if (eyeAlreadyUsedElsewhere) return false;
+      if (eyeLimitReached) return false;
     }
     return NineJudgesRules.canUseAction(
       action: action,
@@ -528,6 +667,7 @@ class ExperimentSimulationRunner {
     required Faction firstPlayer,
     required int saviorScore,
     required int executorScore,
+    required int totalTurns,
     required List<BoardSlot> board,
     required List<SimulationActionRecord> actions,
   }) {
@@ -573,7 +713,7 @@ class ExperimentSimulationRunner {
       firstPlayer: firstPlayer,
       saviorScore: saviorScore,
       executorScore: executorScore,
-      totalTurns: actions.length,
+      totalTurns: totalTurns,
       endReason: 'allConfirmed',
       saviorEyeCount: count(Faction.savior, ActionType.eye),
       executorEyeCount: count(Faction.executor, ActionType.eye),

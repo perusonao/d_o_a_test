@@ -45,8 +45,12 @@ class SimulationExperimentConfig {
     this.eyeZoneMode = EyeZoneMode.unrestricted,
     this.eyeSharedSingleUse = false,
     this.eyeScoreCost = 0,
+    this.eyeMaxUsesPerPlayer,
+    this.eyeFreeFirstUse = false,
     this.firstPlayerBonusAction = FirstPlayerBonusAction.none,
     this.informationMode = InformationMode.standard,
+    this.revokeBudgetFirstPlayer = 0,
+    this.revokeBudgetSecondPlayer = 0,
   });
 
   final String name;
@@ -55,8 +59,24 @@ class SimulationExperimentConfig {
   final EyeZoneMode eyeZoneMode;
   final bool eyeSharedSingleUse;
   final int eyeScoreCost;
+
+  /// Caps how many times each player may use EYE in one game (0..3). `null`
+  /// means no cap beyond whatever [eyeZoneMode]/[eyeSharedSingleUse] already
+  /// forbid.
+  final int? eyeMaxUsesPerPlayer;
+
+  /// When true, each player's *first* EYE use in the game is free; only the
+  /// 2nd and later uses pay [eyeScoreCost].
+  final bool eyeFreeFirstUse;
+
   final FirstPlayerBonusAction firstPlayerBonusAction;
   final InformationMode informationMode;
+
+  /// One-shot-per-game REVOKE budget (remove the most recent LIFE/DEATH mark
+  /// from a still-undecided person), keyed by turn order rather than faction
+  /// so it composes with [SimulationFirstPlayer.alternate]. 0 disables it.
+  final int revokeBudgetFirstPlayer;
+  final int revokeBudgetSecondPlayer;
 
   bool get isControl =>
       finalJudgeMode == FinalJudgeMode.none &&
@@ -64,8 +84,12 @@ class SimulationExperimentConfig {
       eyeZoneMode == EyeZoneMode.unrestricted &&
       !eyeSharedSingleUse &&
       eyeScoreCost == 0 &&
+      eyeMaxUsesPerPlayer == null &&
+      !eyeFreeFirstUse &&
       firstPlayerBonusAction == FirstPlayerBonusAction.none &&
-      informationMode == InformationMode.standard;
+      informationMode == InformationMode.standard &&
+      revokeBudgetFirstPlayer == 0 &&
+      revokeBudgetSecondPlayer == 0;
 
   SimulationExperimentConfig copyWith({
     String? name,
@@ -74,8 +98,12 @@ class SimulationExperimentConfig {
     EyeZoneMode? eyeZoneMode,
     bool? eyeSharedSingleUse,
     int? eyeScoreCost,
+    Object? eyeMaxUsesPerPlayer = _unset,
+    bool? eyeFreeFirstUse,
     FirstPlayerBonusAction? firstPlayerBonusAction,
     InformationMode? informationMode,
+    int? revokeBudgetFirstPlayer,
+    int? revokeBudgetSecondPlayer,
   }) => SimulationExperimentConfig(
     name: name ?? this.name,
     finalJudgeMode: finalJudgeMode ?? this.finalJudgeMode,
@@ -83,10 +111,20 @@ class SimulationExperimentConfig {
     eyeZoneMode: eyeZoneMode ?? this.eyeZoneMode,
     eyeSharedSingleUse: eyeSharedSingleUse ?? this.eyeSharedSingleUse,
     eyeScoreCost: eyeScoreCost ?? this.eyeScoreCost,
+    eyeMaxUsesPerPlayer: identical(eyeMaxUsesPerPlayer, _unset)
+        ? this.eyeMaxUsesPerPlayer
+        : eyeMaxUsesPerPlayer as int?,
+    eyeFreeFirstUse: eyeFreeFirstUse ?? this.eyeFreeFirstUse,
     firstPlayerBonusAction:
         firstPlayerBonusAction ?? this.firstPlayerBonusAction,
     informationMode: informationMode ?? this.informationMode,
+    revokeBudgetFirstPlayer:
+        revokeBudgetFirstPlayer ?? this.revokeBudgetFirstPlayer,
+    revokeBudgetSecondPlayer:
+        revokeBudgetSecondPlayer ?? this.revokeBudgetSecondPlayer,
   );
+
+  static const _unset = Object();
 
   static const control = SimulationExperimentConfig(name: 'CONTROL');
 
@@ -192,6 +230,101 @@ class SimulationExperimentConfig {
       eyeZoneMode: EyeZoneMode.centerOnly,
       eyeSharedSingleUse: true,
       informationMode: InformationMode.firstPlayerIsAttributeViewer,
+    ),
+  ];
+
+  /// The fixed 3x3 knowledge split this round's whole study is built on: own
+  /// row known from the start, opponent's row never EYE-able even though
+  /// it's unknown, center row is the only legal EYE zone. Unlike the first
+  /// round's [centerEyeOnly] (which also shared a single use across both
+  /// players), this base has no cross-player restriction — [eyeMaxUsesPerPlayer]
+  /// is the lever this round instead.
+  static final eyeZoneBase = control.copyWith(
+    name: 'D_ZONE_BASE',
+    eyeZoneMode: EyeZoneMode.centerOnly,
+  );
+
+  /// One cell of the EYE-limit × EYE-cost × first-player-SPECIAL grid.
+  /// [eyeMax] is 0..3 (3 == every center slot, since a slot can only ever be
+  /// EYE'd once per player anyway). [eyeCost] is 0 or 1 (flat per-use point
+  /// cost). [freeFirstUse] downgrades a flat cost to "first use free, 2nd+
+  /// costs [eyeCost]" (Experiment 2's stretch candidate C).
+  static SimulationExperimentConfig eyeGridCell({
+    required int eyeMax,
+    required int eyeCost,
+    bool freeFirstUse = false,
+    bool firstPlayerSpecial = false,
+  }) {
+    final parts = [
+      'EYE$eyeMax',
+      if (eyeCost == 0)
+        'COST0'
+      else if (freeFirstUse)
+        'COST_FREE1ST'
+      else
+        'COST-1',
+      if (firstPlayerSpecial) 'FSPECIAL',
+    ];
+    return eyeZoneBase.copyWith(
+      name: parts.join('_'),
+      eyeMaxUsesPerPlayer: eyeMax,
+      eyeScoreCost: eyeCost,
+      eyeFreeFirstUse: freeFirstUse,
+      firstPlayerBonusAction: firstPlayerSpecial
+          ? FirstPlayerBonusAction.specialVerdict
+          : FirstPlayerBonusAction.none,
+    );
+  }
+
+  /// The full 4 (EYE limit) × 2 (cost) × 2 (first-player SPECIAL) = 16-cell
+  /// grid requested for Experiments 1-3, all built on [eyeZoneBase] via
+  /// [eyeGridCell] rather than one hardcoded config per cell.
+  static final List<SimulationExperimentConfig> eyeGrid = [
+    for (final eyeMax in [0, 1, 2, 3])
+      for (final eyeCost in [0, 1])
+        for (final firstPlayerSpecial in [false, true])
+          eyeGridCell(
+            eyeMax: eyeMax,
+            eyeCost: eyeCost,
+            firstPlayerSpecial: firstPlayerSpecial,
+          ),
+  ];
+
+  /// Experiment 2's stretch candidate C ("1st EYE free, 2nd+ costs 1") for
+  /// eyeMax 2 and 3 — the only limits where a 2nd EYE use is even possible.
+  static final List<SimulationExperimentConfig> eyeFreeFirstUseGrid = [
+    for (final eyeMax in [2, 3])
+      for (final firstPlayerSpecial in [false, true])
+        eyeGridCell(
+          eyeMax: eyeMax,
+          eyeCost: 1,
+          freeFirstUse: true,
+          firstPlayerSpecial: firstPlayerSpecial,
+        ),
+  ];
+
+  /// REVOKE budget presets layered on top of a base (normally one of the
+  /// promising [eyeGrid] cells) for Experiment 4 / the second screening
+  /// stage. Budgets are keyed by turn order, so "first-only" and "first
+  /// gets more" compose the same way [firstPlayerBonusAction] does.
+  static List<SimulationExperimentConfig> revokeVariants(
+    SimulationExperimentConfig base,
+  ) => [
+    base.copyWith(name: '${base.name}_REVOKE_NONE'),
+    base.copyWith(
+      name: '${base.name}_REVOKE_BOTH1',
+      revokeBudgetFirstPlayer: 1,
+      revokeBudgetSecondPlayer: 1,
+    ),
+    base.copyWith(
+      name: '${base.name}_REVOKE_FIRST1',
+      revokeBudgetFirstPlayer: 1,
+      revokeBudgetSecondPlayer: 0,
+    ),
+    base.copyWith(
+      name: '${base.name}_REVOKE_FIRST2_SECOND1',
+      revokeBudgetFirstPlayer: 2,
+      revokeBudgetSecondPlayer: 1,
     ),
   ];
 
