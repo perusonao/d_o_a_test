@@ -315,7 +315,7 @@ void main() {
       expect(find.byKey(const Key('action-death')), findsOneWidget);
       expect(find.byKey(const Key('action-eye')), findsOneWidget);
       expect(find.byKey(const Key('action-specialVerdict')), findsOneWidget);
-      expect(find.byKey(const Key('action-reverse')), findsOneWidget);
+      expect(find.byKey(const Key('special-badge-death')), findsOneWidget);
       expect(find.text('JUDGE'), findsOneWidget);
       expect(find.textContaining('SPECIAL'), findsOneWidget);
       expect(tester.takeException(), isNull);
@@ -377,7 +377,7 @@ void main() {
     expect(label.style!.color, GameColors.gold);
   });
 
-  testWidgets('介入回数0/1/2回で裁定タリーが正しく表示される', (tester) async {
+  testWidgets('裁定回数テキストを出さず生死チップだけで履歴を表す', (tester) async {
     Widget cardWith(int count, List<VerdictActionType> history) => MaterialApp(
       home: Scaffold(
         body: SizedBox(
@@ -408,14 +408,15 @@ void main() {
     expect(find.textContaining('裁定'), findsNothing);
 
     await tester.pumpWidget(cardWith(1, const [VerdictActionType.life]));
-    expect(find.textContaining('裁定 1/3'), findsOneWidget);
-    expect(find.textContaining('次で確定'), findsNothing);
+    expect(find.textContaining('裁定'), findsNothing);
+    expect(find.byKey(const Key('verdict-chip-0-life')), findsOneWidget);
 
     await tester.pumpWidget(
       cardWith(2, const [VerdictActionType.life, VerdictActionType.death]),
     );
-    expect(find.textContaining('裁定 2/3'), findsOneWidget);
-    expect(find.textContaining('次で確定'), findsOneWidget);
+    expect(find.textContaining('裁定'), findsNothing);
+    expect(find.byKey(const Key('verdict-chip-0-life')), findsOneWidget);
+    expect(find.byKey(const Key('verdict-chip-1-death')), findsOneWidget);
   });
 
   testWidgets('LIFE→DEATH→LIFEの順で履歴チップが左から順番通りに表示される', (tester) async {
@@ -538,7 +539,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('救済者はSPECIAL DEATH、執行者はSPECIAL LIFEを表示', (tester) async {
+  testWidgets('逆アクションは該当するLIFE/DEATH内にSPECIAL表示', (tester) async {
     final saviorTurn = NineJudgesController(
       seed: 2,
       settings: const NineJudgesGameSettings(
@@ -551,8 +552,9 @@ void main() {
         home: Scaffold(body: ActionPanel(controller: saviorTurn)),
       ),
     );
-    expect(find.text('SPECIAL DEATH'), findsOneWidget);
-    expect(find.text('SPECIAL LIFE'), findsNothing);
+    expect(find.byKey(const Key('special-badge-death')), findsOneWidget);
+    expect(find.byKey(const Key('special-badge-life')), findsNothing);
+    expect(find.byKey(const Key('action-death')), findsOneWidget);
 
     final executorTurn = NineJudgesController(
       seed: 3,
@@ -566,8 +568,9 @@ void main() {
         home: Scaffold(body: ActionPanel(controller: executorTurn)),
       ),
     );
-    expect(find.text('SPECIAL LIFE'), findsOneWidget);
-    expect(find.text('SPECIAL DEATH'), findsNothing);
+    expect(find.byKey(const Key('special-badge-life')), findsOneWidget);
+    expect(find.byKey(const Key('special-badge-death')), findsNothing);
+    expect(find.byKey(const Key('action-life')), findsOneWidget);
   });
 
   testWidgets('JUDGE・SPECIALは使用済みになると使用済みと表示', (tester) async {

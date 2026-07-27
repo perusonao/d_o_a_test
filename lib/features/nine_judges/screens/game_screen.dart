@@ -432,6 +432,7 @@ class _PlayerPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final isSavior = faction == Faction.savior;
     final active = controller.currentPlayer == faction;
+    final isHuman = !controller.isCpuGame || faction == controller.humanFaction;
     final color = GameColors.faction(isSavior);
     final identity = controller.isCpuGame
         ? (faction == controller.humanFaction ? 'あなた' : 'CPU')
@@ -549,12 +550,20 @@ class _PlayerPanel extends StatelessWidget {
         ),
         borderRadius: BorderRadius.circular(GameMetrics.panelRadius),
         border: Border.all(
-          color: active ? GameColors.gold : GameColors.goldSoft,
-          width: active ? 1.6 : 1,
+          color: isHuman
+              ? (active ? GameColors.gold : const Color(0xFFC8A34A))
+              : (active ? color : GameColors.goldSoft),
+          width: isHuman ? (active ? 2 : 1.5) : (active ? 1.5 : 1),
         ),
-        boxShadow: active
-            ? [BoxShadow(color: color.withValues(alpha: .3), blurRadius: 10)]
-            : null,
+        boxShadow: [
+          if (isHuman)
+            BoxShadow(
+              color: GameColors.gold.withValues(alpha: active ? .34 : .16),
+              blurRadius: active ? 12 : 6,
+            ),
+          if (active)
+            BoxShadow(color: color.withValues(alpha: .25), blurRadius: 9),
+        ],
       ),
       child: Row(children: inner),
     );
@@ -709,9 +718,7 @@ class _BonusBar extends StatelessWidget {
     // line — except for the very first bonus, whose own label already says
     // "両者に公開" and doesn't need the extra context.
     final visibility = controller.bonusVisibilityLabel(viewer);
-    final purposeLine = controller.bonusIndex == 0
-        ? visibility
-        : '次に確定した人物へ加算 ・ $visibility';
+    final purposeLine = controller.bonusIndex == 0 ? visibility : visibility;
     return SizedBox(
       height: 58,
       child: Row(

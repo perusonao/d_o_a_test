@@ -4,8 +4,8 @@ import 'package:dead_or_alive/features/nine_judges/models/judge_models.dart';
 import 'package:dead_or_alive/features/nine_judges/widgets/card_assets.dart';
 import 'package:flutter/material.dart';
 
-/// Bottom action bar. Mirrors the mockup: a LIFE / DEATH / EYE trio on top and
-/// the two one-shot actions (JUDGE and the reverse action) underneath.
+/// Bottom action bar. LIFE / DEATH carry their own normal/SPECIAL status, so
+/// the player never has to reconcile two buttons with the same action name.
 class ActionPanel extends StatelessWidget {
   const ActionPanel({required this.controller, super.key});
 
@@ -60,7 +60,11 @@ class ActionPanel extends StatelessWidget {
               ]) ...[
                 if (action != ActionType.life) const SizedBox(width: 6),
                 Expanded(
-                  child: _ActionButton(controller: controller, action: action),
+                  child: _ActionButton(
+                    controller: controller,
+                    action: action,
+                    asReverse: action == _reverseAction,
+                  ),
                 ),
               ],
             ],
@@ -69,25 +73,11 @@ class ActionPanel extends StatelessWidget {
         const SizedBox(height: 6),
         SizedBox(
           height: 42,
-          child: Row(
-            children: [
-              Expanded(
-                child: _ActionButton(
-                  controller: controller,
-                  action: ActionType.specialVerdict,
-                  compact: true,
-                ),
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: _ActionButton(
-                  controller: controller,
-                  action: _reverseAction,
-                  compact: true,
-                  asReverse: true,
-                ),
-              ),
-            ],
+          width: double.infinity,
+          child: _ActionButton(
+            controller: controller,
+            action: ActionType.specialVerdict,
+            compact: true,
           ),
         ),
       ],
@@ -107,8 +97,7 @@ class _ActionButton extends StatelessWidget {
   final ActionType action;
   final bool compact;
 
-  /// Renders the reverse-action shortcut (bottom row) rather than a plain
-  /// verdict button, so it can carry its own label and one-shot status.
+  /// Marks the faction's opposite LIFE/DEATH as its one-use SPECIAL action.
   final bool asReverse;
 
   @override
@@ -123,14 +112,10 @@ class _ActionButton extends StatelessWidget {
         : action == ActionType.specialVerdict
         ? !controller.specialVerdictAvailable(faction)
         : false;
-    final colors = _colors(asReverse ? ActionType.eye : action);
-    // Concrete capability names (SPECIAL LIFE / SPECIAL DEATH) instead of the
-    // abstract "逆転アクション", so the button says what it actually does.
-    final title = asReverse ? 'SPECIAL ${action.label}' : action.label;
+    final colors = _colors(action);
+    final title = action.label;
     final subtitle = _subtitle(used);
-    final iconAsset = asReverse
-        ? CardAssets.reverseIcon
-        : CardAssets.actionIcon(action);
+    final iconAsset = CardAssets.actionIcon(action);
 
     // Stacking icon+title above the subtitle (rather than cramming both into
     // one row) means neither short line ever needs to be ellipsized, even for
@@ -177,14 +162,47 @@ class _ActionButton extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               _Glyph(iconAsset, size: 26),
-              Text(
-                title,
-                maxLines: 1,
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: .5,
-                ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Flexible(
+                    child: Text(
+                      title,
+                      maxLines: 1,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: .5,
+                      ),
+                    ),
+                  ),
+                  if (asReverse) ...[
+                    const SizedBox(width: 4),
+                    Container(
+                      key: Key('special-badge-${action.name}'),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 4,
+                        vertical: 1,
+                      ),
+                      decoration: BoxDecoration(
+                        color: colors.accent.withValues(alpha: .18),
+                        borderRadius: BorderRadius.circular(5),
+                        border: Border.all(
+                          color: colors.accent.withValues(alpha: .7),
+                        ),
+                      ),
+                      child: const Text(
+                        'SPECIAL',
+                        style: TextStyle(
+                          fontSize: 6,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: .3,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
               ),
               Text(
                 subtitle,
@@ -241,7 +259,7 @@ class _ActionButton extends StatelessWidget {
         child: Material(
           color: Colors.transparent,
           child: InkWell(
-            key: Key('action-${asReverse ? 'reverse' : action.name}'),
+            key: Key('action-${action.name}'),
             borderRadius: BorderRadius.circular(10),
             onTap: enabled ? () => controller.chooseAction(action) : null,
             child: Opacity(
@@ -259,6 +277,7 @@ class _ActionButton extends StatelessWidget {
 
   String _subtitle(bool used) {
     if (used) return '使用済み';
+    if (asReverse) return '1回限定・残り1回';
     // JUDGE and the special (reverse) action are always rendered compact;
     // keep their status short so it never risks truncation.
     if (compact) return '残り1回';

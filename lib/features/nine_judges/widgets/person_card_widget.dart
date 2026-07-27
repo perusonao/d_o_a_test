@@ -1,7 +1,6 @@
 import 'package:dead_or_alive/app/theme.dart';
 import 'package:dead_or_alive/features/nine_judges/models/judge_models.dart';
 import 'package:dead_or_alive/features/nine_judges/widgets/card_assets.dart';
-import 'package:dead_or_alive/features/nine_judges/widgets/game_style.dart';
 import 'package:flutter/material.dart';
 
 /// A single board card rendered in the dark-fantasy style of the mockup:
@@ -99,6 +98,29 @@ class PersonCardWidget extends StatelessWidget {
                             attributeVisible: attributeVisible,
                             dimmed: !enabled && !confirmed && !highlighted,
                           ),
+                          if (confirmed)
+                            DecoratedBox(
+                              key: Key(
+                                person.isAlive
+                                    ? 'confirmed-tint-alive'
+                                    : 'confirmed-tint-dead',
+                              ),
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  colors: person.isAlive
+                                      ? const [
+                                          Color(0x183DE6C3),
+                                          Color(0x6630B99C),
+                                        ]
+                                      : const [
+                                          Color(0x18FF4D55),
+                                          Color(0x667B1721),
+                                        ],
+                                ),
+                              ),
+                            ),
                           const _Scrim(),
                           _Corners(
                             coordinate: coordinate,
@@ -386,8 +408,6 @@ class _Footer extends StatelessWidget {
     // history > "審議中": every unconfirmed card used to shout "審議中" at the
     // same weight as a real verdict, so it's shrunk and muted here instead of
     // competing with the more useful information above and below it.
-    final count = person.verdictActionCount;
-    final showTally = !confirmed && count > 0 && !compact;
     return Padding(
       padding: const EdgeInsets.fromLTRB(4, 2, 4, 4),
       child: Column(
@@ -449,30 +469,6 @@ class _Footer extends StatelessWidget {
               ],
             ],
           ),
-          if (showTally)
-            Padding(
-              padding: const EdgeInsets.only(top: 1),
-              child: Text.rich(
-                TextSpan(
-                  style: const TextStyle(
-                    fontSize: 7,
-                    color: GameColors.textDim,
-                    fontWeight: FontWeight.w700,
-                  ),
-                  children: [
-                    TextSpan(text: '裁定 $count/3'),
-                    if (count == 2)
-                      const TextSpan(
-                        text: ' ・ 次で確定',
-                        style: TextStyle(
-                          color: GameColors.gold,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ),
           const SizedBox(height: 2),
           _HistoryPips(history: person.verdictHistory),
           if (scoreDetail case final detail?)
