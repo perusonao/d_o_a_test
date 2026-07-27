@@ -39,7 +39,8 @@ class GameScreen extends ConsumerWidget {
       return const Scaffold(body: SizedBox.shrink());
     }
 
-    final peeking = state.phase == GamePhase.peekA || state.phase == GamePhase.peekB;
+    final peeking =
+        state.phase == GamePhase.peekA || state.phase == GamePhase.peekB;
 
     return Scaffold(
       body: SafeArea(
@@ -61,8 +62,7 @@ class GameScreen extends ConsumerWidget {
             const headerH = 52.0;
             const bottomChrome = 120.0;
             final reservedBottom = peeking ? 96.0 : (handH + bottomChrome);
-            final avail =
-                h - headerH - oppStripH - reservedBottom - gap * 5;
+            final avail = h - headerH - oppStripH - reservedBottom - gap * 5;
             final pByWidth = (contentW - gap * 2) / 3;
             final pByHeight = (avail / 3) / 1.28;
             final size = math.min(pByWidth, pByHeight).clamp(52.0, 132.0);
@@ -138,7 +138,8 @@ class GameScreen extends ConsumerWidget {
             } else {
               blocked = false;
             }
-            final canPeek = interactive &&
+            final canPeek =
+                interactive &&
                 selType == null &&
                 state.isKnownBy(state.current, hcard.position) &&
                 !hcard.revealed &&
@@ -234,45 +235,61 @@ class _Header extends StatelessWidget {
       child: Row(
         children: [
           if (playing) ...[
-            Icon(CardVisuals.factionIcon(cur.faction), color: curColor, size: 22),
+            Icon(
+              CardVisuals.factionIcon(cur.faction),
+              color: curColor,
+              size: 22,
+            ),
             const SizedBox(width: 6),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                      '${cur.id == PlayerId.a ? "プレイヤーA" : "プレイヤーB"}${cur.isCpu ? "(CPU)" : ""}の番'
-                      '（${CardVisuals.factionLabel(cur.faction)}）',
-                      style: TextStyle(
-                          color: curColor,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13)),
+                    '${cur.id == PlayerId.a ? "プレイヤーA" : "プレイヤーB"}${cur.isCpu ? "(CPU)" : ""}の番'
+                    '（${CardVisuals.factionLabel(cur.faction)}）',
+                    style: TextStyle(
+                      color: curColor,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
                   Text(
-                      '残り 生${cur.countUsable(ActionType.life)} 死${cur.countUsable(ActionType.death)} 保${cur.countUsable(ActionType.protect)}',
-                      style: const TextStyle(
-                          color: Color(0xFFB9B2A2), fontSize: 11)),
+                    '残り 生${cur.countUsable(ActionType.life)} 死${cur.countUsable(ActionType.death)} 保${cur.countUsable(ActionType.protect)}',
+                    style: const TextStyle(
+                      color: Color(0xFFB9B2A2),
+                      fontSize: 11,
+                    ),
+                  ),
                 ],
               ),
             ),
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Text('暫定(公開分)',
-                    style: TextStyle(
-                        color: AppTheme.accent.withValues(alpha: 0.8),
-                        fontSize: 10)),
                 Text(
-                    '救${_provisional(Faction.savior)} / 執${_provisional(Faction.executioner)}',
-                    style: const TextStyle(
-                        color: Color(0xFFCFC7B5),
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold)),
+                  '暫定(公開分)',
+                  style: TextStyle(
+                    color: AppTheme.accent.withValues(alpha: 0.8),
+                    fontSize: 10,
+                  ),
+                ),
+                Text(
+                  '救${_provisional(Faction.savior)} / 執${_provisional(Faction.executioner)}',
+                  style: const TextStyle(
+                    color: Color(0xFFCFC7B5),
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ],
             ),
           ] else
             const Expanded(
-              child: Text('初期情報の確認フェーズ',
-                  style: TextStyle(color: Color(0xFFCFC7B5), fontSize: 13)),
+              child: Text(
+                '初期情報の確認フェーズ',
+                style: TextStyle(color: Color(0xFFCFC7B5), fontSize: 13),
+              ),
             ),
         ],
       ),
@@ -290,14 +307,17 @@ class _OpponentHand extends StatelessWidget {
   Widget build(BuildContext context) {
     // 相手＝現在の手番でない側。
     final opp = state.player(
-        state.current == PlayerId.a ? PlayerId.b : PlayerId.a);
+      state.current == PlayerId.a ? PlayerId.b : PlayerId.a,
+    );
     final oppLabel = opp.id == PlayerId.a ? 'プレイヤーA' : 'プレイヤーB';
     return Column(
       children: [
         Align(
           alignment: Alignment.centerLeft,
-          child: Text('相手（$oppLabel${opp.isCpu ? "・CPU" : ""}）の残り手札',
-              style: const TextStyle(fontSize: 10, color: Color(0xFF9A9384))),
+          child: Text(
+            '相手（$oppLabel${opp.isCpu ? "・CPU" : ""}）の残り手札',
+            style: const TextStyle(fontSize: 10, color: Color(0xFF9A9384)),
+          ),
         ),
         const SizedBox(height: 2),
         Wrap(
@@ -305,11 +325,9 @@ class _OpponentHand extends StatelessWidget {
           runSpacing: 3,
           alignment: WrapAlignment.center,
           children: opp.hand
-              .map((c) => ActionCardWidget(
-                    card: c,
-                    width: width,
-                    enabled: false,
-                  ))
+              .map(
+                (c) => ActionCardWidget(card: c, width: width, enabled: false),
+              )
               .toList(),
         ),
       ],
@@ -340,9 +358,11 @@ class _PeekBar extends ConsumerWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('$who は${side}3枚（種類と得点）を覚えてください',
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 13, color: Color(0xFFCFC7B5))),
+            Text(
+              '$who は${side}3枚（種類と得点）を覚えてください',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 13, color: Color(0xFFCFC7B5)),
+            ),
             const SizedBox(height: 8),
             SizedBox(
               width: double.infinity,
@@ -381,7 +401,8 @@ class _HandArea extends ConsumerWidget {
       }
     }
     final interactive = !state.isBusy && !state.currentPlayer.isCpu;
-    final canConfirm = interactive &&
+    final canConfirm =
+        interactive &&
         state.selectedActionCardId != null &&
         state.selectedPosition != null;
 
@@ -403,22 +424,30 @@ class _HandArea extends ConsumerWidget {
                   : Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.info_outline,
-                            size: 13, color: AppTheme.evil),
+                        const Icon(
+                          Icons.info_outline,
+                          size: 13,
+                          color: AppTheme.evil,
+                        ),
                         const SizedBox(width: 4),
                         Flexible(
-                          child: Text(state.message!,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                  fontSize: 11, color: AppTheme.evil)),
+                          child: Text(
+                            state.message!,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: AppTheme.evil,
+                            ),
+                          ),
                         ),
                       ],
                     ),
             ),
             _SelectedInfo(
-                selected: selected,
-                hasTarget: state.selectedPosition != null),
+              selected: selected,
+              hasTarget: state.selectedPosition != null,
+            ),
             const SizedBox(height: 4),
             Wrap(
               spacing: 5,
@@ -463,23 +492,33 @@ class _SelectedInfo extends StatelessWidget {
   Widget build(BuildContext context) {
     final card = selected;
     if (card == null) {
-      return const Text('カードを選択 → 対象を選択 → 決定',
-          style: TextStyle(fontSize: 12, color: Color(0xFF9A9384)));
+      return const Text(
+        'カードを選択 → 対象を選択 → 決定',
+        style: TextStyle(fontSize: 12, color: Color(0xFF9A9384)),
+      );
     }
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Icon(CardVisuals.actionIcon(card.type),
-            size: 16, color: CardVisuals.actionColor(card.type)),
+        Icon(
+          CardVisuals.actionIcon(card.type),
+          size: 16,
+          color: CardVisuals.actionColor(card.type),
+        ),
         const SizedBox(width: 4),
-        Text('${CardVisuals.actionLabel(card.type)}カード',
-            style: TextStyle(
-                fontSize: 13,
-                color: CardVisuals.actionColor(card.type),
-                fontWeight: FontWeight.bold)),
+        Text(
+          '${CardVisuals.actionLabel(card.type)}カード',
+          style: TextStyle(
+            fontSize: 13,
+            color: CardVisuals.actionColor(card.type),
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         const SizedBox(width: 8),
-        Text(hasTarget ? '→ 対象選択済み' : '→ 対象を選択',
-            style: const TextStyle(fontSize: 12, color: Color(0xFF9A9384))),
+        Text(
+          hasTarget ? '→ 対象選択済み' : '→ 対象を選択',
+          style: const TextStyle(fontSize: 12, color: Color(0xFF9A9384)),
+        ),
       ],
     );
   }

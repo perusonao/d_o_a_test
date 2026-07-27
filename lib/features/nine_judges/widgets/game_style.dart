@@ -16,6 +16,10 @@ abstract final class GameColors {
   static const goldSoft = Color(0x55C7A24C);
   static const goldFaint = Color(0x22C7A24C);
 
+  /// A deliberately muted gold for "it's not your turn" states, so CPU TURN
+  /// never competes visually with the emphasized YOUR TURN.
+  static const goldMuted = Color(0xFF8A7A55);
+
   // Factions.
   static const savior = Color(0xFF5AA9E6);
   static const saviorPanelTop = Color(0xFF15293F);

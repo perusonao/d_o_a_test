@@ -40,8 +40,10 @@ class HumanCardWidget extends StatefulWidget {
 
 class _HumanCardWidgetState extends State<HumanCardWidget>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _flash =
-      AnimationController(vsync: this, duration: const Duration(milliseconds: 500));
+  late final AnimationController _flash = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 500),
+  );
 
   @override
   void initState() {
@@ -87,7 +89,9 @@ class _HumanCardWidgetState extends State<HumanCardWidget>
         ? CardVisuals.humanTypeColor(card.type)
         : AppTheme.accent;
 
-    Widget face = widget.faceUp ? _buildFace(card, s, typeColor) : _buildBack(s);
+    Widget face = widget.faceUp
+        ? _buildFace(card, s, typeColor)
+        : _buildBack(s);
 
     Widget content = Stack(
       alignment: Alignment.center,
@@ -97,11 +101,14 @@ class _HumanCardWidgetState extends State<HumanCardWidget>
         Positioned(
           top: 2,
           left: 4,
-          child: Text('${card.points}',
-              style: TextStyle(
-                  fontSize: s * 0.2,
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.accent.withValues(alpha: 0.95))),
+          child: Text(
+            '${card.points}',
+            style: TextStyle(
+              fontSize: s * 0.2,
+              fontWeight: FontWeight.bold,
+              color: AppTheme.accent.withValues(alpha: 0.95),
+            ),
+          ),
         ),
         // 保護バッジ。
         if (card.protected)
@@ -115,8 +122,11 @@ class _HumanCardWidgetState extends State<HumanCardWidget>
           Positioned(
             bottom: 2,
             right: 3,
-            child: Icon(Icons.visibility,
-                color: AppTheme.good.withValues(alpha: 0.85), size: s * 0.22),
+            child: Icon(
+              Icons.visibility,
+              color: AppTheme.good.withValues(alpha: 0.85),
+              size: s * 0.22,
+            ),
           ),
         // フラッシュ。
         IgnorePointer(
@@ -174,8 +184,11 @@ class _HumanCardWidgetState extends State<HumanCardWidget>
         ),
       ),
       child: Center(
-        child: Icon(Icons.help_outline,
-            color: AppTheme.accent.withValues(alpha: 0.7), size: s * 0.4),
+        child: Icon(
+          Icons.help_outline,
+          color: AppTheme.accent.withValues(alpha: 0.7),
+          size: s * 0.4,
+        ),
       ),
     );
   }
@@ -209,17 +222,25 @@ class _HumanCardWidgetState extends State<HumanCardWidget>
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(CardVisuals.humanTypeIcon(card.type),
-                      color: typeColor, size: s * 0.34),
+                  Icon(
+                    CardVisuals.humanTypeIcon(card.type),
+                    color: typeColor,
+                    size: s * 0.34,
+                  ),
                   const SizedBox(height: 2),
-                  Text('${card.points}',
-                      style: TextStyle(
-                          fontSize: s * 0.32,
-                          fontWeight: FontWeight.bold,
-                          color: const Color(0xFFEDE6D4))),
+                  Text(
+                    '${card.points}',
+                    style: TextStyle(
+                      fontSize: s * 0.32,
+                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFFEDE6D4),
+                    ),
+                  ),
                   const SizedBox(height: 2),
-                  Text(CardVisuals.humanTypeLabel(card.type),
-                      style: TextStyle(fontSize: s * 0.15, color: typeColor)),
+                  Text(
+                    CardVisuals.humanTypeLabel(card.type),
+                    style: TextStyle(fontSize: s * 0.15, color: typeColor),
+                  ),
                 ],
               ),
             ),
@@ -233,8 +254,11 @@ class _HumanCardWidgetState extends State<HumanCardWidget>
               borderRadius: BorderRadius.circular(8),
               color: Colors.black.withValues(alpha: 0.6),
             ),
-            child: Icon(Icons.heart_broken,
-                color: AppTheme.dead, size: s * 0.5),
+            child: Icon(
+              Icons.heart_broken,
+              color: AppTheme.dead,
+              size: s * 0.5,
+            ),
           ),
       ],
     );

@@ -33,7 +33,11 @@ List<HumanCard> buildBoard(Random rng) {
   return [
     for (var i = 0; i < 9; i++)
       HumanCard(
-          id: 'h$i', position: i, type: cards[i].type, points: cards[i].points)
+        id: 'h$i',
+        position: i,
+        type: cards[i].type,
+        points: cards[i].points,
+      ),
   ];
 }
 
@@ -44,7 +48,12 @@ bool _knownRow(PlayerId who, int pos) =>
     pos ~/ 3 == (who == PlayerId.a ? 2 : 0);
 
 double scoreMove(
-    List<HumanCard> board, ActionType type, int pos, PlayerId owner, bool saviorSide) {
+  List<HumanCard> board,
+  ActionType type,
+  int pos,
+  PlayerId owner,
+  bool saviorSide,
+) {
   final h = board[pos];
   final known = h.revealed || _knownRow(owner, pos) || h.diagnosedBy(owner);
   final points = h.points.toDouble();
@@ -80,8 +89,13 @@ double scoreMove(
 }
 
 /// owner の最善手 (type,pos) を返す。使える手が無ければ null。
-({ActionType type, int pos})? decide(List<HumanCard> board,
-    Map<ActionType, int> pool, PlayerId owner, bool saviorSide, Random rng) {
+({ActionType type, int pos})? decide(
+  List<HumanCard> board,
+  Map<ActionType, int> pool,
+  PlayerId owner,
+  bool saviorSide,
+  Random rng,
+) {
   ({ActionType type, int pos})? best;
   var bestScore = double.negativeInfinity;
   for (final entry in pool.entries) {
@@ -94,7 +108,8 @@ double scoreMove(
           (h.revealed || _knownRow(owner, pos) || h.diagnosedBy(owner))) {
         continue;
       }
-      final s = scoreMove(board, type, pos, owner, saviorSide) +
+      final s =
+          scoreMove(board, type, pos, owner, saviorSide) +
           rng.nextDouble() * 0.01;
       if (s > bestScore) {
         bestScore = s;
@@ -110,8 +125,9 @@ void apply(List<HumanCard> board, ActionType type, int pos, PlayerId owner) {
   switch (type) {
     case ActionType.diagnose:
       board[pos] = h.copyWith(
-          diagnosedByA: owner == PlayerId.a ? true : h.diagnosedByA,
-          diagnosedByB: owner == PlayerId.b ? true : h.diagnosedByB);
+        diagnosedByA: owner == PlayerId.a ? true : h.diagnosedByA,
+        diagnosedByB: owner == PlayerId.b ? true : h.diagnosedByB,
+      );
       break;
     case ActionType.protect:
       board[pos] = h.copyWith(protected: true);
@@ -163,8 +179,7 @@ void main(List<String> args) {
     var current = PlayerId.a;
     var guard = 0;
     while (pool.values.any((v) => v > 0) && guard < 100) {
-      final saviorSide =
-          (current == PlayerId.a) == aSavior; // 現在手番が救済者か
+      final saviorSide = (current == PlayerId.a) == aSavior; // 現在手番が救済者か
       final move = decide(board, pool, current, saviorSide, rng);
       if (move == null) break;
       pool[move.type] = pool[move.type]! - 1;

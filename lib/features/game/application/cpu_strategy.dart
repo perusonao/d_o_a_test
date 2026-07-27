@@ -78,8 +78,7 @@ class CpuStrategy {
     }
   }
 
-  double _score(
-      ActionCard card, HumanCard human, bool known, bool saviorSide) {
+  double _score(ActionCard card, HumanCard human, bool known, bool saviorSide) {
     // 得点は常に見えるので、未知でも points は使える（正体＝種類だけが不明）。
     final points = human.points.toDouble();
 

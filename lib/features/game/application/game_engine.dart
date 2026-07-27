@@ -35,11 +35,9 @@ class GameLabels {
     }
   }
 
-  static String faction(Faction f) =>
-      f == Faction.savior ? '救済者' : '執行者';
+  static String faction(Faction f) => f == Faction.savior ? '救済者' : '執行者';
 
-  static String player(PlayerId id) =>
-      id == PlayerId.a ? 'プレイヤーA' : 'プレイヤーB';
+  static String player(PlayerId id) => id == PlayerId.a ? 'プレイヤーA' : 'プレイヤーB';
 }
 
 /// ゲームロジックを集約するエンジン（Widget にロジックを書かない）。
@@ -56,12 +54,14 @@ class GameEngine {
     var seq = 0;
     for (final type in HumanType.values) {
       for (final pt in GameConstants.pointValues) {
-        cards.add(HumanCard(
-          id: 'h${seq++}',
-          position: 0, // 後で確定
-          type: type,
-          points: pt,
-        ));
+        cards.add(
+          HumanCard(
+            id: 'h${seq++}',
+            position: 0, // 後で確定
+            type: type,
+            points: pt,
+          ),
+        );
       }
     }
     cards.shuffle(_random);
@@ -75,8 +75,9 @@ class GameEngine {
         ),
     ];
 
-    final playerBFaction =
-        playerAFaction == Faction.savior ? Faction.executioner : Faction.savior;
+    final playerBFaction = playerAFaction == Faction.savior
+        ? Faction.executioner
+        : Faction.savior;
 
     return GameState(
       humans: humans,
@@ -100,11 +101,9 @@ class GameEngine {
     final comp = GameConstants.handFor(faction);
     final hand = <ActionCard>[];
     for (var i = 0; i < comp.length; i++) {
-      hand.add(ActionCard(
-        id: 'ac_${owner.name}_$i',
-        type: comp[i],
-        owner: owner,
-      ));
+      hand.add(
+        ActionCard(id: 'ac_${owner.name}_$i', type: comp[i], owner: owner),
+      );
     }
     return hand;
   }
@@ -182,8 +181,9 @@ class GameEngine {
   GameState applyAction(GameState state, GameAction action) {
     final actor = state.player(action.player);
     final card = actor.hand.firstWhere((c) => c.id == action.actionCardId);
-    final index =
-        state.humans.indexWhere((h) => h.position == action.targetPosition);
+    final index = state.humans.indexWhere(
+      (h) => h.position == action.targetPosition,
+    );
     final target = state.humans[index];
 
     HumanCard updated;
@@ -210,8 +210,9 @@ class GameEngine {
           protectAbsorbed = true;
           updated = target.copyWith(protected: false, revealed: true);
         } else {
-          final newState =
-              card.type == ActionType.life ? CardState.alive : CardState.dead;
+          final newState = card.type == ActionType.life
+              ? CardState.alive
+              : CardState.dead;
           updated = target.copyWith(state: newState, revealed: true);
         }
         break;
@@ -265,8 +266,8 @@ class GameEngine {
     final Faction? winner = savior > executioner
         ? Faction.savior
         : executioner > savior
-            ? Faction.executioner
-            : null;
+        ? Faction.executioner
+        : null;
     return GameResult(
       saviorScore: savior,
       executionerScore: executioner,

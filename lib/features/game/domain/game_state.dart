@@ -57,8 +57,7 @@ class GameState {
   static int knownRowOf(PlayerId id) => id == PlayerId.a ? 2 : 0;
 
   /// 位置 [position] が [id] の初期既知カード（列＝行）か。
-  bool isKnownBy(PlayerId id, int position) =>
-      position ~/ 3 == knownRowOf(id);
+  bool isKnownBy(PlayerId id, int position) => position ~/ 3 == knownRowOf(id);
 
   /// [id] がその位置の正体を（公開・初期既知・診のいずれかで）見えるか。
   bool canSeeFace(PlayerId id, int position) {
@@ -69,8 +68,7 @@ class GameState {
   HumanCard humanAt(int position) =>
       humans.firstWhere((h) => h.position == position);
 
-  bool get bothHandsEmpty =>
-      !playerA.hasUsableCards && !playerB.hasUsableCards;
+  bool get bothHandsEmpty => !playerA.hasUsableCards && !playerB.hasUsableCards;
 
   GameState copyWith({
     List<HumanCard>? humans,
@@ -98,8 +96,9 @@ class GameState {
       selectedActionCardId: clearSelection
           ? null
           : (selectedActionCardId ?? this.selectedActionCardId),
-      selectedPosition:
-          clearSelection ? null : (selectedPosition ?? this.selectedPosition),
+      selectedPosition: clearSelection
+          ? null
+          : (selectedPosition ?? this.selectedPosition),
       message: clearMessage ? null : (message ?? this.message),
       lastActionPosition: lastActionPosition ?? this.lastActionPosition,
       lastActionType: lastActionType ?? this.lastActionType,

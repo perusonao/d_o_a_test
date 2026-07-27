@@ -124,41 +124,51 @@ class _ActionButton extends StatelessWidget {
         ? !controller.specialVerdictAvailable(faction)
         : false;
     final colors = _colors(asReverse ? ActionType.eye : action);
-    final title = asReverse ? '逆転アクション' : action.label;
+    // Concrete capability names (SPECIAL LIFE / SPECIAL DEATH) instead of the
+    // abstract "逆転アクション", so the button says what it actually does.
+    final title = asReverse ? 'SPECIAL ${action.label}' : action.label;
     final subtitle = _subtitle(used);
     final iconAsset = asReverse
         ? CardAssets.reverseIcon
         : CardAssets.actionIcon(action);
 
+    // Stacking icon+title above the subtitle (rather than cramming both into
+    // one row) means neither short line ever needs to be ellipsized, even for
+    // the longer "SPECIAL DEATH" / "SPECIAL LIFE" labels.
     final content = compact
-        ? Row(
+        ? Column(
             mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              _Glyph(iconAsset, size: 22),
-              const SizedBox(width: 7),
-              Flexible(
-                child: Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: .5,
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _Glyph(iconAsset, size: 15),
+                  const SizedBox(width: 5),
+                  Flexible(
+                    child: Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: .3,
+                      ),
+                    ),
                   ),
-                ),
+                ],
               ),
-              const SizedBox(width: 6),
-              Flexible(
-                child: Text(
-                  subtitle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: used ? Colors.white54 : colors.accent,
-                    fontSize: 8,
-                    fontWeight: FontWeight.w700,
-                  ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: used ? Colors.white54 : colors.accent,
+                  fontSize: 8,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ],
@@ -189,6 +199,20 @@ class _ActionButton extends StatelessWidget {
             ],
           );
 
+    // Disabled buttons get a flat, neutral-grey frame (not just a faded
+    // version of their colour) so "can't tap this" reads at a glance instead
+    // of looking like a dim-but-still-colourful active button.
+    final borderColor = selected
+        ? Colors.white
+        : enabled
+        ? colors.accent
+        : const Color(0x33FFFFFF);
+    final tintAmount = selected
+        ? .4
+        : enabled
+        ? .16
+        : 0.0;
+
     return Semantics(
       label: '$title $subtitle',
       button: true,
@@ -200,15 +224,12 @@ class _ActionButton extends StatelessWidget {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              Color.lerp(colors.background, colors.accent, selected ? .4 : .16)!,
+              Color.lerp(colors.background, colors.accent, tintAmount)!,
               colors.background,
             ],
           ),
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: selected ? Colors.white : colors.accent,
-            width: selected ? 2.1 : 1.1,
-          ),
+          border: Border.all(color: borderColor, width: selected ? 2.1 : 1.1),
           boxShadow: [
             if (selected)
               BoxShadow(
@@ -237,34 +258,37 @@ class _ActionButton extends StatelessWidget {
   }
 
   String _subtitle(bool used) {
-    if (used) return '✓ 使用済み';
-    if (asReverse) return '残り1回';
+    if (used) return '使用済み';
+    // JUDGE and the special (reverse) action are always rendered compact;
+    // keep their status short so it never risks truncation.
+    if (compact) return '残り1回';
     return switch (action) {
       ActionType.life => '命を与える',
       ActionType.death => '死を与える',
       ActionType.eye => '正体を見る',
-      ActionType.specialVerdict => '即時裁定  •  残り1回',
+      ActionType.specialVerdict => '残り1回',
     };
   }
 
-  ({Color background, Color accent}) _colors(ActionType value) => switch (value) {
-    ActionType.life => (
-      background: const Color(0xFF092B36),
-      accent: const Color(0xFF55D9ED),
-    ),
-    ActionType.death => (
-      background: const Color(0xFF3B1115),
-      accent: AppTheme.executor,
-    ),
-    ActionType.eye => (
-      background: const Color(0xFF281445),
-      accent: AppTheme.eye,
-    ),
-    ActionType.specialVerdict => (
-      background: const Color(0xFF332713),
-      accent: const Color(0xFFFFD76A),
-    ),
-  };
+  ({Color background, Color accent}) _colors(ActionType value) =>
+      switch (value) {
+        ActionType.life => (
+          background: const Color(0xFF092B36),
+          accent: const Color(0xFF55D9ED),
+        ),
+        ActionType.death => (
+          background: const Color(0xFF3B1115),
+          accent: AppTheme.executor,
+        ),
+        ActionType.eye => (
+          background: const Color(0xFF281445),
+          accent: AppTheme.eye,
+        ),
+        ActionType.specialVerdict => (
+          background: const Color(0xFF332713),
+          accent: const Color(0xFFFFD76A),
+        ),
+      };
 }
 
 class _Glyph extends StatelessWidget {

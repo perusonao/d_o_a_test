@@ -43,7 +43,9 @@ class ActionCardWidget extends StatelessWidget {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: selected ? AppTheme.good : color.withValues(alpha: 0.7),
+                  color: selected
+                      ? AppTheme.good
+                      : color.withValues(alpha: 0.7),
                   width: selected ? 3 : 1.5,
                 ),
                 gradient: LinearGradient(
@@ -60,14 +62,20 @@ class ActionCardWidget extends StatelessWidget {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(CardVisuals.actionIcon(card.type),
-                          color: color, size: width * 0.42),
+                      Icon(
+                        CardVisuals.actionIcon(card.type),
+                        color: color,
+                        size: width * 0.42,
+                      ),
                       const SizedBox(height: 3),
-                      Text(CardVisuals.actionLabel(card.type),
-                          style: TextStyle(
-                              fontSize: width * 0.34,
-                              fontWeight: FontWeight.bold,
-                              color: const Color(0xFFEDE6D4))),
+                      Text(
+                        CardVisuals.actionLabel(card.type),
+                        style: TextStyle(
+                          fontSize: width * 0.34,
+                          fontWeight: FontWeight.bold,
+                          color: const Color(0xFFEDE6D4),
+                        ),
+                      ),
                     ],
                   ),
                 ),

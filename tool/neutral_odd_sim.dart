@@ -36,7 +36,11 @@ List<HumanCard> buildBoard(Random rng) {
   return [
     for (var i = 0; i < 9; i++)
       HumanCard(
-          id: 'h$i', position: i, type: cards[i].type, points: cards[i].points)
+        id: 'h$i',
+        position: i,
+        type: cards[i].type,
+        points: cards[i].points,
+      ),
   ];
 }
 
@@ -46,8 +50,13 @@ bool _knownRow(PlayerId who, int pos) =>
 bool wantAliveGoodEvil(HumanType type, bool saviorSide) =>
     type == HumanType.good ? saviorSide : !saviorSide;
 
-double scoreMove(List<HumanCard> board, ActionType type, int pos,
-    PlayerId owner, bool saviorSide) {
+double scoreMove(
+  List<HumanCard> board,
+  ActionType type,
+  int pos,
+  PlayerId owner,
+  bool saviorSide,
+) {
   final h = board[pos];
   final known = h.revealed || _knownRow(owner, pos) || h.diagnosedBy(owner);
   final points = h.points.toDouble();
@@ -83,8 +92,13 @@ double scoreMove(List<HumanCard> board, ActionType type, int pos,
   }
 }
 
-({ActionType type, int pos})? decide(List<HumanCard> board,
-    Map<ActionType, int> hand, PlayerId owner, bool saviorSide, Random rng) {
+({ActionType type, int pos})? decide(
+  List<HumanCard> board,
+  Map<ActionType, int> hand,
+  PlayerId owner,
+  bool saviorSide,
+  Random rng,
+) {
   ({ActionType type, int pos})? best;
   var bestScore = double.negativeInfinity;
   for (final e in hand.entries) {
@@ -96,7 +110,8 @@ double scoreMove(List<HumanCard> board, ActionType type, int pos,
           (h.revealed || _knownRow(owner, pos) || h.diagnosedBy(owner))) {
         continue;
       }
-      final s = scoreMove(board, e.key, pos, owner, saviorSide) +
+      final s =
+          scoreMove(board, e.key, pos, owner, saviorSide) +
           rng.nextDouble() * 0.01;
       if (s > bestScore) {
         bestScore = s;
@@ -112,8 +127,9 @@ void apply(List<HumanCard> board, ActionType type, int pos, PlayerId owner) {
   switch (type) {
     case ActionType.diagnose:
       board[pos] = h.copyWith(
-          diagnosedByA: owner == PlayerId.a ? true : h.diagnosedByA,
-          diagnosedByB: owner == PlayerId.b ? true : h.diagnosedByB);
+        diagnosedByA: owner == PlayerId.a ? true : h.diagnosedByA,
+        diagnosedByB: owner == PlayerId.b ? true : h.diagnosedByB,
+      );
       break;
     case ActionType.protect:
       board[pos] = h.copyWith(protected: true);
@@ -158,8 +174,7 @@ void main(List<String> args) {
 
     var current = PlayerId.a;
     var guard = 0;
-    while ((handA.values.any((v) => v > 0) ||
-            handB.values.any((v) => v > 0)) &&
+    while ((handA.values.any((v) => v > 0) || handB.values.any((v) => v > 0)) &&
         guard < 100) {
       final hand = current == PlayerId.a ? handA : handB;
       if (!hand.values.any((v) => v > 0)) {

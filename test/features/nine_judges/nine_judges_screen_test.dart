@@ -1,9 +1,15 @@
+import 'package:dead_or_alive/app/theme.dart';
+import 'package:dead_or_alive/features/nine_judges/game/game_controller.dart';
 import 'package:dead_or_alive/features/nine_judges/models/judge_models.dart';
 import 'package:dead_or_alive/features/nine_judges/screens/game_screen.dart';
 import 'package:dead_or_alive/features/nine_judges/screens/mode_select_screen.dart';
+import 'package:dead_or_alive/features/nine_judges/widgets/action_panel.dart';
+import 'package:dead_or_alive/features/nine_judges/widgets/game_style.dart';
 import 'package:dead_or_alive/features/nine_judges/widgets/person_card_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+void _noop() {}
 
 void main() {
   testWidgets('ホームから3種類の配布物へ移動できる', (tester) async {
@@ -288,6 +294,7 @@ void main() {
 
   for (final size in [
     const Size(360, 640),
+    const Size(375, 667),
     const Size(390, 844),
     const Size(430, 932),
   ]) {
@@ -303,10 +310,384 @@ void main() {
         ),
       );
       expect(find.byKey(const Key('nine-judges-board')), findsOneWidget);
+      expect(find.byType(PersonCardWidget), findsNWidgets(9));
       expect(find.byKey(const Key('action-life')), findsOneWidget);
+      expect(find.byKey(const Key('action-death')), findsOneWidget);
       expect(find.byKey(const Key('action-eye')), findsOneWidget);
       expect(find.byKey(const Key('action-specialVerdict')), findsOneWidget);
+      expect(find.byKey(const Key('action-reverse')), findsOneWidget);
+      expect(find.text('JUDGE'), findsOneWidget);
+      expect(find.textContaining('SPECIAL'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
   }
+
+  testWidgets('CPUの手番はCPU TURNを弱い金色で、あなたの手番はYOUR TURNを強い金色で表示', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: NineJudgesGameScreen(
+          initialSettings: NineJudgesGameSettings(
+            mode: GameMode.cpu,
+            cpuFaction: Faction.savior,
+            firstPlayer: Faction.savior,
+            firstPlayerSelection: FirstPlayerSelection.cpu,
+            // Zero-duration CPU delays, and skipCpuDelays also makes the
+            // confirmation overlay skip scheduling its own auto-close timer
+            // (see _ConfirmationOverlayState.initState) — so regardless of
+            // which move the (unseeded) CPU randomly draws, no real Timer is
+            // ever left pending at teardown.
+            skipCpuDelays: true,
+          ),
+        ),
+      ),
+    );
+    expect(find.text('CPU TURN'), findsOneWidget);
+    expect(find.text('YOUR TURN'), findsNothing);
+    final cpuLabel = tester.widget<Text>(
+      find.byKey(const Key('turn-big-label')),
+    );
+    expect(cpuLabel.style!.color, GameColors.goldMuted);
+    // Flush the CPU's zero-duration "think" and "clear feedback" delays.
+    // An explicit non-zero step reliably advances the fake clock past a
+    // zero-duration Timer; a bare pump() is not guaranteed to.
+    for (var i = 0; i < 4; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+  });
+
+  testWidgets('あなたの手番ではYOUR TURNを金色で強調表示', (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: NineJudgesGameScreen(
+          initialSettings: NineJudgesGameSettings(
+            mode: GameMode.cpu,
+            cpuFaction: Faction.savior,
+            firstPlayer: Faction.executor,
+            firstPlayerSelection: FirstPlayerSelection.human,
+          ),
+        ),
+      ),
+    );
+    expect(find.text('YOUR TURN'), findsOneWidget);
+    expect(find.text('CPU TURN'), findsNothing);
+    final label = tester.widget<Text>(find.byKey(const Key('turn-big-label')));
+    expect(label.style!.color, GameColors.gold);
+  });
+
+  testWidgets('介入回数0/1/2回で裁定タリーが正しく表示される', (tester) async {
+    Widget cardWith(int count, List<VerdictActionType> history) => MaterialApp(
+      home: Scaffold(
+        body: SizedBox(
+          width: 150,
+          height: 220,
+          child: PersonCardWidget(
+            person: PersonCard(
+              id: 'p',
+              attribute: PersonAttribute.good,
+              verdictActionCount: count,
+              verdictHistory: history,
+            ),
+            attributeVisible: true,
+            viewerEyeKnown: false,
+            opponentEyeKnown: false,
+            viewerLabel: 'YOU',
+            opponentLabel: 'CPU',
+            selected: false,
+            cpuHighlighted: false,
+            enabled: false,
+            onTap: () {},
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpWidget(cardWith(0, const []));
+    expect(find.textContaining('裁定'), findsNothing);
+
+    await tester.pumpWidget(cardWith(1, const [VerdictActionType.life]));
+    expect(find.textContaining('裁定 1/3'), findsOneWidget);
+    expect(find.textContaining('次で確定'), findsNothing);
+
+    await tester.pumpWidget(
+      cardWith(2, const [VerdictActionType.life, VerdictActionType.death]),
+    );
+    expect(find.textContaining('裁定 2/3'), findsOneWidget);
+    expect(find.textContaining('次で確定'), findsOneWidget);
+  });
+
+  testWidgets('LIFE→DEATH→LIFEの順で履歴チップが左から順番通りに表示される', (tester) async {
+    const person = PersonCard(
+      id: 'order',
+      attribute: PersonAttribute.good,
+      verdictActionCount: 3,
+      verdictHistory: [
+        VerdictActionType.life,
+        VerdictActionType.death,
+        VerdictActionType.life,
+      ],
+    );
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 140,
+            height: 140,
+            child: PersonCardWidget(
+              person: person,
+              attributeVisible: true,
+              viewerEyeKnown: false,
+              opponentEyeKnown: false,
+              viewerLabel: 'YOU',
+              opponentLabel: 'CPU',
+              selected: false,
+              cpuHighlighted: false,
+              enabled: false,
+              onTap: _noop,
+            ),
+          ),
+        ),
+      ),
+    );
+    expect(find.byKey(const Key('verdict-chip-0-life')), findsOneWidget);
+    expect(find.byKey(const Key('verdict-chip-1-death')), findsOneWidget);
+    expect(find.byKey(const Key('verdict-chip-2-life')), findsOneWidget);
+  });
+
+  testWidgets('確定していないボーナスは?POINTとして表示され数値が漏れない', (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: NineJudgesGameScreen(initialSettings: NineJudgesGameSettings()),
+      ),
+    );
+    // Force a confirmation via JUDGE so the very next bonus becomes hidden
+    // from both factions until the non-confirmer's next turn begins.
+    await tester.tap(find.byKey(const Key('action-specialVerdict')));
+    await tester.pump();
+    await tester.tap(find.byType(PersonCardWidget).first);
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('confirm-judge')));
+    await tester.pump();
+    // The confirmation overlay sits on top, but the board underneath (with
+    // its now-hidden bonus panel) remains in the tree. Match the bonus
+    // panel's exact "N POINT" text node specifically, so the (legitimately
+    // revealed) already-awarded bonus inside the overlay's reveal message
+    // doesn't produce a false positive.
+    expect(find.textContaining('? POINT'), findsOneWidget);
+    final leakedBonus = find.byWidgetPredicate(
+      (widget) =>
+          widget is Text &&
+          widget.data != null &&
+          RegExp(r'^[1-9] POINT$').hasMatch(widget.data!),
+    );
+    expect(leakedBonus, findsNothing);
+  });
+
+  testWidgets('CPUだけがEYE済みの場合はCPUマーカーのみ表示され属性は漏れない', (tester) async {
+    const person = PersonCard(id: 'hidden', attribute: PersonAttribute.evil);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 120,
+            height: 160,
+            child: PersonCardWidget(
+              person: person,
+              attributeVisible: false,
+              viewerEyeKnown: false,
+              opponentEyeKnown: true,
+              viewerLabel: 'YOU',
+              opponentLabel: 'CPU',
+              selected: false,
+              cpuHighlighted: false,
+              enabled: false,
+              onTap: () {},
+            ),
+          ),
+        ),
+      ),
+    );
+    expect(find.text('CPU'), findsOneWidget);
+    expect(find.text('YOU'), findsNothing);
+    expect(find.byKey(const Key('attribute-icon-hidden')), findsOneWidget);
+    expect(find.byKey(const Key('attribute-icon-evil')), findsNothing);
+    expect(find.text('正体不明'), findsOneWidget);
+    expect(find.text('悪人'), findsNothing);
+  });
+
+  testWidgets('JUDGEボタンはJUDGEと残り1回を別々の切れないテキストで表示', (tester) async {
+    final controller = NineJudgesController(
+      seed: 1,
+      settings: const NineJudgesGameSettings(
+        mode: GameMode.hotseat,
+        firstPlayer: Faction.savior,
+      ),
+    );
+    tester.view.physicalSize = const Size(375, 667);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: ActionPanel(controller: controller)),
+      ),
+    );
+    expect(find.text('JUDGE'), findsOneWidget);
+    expect(find.text('残り1回'), findsWidgets);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('救済者はSPECIAL DEATH、執行者はSPECIAL LIFEを表示', (tester) async {
+    final saviorTurn = NineJudgesController(
+      seed: 2,
+      settings: const NineJudgesGameSettings(
+        mode: GameMode.hotseat,
+        firstPlayer: Faction.savior,
+      ),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: ActionPanel(controller: saviorTurn)),
+      ),
+    );
+    expect(find.text('SPECIAL DEATH'), findsOneWidget);
+    expect(find.text('SPECIAL LIFE'), findsNothing);
+
+    final executorTurn = NineJudgesController(
+      seed: 3,
+      settings: const NineJudgesGameSettings(
+        mode: GameMode.hotseat,
+        firstPlayer: Faction.executor,
+      ),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: ActionPanel(controller: executorTurn)),
+      ),
+    );
+    expect(find.text('SPECIAL LIFE'), findsOneWidget);
+    expect(find.text('SPECIAL DEATH'), findsNothing);
+  });
+
+  testWidgets('JUDGE・SPECIALは使用済みになると使用済みと表示', (tester) async {
+    final controller = NineJudgesController(
+      seed: 4,
+      settings: const NineJudgesGameSettings(
+        mode: GameMode.hotseat,
+        firstPlayer: Faction.savior,
+      ),
+    );
+    controller.specialVerdictUsed[Faction.savior] = true;
+    controller.reverseActionUsed[Faction.savior] = true;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: ActionPanel(controller: controller)),
+      ),
+    );
+    expect(find.text('使用済み'), findsNWidgets(2));
+    expect(find.text('残り1回'), findsNothing);
+  });
+
+  testWidgets('JUDGEキャンセルではJUDGE残数・状態・ボーナス・手番が変化しない', (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: NineJudgesGameScreen(initialSettings: NineJudgesGameSettings()),
+      ),
+    );
+    String bonusPointText() =>
+        tester.widgetList<Text>(find.textContaining('POINT')).first.data!;
+    final bonusBefore = bonusPointText();
+    final ownerBefore = tester
+        .widget<Text>(find.byKey(const Key('turn-owner-label')))
+        .data;
+    final judgeStatusBefore = tester
+        .widget<Text>(find.byKey(const Key('verdict-status-savior')))
+        .data;
+
+    await tester.tap(find.byKey(const Key('action-specialVerdict')));
+    await tester.pump();
+    await tester.tap(find.byType(PersonCardWidget).first);
+    await tester.pump();
+    await tester.tap(find.text('キャンセル'));
+    await tester.pumpAndSettle();
+
+    expect(bonusPointText(), bonusBefore);
+    expect(
+      tester.widget<Text>(find.byKey(const Key('turn-owner-label'))).data,
+      ownerBefore,
+    );
+    expect(
+      tester.widget<Text>(find.byKey(const Key('verdict-status-savior'))).data,
+      judgeStatusBefore,
+    );
+    expect(find.textContaining('TURN 1'), findsOneWidget);
+    expect(find.byKey(const Key('verdict-deliberating')), findsNWidgets(9));
+  });
+
+  testWidgets('生存確定は緑、死亡確定は赤の枠で表示される', (tester) async {
+    Border borderOf(Key key) {
+      final container = tester.widget<AnimatedContainer>(find.byKey(key));
+      return (container.decoration! as BoxDecoration).border! as Border;
+    }
+
+    const alive = PersonCard(
+      id: 'a',
+      attribute: PersonAttribute.good,
+      verdictState: VerdictState.aliveConfirmed,
+      awardedBonus: 3,
+    );
+    const dead = PersonCard(
+      id: 'd',
+      attribute: PersonAttribute.evil,
+      verdictState: VerdictState.deadConfirmed,
+      awardedBonus: 3,
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Row(
+            children: [
+              Expanded(
+                child: PersonCardWidget(
+                  person: alive,
+                  attributeVisible: true,
+                  viewerEyeKnown: false,
+                  opponentEyeKnown: false,
+                  viewerLabel: 'YOU',
+                  opponentLabel: 'CPU',
+                  selected: false,
+                  cpuHighlighted: false,
+                  enabled: false,
+                  onTap: () {},
+                ),
+              ),
+              Expanded(
+                child: PersonCardWidget(
+                  person: dead,
+                  attributeVisible: true,
+                  viewerEyeKnown: false,
+                  opponentEyeKnown: false,
+                  viewerLabel: 'YOU',
+                  opponentLabel: 'CPU',
+                  selected: false,
+                  cpuHighlighted: false,
+                  enabled: false,
+                  onTap: () {},
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    expect(
+      borderOf(const Key('card-surface-aliveConfirmed')).top.color,
+      AppTheme.alive,
+    );
+    expect(
+      borderOf(const Key('card-surface-deadConfirmed')).top.color,
+      AppTheme.dead,
+    );
+  });
 }

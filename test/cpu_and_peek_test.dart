@@ -30,7 +30,10 @@ void main() {
         s = engine.applyAction(
           s,
           GameAction(
-              player: s.current, actionCardId: aCard.id, targetPosition: 0),
+            player: s.current,
+            actionCardId: aCard.id,
+            targetPosition: 0,
+          ),
         );
         expect(s.current, PlayerId.b);
         final d = cpu.decide(s, PlayerId.b);
@@ -95,10 +98,15 @@ void main() {
 
       // プレイヤーA の既知は下段（位置6,7,8）。
       controller.selectPosition(6);
-      expect(container.read(gameControllerProvider)!.peeked.contains(6), isTrue);
+      expect(
+        container.read(gameControllerProvider)!.peeked.contains(6),
+        isTrue,
+      );
       controller.selectPosition(6);
       expect(
-          container.read(gameControllerProvider)!.peeked.contains(6), isFalse);
+        container.read(gameControllerProvider)!.peeked.contains(6),
+        isFalse,
+      );
     });
 
     test('アクション選択中はタップが対象選択になる（peek しない）', () {
@@ -108,8 +116,11 @@ void main() {
       controller.startGame(Faction.savior, vsCpu: true);
       controller.confirmPeek();
 
-      final card =
-          container.read(gameControllerProvider)!.currentPlayer.usableCards.first;
+      final card = container
+          .read(gameControllerProvider)!
+          .currentPlayer
+          .usableCards
+          .first;
       controller.selectActionCard(card.id);
       controller.selectPosition(0);
       final s = container.read(gameControllerProvider)!;
