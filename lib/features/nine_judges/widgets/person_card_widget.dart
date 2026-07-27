@@ -311,36 +311,22 @@ class _EyeMark extends StatelessWidget {
 }
 
 class _AssetBadge extends StatelessWidget {
-  const _AssetBadge({
-    required this.asset,
-    this.dim = false,
-    this.ring,
-    this.badgeKey,
-  });
+  const _AssetBadge({required this.asset, this.badgeKey});
 
   final String asset;
-  final bool dim;
-  final Color? ring;
   final Key? badgeKey;
 
   @override
-  Widget build(BuildContext context) => Opacity(
-    opacity: dim ? .35 : 1,
-    child: Container(
-      width: 22,
-      height: 22,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: ring == null ? null : Border.all(color: ring!, width: 1.4),
-      ),
-      child: ClipOval(
-        child: Image.asset(
-          asset,
-          key: badgeKey,
-          fit: BoxFit.cover,
-          gaplessPlayback: true,
-          errorBuilder: (_, _, _) => const SizedBox.shrink(),
-        ),
+  Widget build(BuildContext context) => SizedBox(
+    width: 22,
+    height: 22,
+    child: ClipOval(
+      child: Image.asset(
+        asset,
+        key: badgeKey,
+        fit: BoxFit.cover,
+        gaplessPlayback: true,
+        errorBuilder: (_, _, _) => const SizedBox.shrink(),
       ),
     ),
   );
