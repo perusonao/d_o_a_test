@@ -1,3 +1,6 @@
+import 'dart:math';
+
+import 'package:dead_or_alive/features/nine_judges/models/judge_models.dart';
 import 'package:dead_or_alive/features/nine_judges/simulation/experiments/experiment_config.dart';
 import 'package:dead_or_alive/features/nine_judges/simulation/experiments/experiment_result.dart';
 import 'package:dead_or_alive/features/nine_judges/simulation/simulation_result.dart';
@@ -123,7 +126,189 @@ class ExperimentExtraStatistics {
       values['informationMode'] = experiment.informationMode.name;
     }
 
+    final results = [for (final outcome in outcomes) outcome.result];
+    if (results.isNotEmpty) {
+      final saviorWins = results.where((r) => r.winner == Faction.savior).length;
+      final executorWins = results
+          .where((r) => r.winner == Faction.executor)
+          .length;
+      values['saviorWinRate95CI'] = _wilson(saviorWins, games);
+      values['executorWinRate95CI'] = _wilson(executorWins, games);
+      final firstWins = results
+          .where((r) => r.winner == r.firstPlayer)
+          .length;
+      values['firstWinRate95CI'] = _wilson(firstWins, games);
+    }
+
+    // EYE grid: how the center row (the only legal EYE zone this round) was
+    // actually resolved — via EYE, or "blind" through LIFE/DEATH alone.
+    if (experiment.eyeZoneMode == EyeZoneMode.centerOnly) {
+      const center = [3, 4, 5];
+      final eyedCounts = <int>[];
+      final blindConfirmedCounts = <int>[];
+      final eyeTargetTally = {for (final i in center) i: 0};
+      final eyeUsesPerPlayer = <int>[];
+      for (final result in results) {
+        final eyedHere = <int>{};
+        for (final action in result.actions) {
+          if (action.action == ActionType.eye) {
+            eyedHere.add(action.targetIndex);
+            eyeTargetTally[action.targetIndex] =
+                (eyeTargetTally[action.targetIndex] ?? 0) + 1;
+          }
+        }
+        eyedCounts.add(eyedHere.length);
+        blindConfirmedCounts.add(center.length - eyedHere.length);
+        eyeUsesPerPlayer
+          ..add(result.saviorEyeCount)
+          ..add(result.executorEyeCount);
+      }
+      values['centerPersonsEyedAverage'] = average(eyedCounts);
+      values['centerPersonsBlindConfirmedAverage'] = average(
+        blindConfirmedCounts,
+      );
+      values['eyeTargetDistribution'] = eyeTargetTally.map(
+        (index, count) => MapEntry('$index', count),
+      );
+      final usageDistribution = <String, int>{};
+      for (final count in eyeUsesPerPlayer) {
+        final key = '$count';
+        usageDistribution[key] = (usageDistribution[key] ?? 0) + 1;
+      }
+      values['eyeUsesPerPlayerDistribution'] = usageDistribution;
+    }
+
+    // REVOKE (Experiment 4): usage profile plus the requested per-event
+    // breakdown. Every figure here is descriptive/correlational, never
+    // causal (see REPORT_NEXT_RULE.md).
+    if (experiment.revokeBudgetFirstPlayer > 0 ||
+        experiment.revokeBudgetSecondPlayer > 0) {
+      final revokeCounts = outcomes
+          .map((o) => o.extras['revokeCount']! as int)
+          .toList();
+      final allEvents = <Map<String, Object?>>[
+        for (final outcome in outcomes)
+          ...?(outcome.extras['revokeEvents'] as List<Map<String, Object?>>?),
+      ];
+      final usedGames = outcomes
+          .where((o) => (o.extras['revokeCount']! as int) > 0)
+          .length;
+      final firstPlayerEvents = <Map<String, Object?>>[];
+      final secondPlayerEvents = <Map<String, Object?>>[];
+      for (var i = 0; i < outcomes.length; i++) {
+        final events =
+            outcomes[i].extras['revokeEvents'] as List<Map<String, Object?>>?;
+        if (events == null) continue;
+        final firstPlayer = outcomes[i].result.firstPlayer;
+        for (final event in events) {
+          if (event['faction'] == firstPlayer.name) {
+            firstPlayerEvents.add(event);
+          } else {
+            secondPlayerEvents.add(event);
+          }
+        }
+      }
+      final lifeRemoved = allEvents
+          .where((e) => e['removedAction'] == 'life')
+          .length;
+      final deathRemoved = allEvents
+          .where((e) => e['removedAction'] == 'death')
+          .length;
+      final contestedUses = allEvents
+          .where((e) => e['wasContestedSoFar'] == true)
+          .length;
+      final touchedAgain = <bool>[
+        for (final outcome in outcomes)
+          ...?(outcome.extras['revokeTargetTouchedAgainAfter'] as List<bool>?),
+      ];
+      final gotCredit = <bool>[
+        for (final outcome in outcomes)
+          ...?(outcome.extras['revokeUserGotFinalCredit'] as List<bool>?),
+      ];
+      final finalScorers = <String?>[
+        for (final outcome in outcomes)
+          ...?(outcome.extras['revokeTargetFinalScorer'] as List<String?>?),
+      ];
+      final attributeTally = <String, int>{};
+      final historyLengths = <int>[];
+      final turns = <int>[];
+      for (final event in allEvents) {
+        final attribute = event['attribute']! as String;
+        attributeTally[attribute] = (attributeTally[attribute] ?? 0) + 1;
+        historyLengths.add(event['historyLengthBefore']! as int);
+        turns.add(event['turn']! as int);
+      }
+      values['revokeUsageRate'] = rate(usedGames);
+      values['revokeAveragePerGame'] = average(revokeCounts);
+      values['revokeTotalEvents'] = allEvents.length;
+      values['revokeAverageTurn'] = average(turns);
+      values['revokeFirstPlayerUsageRate'] = rate(
+        outcomes.where((o) {
+          final events =
+              o.extras['revokeEvents'] as List<Map<String, Object?>>?;
+          return events != null &&
+              events.any((e) => e['faction'] == o.result.firstPlayer.name);
+        }).length,
+      );
+      values['revokeSecondPlayerUsageRate'] = rate(
+        outcomes.where((o) {
+          final events =
+              o.extras['revokeEvents'] as List<Map<String, Object?>>?;
+          return events != null &&
+              events.any((e) => e['faction'] != o.result.firstPlayer.name);
+        }).length,
+      );
+      values['revokeTargetAttributeDistribution'] = attributeTally;
+      values['revokeAverageHistoryLengthBefore'] = average(historyLengths);
+      values['revokeLifeRemovedCount'] = lifeRemoved;
+      values['revokeDeathRemovedCount'] = deathRemoved;
+      values['revokeContestedSoFarRate'] = allEvents.isEmpty
+          ? 0.0
+          : contestedUses / allEvents.length;
+      values['revokeTargetTouchedAgainRate'] = touchedAgain.isEmpty
+          ? 0.0
+          : touchedAgain.where((v) => v).length / touchedAgain.length;
+      values['revokeUserGotFinalCreditRate'] = gotCredit.isEmpty
+          ? 0.0
+          : gotCredit.where((v) => v).length / gotCredit.length;
+      values['revokeTargetFinalScorerSaviorRate'] = finalScorers.isEmpty
+          ? 0.0
+          : finalScorers.where((s) => s == 'savior').length /
+                finalScorers.length;
+
+      // Reference-only correlation, not causal: win rate in games where a
+      // REVOKE happened to be used vs games where it wasn't.
+      final withRevoke = [
+        for (final o in outcomes)
+          if ((o.extras['revokeCount']! as int) > 0) o.result,
+      ];
+      final withoutRevoke = [
+        for (final o in outcomes)
+          if ((o.extras['revokeCount']! as int) == 0) o.result,
+      ];
+      double firstWinRateOf(List<SimulationResult> list) => list.isEmpty
+          ? 0.0
+          : list.where((r) => r.winner == r.firstPlayer).length / list.length;
+      values['firstWinRateInGamesWithRevoke'] = firstWinRateOf(withRevoke);
+      values['firstWinRateInGamesWithoutRevoke'] = firstWinRateOf(
+        withoutRevoke,
+      );
+      values['gamesWithRevoke'] = withRevoke.length;
+      values['gamesWithoutRevoke'] = withoutRevoke.length;
+    }
+
     return ExperimentExtraStatistics._(values);
+  }
+
+  static Map<String, double> _wilson(int successes, int total) {
+    if (total == 0) return {'lower': 0, 'upper': 0};
+    const z = 1.959963984540054;
+    final p = successes / total;
+    final denominator = 1 + z * z / total;
+    final center = (p + z * z / (2 * total)) / denominator;
+    final margin =
+        z * sqrt((p * (1 - p) + z * z / (4 * total)) / total) / denominator;
+    return {'lower': center - margin, 'upper': center + margin};
   }
 
   Map<String, Object> toJson() => values;
