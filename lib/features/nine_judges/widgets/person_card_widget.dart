@@ -105,6 +105,9 @@ class PersonCardWidget extends StatelessWidget {
                             attribute: person.attribute,
                             viewerEyeKnown: viewerEyeKnown,
                             opponentEyeKnown: opponentEyeKnown,
+                            viewerLabel: viewerLabel,
+                            opponentLabel: opponentLabel,
+                            confirmed: confirmed,
                             accent: accent,
                           ),
                           Align(
@@ -194,6 +197,9 @@ class _Corners extends StatelessWidget {
     required this.attribute,
     required this.viewerEyeKnown,
     required this.opponentEyeKnown,
+    required this.viewerLabel,
+    required this.opponentLabel,
+    required this.confirmed,
     required this.accent,
   });
 
@@ -202,6 +208,9 @@ class _Corners extends StatelessWidget {
   final PersonAttribute attribute;
   final bool viewerEyeKnown;
   final bool opponentEyeKnown;
+  final String viewerLabel;
+  final String opponentLabel;
+  final bool confirmed;
   final Color accent;
 
   @override
@@ -241,13 +250,62 @@ class _Corners extends StatelessWidget {
             ),
           ),
           const Spacer(),
-          _AssetBadge(
-            asset: CardAssets.eyeBadge,
-            dim: !viewerEyeKnown,
-            ring: opponentEyeKnown ? AppTheme.executor : null,
-          ),
+          if (!confirmed)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                if (viewerEyeKnown)
+                  _EyeMark(label: viewerLabel, color: AppTheme.eye),
+                if (opponentEyeKnown)
+                  _EyeMark(label: opponentLabel, color: AppTheme.executor),
+              ],
+            ),
         ],
       ),
+    ),
+  );
+}
+
+/// EYE marker: the sliced eye badge tagged with who has seen the attribute
+/// (`YOU` / `CPU`, or the faction name in hotseat).
+class _EyeMark extends StatelessWidget {
+  const _EyeMark({required this.label, required this.color});
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    margin: const EdgeInsets.only(bottom: 2),
+    padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 1),
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: .18),
+      borderRadius: BorderRadius.circular(5),
+      border: Border.all(color: color.withValues(alpha: .8)),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        ClipOval(
+          child: Image.asset(
+            CardAssets.eyeBadge,
+            width: 12,
+            height: 12,
+            fit: BoxFit.cover,
+            gaplessPlayback: true,
+            errorBuilder: (_, _, _) => Icon(Icons.visibility, size: 10, color: color),
+          ),
+        ),
+        const SizedBox(width: 2),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 7,
+            color: color,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ],
     ),
   );
 }
@@ -349,6 +407,16 @@ class _Footer extends StatelessWidget {
                   key: const Key('confirmed-label'),
                   size: compact ? 10 : 12,
                   color: accent,
+                ),
+                const SizedBox(width: 2),
+                Text(
+                  person.isAlive ? 'ALIVE' : 'DEAD',
+                  style: TextStyle(
+                    color: accent,
+                    fontSize: compact ? 7 : 8,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: .5,
+                  ),
                 ),
               ],
             ],
