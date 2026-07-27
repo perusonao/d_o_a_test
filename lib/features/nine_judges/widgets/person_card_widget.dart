@@ -1,6 +1,7 @@
 import 'package:dead_or_alive/app/theme.dart';
 import 'package:dead_or_alive/features/nine_judges/models/judge_models.dart';
 import 'package:dead_or_alive/features/nine_judges/widgets/card_assets.dart';
+import 'package:dead_or_alive/features/nine_judges/widgets/game_style.dart';
 import 'package:flutter/material.dart';
 
 /// A single board card rendered in the dark-fantasy style of the mockup:
@@ -216,52 +217,75 @@ class _Corners extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.all(3),
-    child: Align(
-      alignment: Alignment.topCenter,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _AssetBadge(
-            asset: attributeVisible
-                ? CardAssets.attributeBadge(attribute)
-                : CardAssets.unknownBadge,
-            badgeKey: Key(
-              attributeVisible
-                  ? 'attribute-icon-${attribute.name}'
-                  : 'attribute-icon-hidden',
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Badge + coordinate chip: wrapped in FittedBox so this group scales
+        // down as a whole instead of ever hard-overflowing, no matter how
+        // narrow the card gets (down to the smallest supported phone width).
+        Flexible(
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.topLeft,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _AssetBadge(
+                  asset: attributeVisible
+                      ? CardAssets.attributeBadge(attribute)
+                      : CardAssets.unknownBadge,
+                  badgeKey: Key(
+                    attributeVisible
+                        ? 'attribute-icon-${attribute.name}'
+                        : 'attribute-icon-hidden',
+                  ),
+                ),
+                const SizedBox(width: 3),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 4,
+                    vertical: 1,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: .5),
+                    borderRadius: BorderRadius.circular(5),
+                    border: Border.all(color: accent.withValues(alpha: .6)),
+                  ),
+                  child: Text(
+                    coordinate,
+                    key: Key('coordinate-$coordinate'),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 8,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFFEAD9A4),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(width: 3),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-            decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: .5),
-              borderRadius: BorderRadius.circular(5),
-              border: Border.all(color: accent.withValues(alpha: .6)),
-            ),
-            child: Text(
-              coordinate,
-              key: Key('coordinate-$coordinate'),
-              style: const TextStyle(
-                fontSize: 8,
-                fontWeight: FontWeight.w900,
-                color: Color(0xFFEAD9A4),
+        ),
+        const Spacer(),
+        if (!confirmed && (viewerEyeKnown || opponentEyeKnown))
+          Flexible(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.topRight,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (viewerEyeKnown)
+                    _EyeMark(label: viewerLabel, color: AppTheme.eye),
+                  if (opponentEyeKnown)
+                    _EyeMark(label: opponentLabel, color: AppTheme.executor),
+                ],
               ),
             ),
           ),
-          const Spacer(),
-          if (!confirmed)
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                if (viewerEyeKnown)
-                  _EyeMark(label: viewerLabel, color: AppTheme.eye),
-                if (opponentEyeKnown)
-                  _EyeMark(label: opponentLabel, color: AppTheme.executor),
-              ],
-            ),
-        ],
-      ),
+      ],
     ),
   );
 }
@@ -293,16 +317,21 @@ class _EyeMark extends StatelessWidget {
             height: 12,
             fit: BoxFit.cover,
             gaplessPlayback: true,
-            errorBuilder: (_, _, _) => Icon(Icons.visibility, size: 10, color: color),
+            errorBuilder: (_, _, _) =>
+                Icon(Icons.visibility, size: 10, color: color),
           ),
         ),
         const SizedBox(width: 2),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 7,
-            color: color,
-            fontWeight: FontWeight.w900,
+        Flexible(
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 7,
+              color: color,
+              fontWeight: FontWeight.w900,
+            ),
           ),
         ),
       ],
@@ -352,6 +381,13 @@ class _Footer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final confirmed = person.isConfirmed;
+    final deliberating = person.verdictState == VerdictState.deliberating;
+    // Priority order for a still-undecided card is attribute > portrait >
+    // history > "審議中": every unconfirmed card used to shout "審議中" at the
+    // same weight as a real verdict, so it's shrunk and muted here instead of
+    // competing with the more useful information above and below it.
+    final count = person.verdictActionCount;
+    final showTally = !confirmed && count > 0 && !compact;
     return Padding(
       padding: const EdgeInsets.fromLTRB(4, 2, 4, 4),
       child: Column(
@@ -380,9 +416,15 @@ class _Footer extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: _stateColor(person.verdictState),
-                    fontSize: compact ? 8 : 10,
-                    fontWeight: FontWeight.w900,
+                    color: deliberating
+                        ? _stateColor(person.verdictState).withValues(alpha: .6)
+                        : _stateColor(person.verdictState),
+                    fontSize: confirmed
+                        ? (compact ? 9 : 12)
+                        : (compact ? 7 : 9),
+                    fontWeight: deliberating
+                        ? FontWeight.w600
+                        : FontWeight.w900,
                   ),
                 ),
               ),
@@ -391,7 +433,7 @@ class _Footer extends StatelessWidget {
                 Icon(
                   person.isAlive ? Icons.check_circle : Icons.cancel,
                   key: const Key('confirmed-label'),
-                  size: compact ? 10 : 12,
+                  size: compact ? 11 : 14,
                   color: accent,
                 ),
                 const SizedBox(width: 2),
@@ -399,7 +441,7 @@ class _Footer extends StatelessWidget {
                   person.isAlive ? 'ALIVE' : 'DEAD',
                   style: TextStyle(
                     color: accent,
-                    fontSize: compact ? 7 : 8,
+                    fontSize: compact ? 8 : 9,
                     fontWeight: FontWeight.w900,
                     letterSpacing: .5,
                   ),
@@ -407,6 +449,30 @@ class _Footer extends StatelessWidget {
               ],
             ],
           ),
+          if (showTally)
+            Padding(
+              padding: const EdgeInsets.only(top: 1),
+              child: Text.rich(
+                TextSpan(
+                  style: const TextStyle(
+                    fontSize: 7,
+                    color: GameColors.textDim,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  children: [
+                    TextSpan(text: '裁定 $count/3'),
+                    if (count == 2)
+                      const TextSpan(
+                        text: ' ・ 次で確定',
+                        style: TextStyle(
+                          color: GameColors.gold,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
           const SizedBox(height: 2),
           _HistoryPips(history: person.verdictHistory),
           if (scoreDetail case final detail?)

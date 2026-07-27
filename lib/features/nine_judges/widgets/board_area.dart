@@ -48,13 +48,12 @@ class BoardArea extends StatelessWidget {
                     key: const Key('nine-judges-board'),
                     physics: const NeverScrollableScrollPhysics(),
                     padding: EdgeInsets.zero,
-                    gridDelegate:
-                        SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 3,
-                          crossAxisSpacing: gap,
-                          mainAxisSpacing: gap,
-                          childAspectRatio: cellW / cellH,
-                        ),
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 3,
+                      crossAxisSpacing: gap,
+                      mainAxisSpacing: gap,
+                      childAspectRatio: cellW / cellH,
+                    ),
                     itemCount: 9,
                     itemBuilder: (context, index) => _card(index),
                   ),
@@ -139,9 +138,7 @@ class _ColumnLetters extends StatelessWidget {
             if (col > 0) SizedBox(width: gap),
             SizedBox(
               width: cellW,
-              child: Center(
-                child: _CoordLabel(String.fromCharCode(65 + col)),
-              ),
+              child: Center(child: _CoordLabel(String.fromCharCode(65 + col))),
             ),
           ],
         ],

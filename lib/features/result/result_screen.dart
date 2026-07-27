@@ -32,8 +32,9 @@ class ResultScreen extends ConsumerWidget {
       title = '引き分け';
     } else {
       color = CardVisuals.factionColor(result.winner!);
-      final winnerPlayer =
-          result.playerAFaction == result.winner ? 'プレイヤーA' : 'プレイヤーB';
+      final winnerPlayer = result.playerAFaction == result.winner
+          ? 'プレイヤーA'
+          : 'プレイヤーB';
       title = '$winnerPlayer の勝利';
     }
 
@@ -47,18 +48,28 @@ class ResultScreen extends ConsumerWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(result.isDraw ? Icons.balance : Icons.emoji_events,
-                      size: 60, color: color),
+                  Icon(
+                    result.isDraw ? Icons.balance : Icons.emoji_events,
+                    size: 60,
+                    color: color,
+                  ),
                   const SizedBox(height: 8),
-                  Text(title,
-                      style: TextStyle(
-                          fontSize: 30,
-                          fontWeight: FontWeight.bold,
-                          color: color)),
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 30,
+                      fontWeight: FontWeight.bold,
+                      color: color,
+                    ),
+                  ),
                   if (!result.isDraw)
-                    Text('勝利陣営：${CardVisuals.factionLabel(result.winner!)}',
-                        style: const TextStyle(
-                            fontSize: 14, color: Color(0xFFCFC7B5))),
+                    Text(
+                      '勝利陣営：${CardVisuals.factionLabel(result.winner!)}',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Color(0xFFCFC7B5),
+                      ),
+                    ),
                   const SizedBox(height: 20),
                   _ScorePanel(result: result),
                   const SizedBox(height: 22),
@@ -111,51 +122,68 @@ class _ScorePanel extends StatelessWidget {
             children: [
               Expanded(
                 child: _tile(
-                    '救済者',
-                    result.saviorScore,
-                    AppTheme.alive,
-                    result.winner == Faction.savior,
-                    result.playerAFaction == Faction.savior ? 'A' : 'B'),
+                  '救済者',
+                  result.saviorScore,
+                  AppTheme.alive,
+                  result.winner == Faction.savior,
+                  result.playerAFaction == Faction.savior ? 'A' : 'B',
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: _tile(
-                    '執行者',
-                    result.executionerScore,
-                    AppTheme.evil,
-                    result.winner == Faction.executioner,
-                    result.playerAFaction == Faction.executioner ? 'A' : 'B'),
+                  '執行者',
+                  result.executionerScore,
+                  AppTheme.evil,
+                  result.winner == Faction.executioner,
+                  result.playerAFaction == Faction.executioner ? 'A' : 'B',
+                ),
               ),
             ],
           ),
           const SizedBox(height: 10),
-          const Text('得点は各カード（善人/中立=生存で救済者・死亡で執行者、悪人=逆）の合計。',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 11, color: Color(0xFF9A9384))),
+          const Text(
+            '得点は各カード（善人/中立=生存で救済者・死亡で執行者、悪人=逆）の合計。',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 11, color: Color(0xFF9A9384)),
+          ),
         ],
       ),
     );
   }
 
   Widget _tile(
-      String label, int score, Color color, bool winner, String playerTag) {
+    String label,
+    int score,
+    Color color,
+    bool winner,
+    String playerTag,
+  ) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 12),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(10),
         color: winner ? color.withValues(alpha: 0.18) : Colors.transparent,
         border: Border.all(
-            color: color.withValues(alpha: winner ? 0.8 : 0.3),
-            width: winner ? 2 : 1),
+          color: color.withValues(alpha: winner ? 0.8 : 0.3),
+          width: winner ? 2 : 1,
+        ),
       ),
       child: Column(
         children: [
-          Text('$label（$playerTag）',
-              style: TextStyle(fontSize: 13, color: color)),
+          Text(
+            '$label（$playerTag）',
+            style: TextStyle(fontSize: 13, color: color),
+          ),
           const SizedBox(height: 2),
-          Text('$score',
-              style: TextStyle(
-                  fontSize: 30, fontWeight: FontWeight.bold, color: color)),
+          Text(
+            '$score',
+            style: TextStyle(
+              fontSize: 30,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
         ],
       ),
     );

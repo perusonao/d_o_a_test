@@ -64,8 +64,10 @@ void main(List<String> args) {
     while (s.phase != GamePhase.finished && guard < 100) {
       final actor = s.current;
       final d = strat.decide(s, actor)!;
-      final card =
-          s.player(actor).hand.firstWhere((c) => c.id == d.actionCardId);
+      final card = s
+          .player(actor)
+          .hand
+          .firstWhere((c) => c.id == d.actionCardId);
       final pos = d.targetPosition;
 
       if (card.type == ActionType.life || card.type == ActionType.death) {
@@ -152,11 +154,15 @@ void main(List<String> args) {
   print('  救済者=後手(B): ${pct(saviorWinsAsB, saviorGamesAsB)}');
   print('');
   print('[カード有効率]');
-  print('  保：吸収して仕事をした率  ${pct(protAbsorbed, protPlaced)}  '
-      '($protAbsorbed/$protPlaced)');
+  print(
+    '  保：吸収して仕事をした率  ${pct(protAbsorbed, protPlaced)}  '
+    '($protAbsorbed/$protPlaced)',
+  );
   print('  保：最終的に望む状態を守れた率 ${pct(protFavorable, protPlaced)}');
-  print('  診：本人が後で対象に手を打った率 ${pct(diagActed, diagPlaced)}  '
-      '($diagActed/$diagPlaced)');
+  print(
+    '  診：本人が後で対象に手を打った率 ${pct(diagActed, diagPlaced)}  '
+    '($diagActed/$diagPlaced)',
+  );
   print('');
   print('[参考]');
   print('  平均得点差(|救-執|): ${(marginSum / games).toStringAsFixed(2)}');

@@ -32,11 +32,12 @@ abstract final class CardAssets {
   static String unknownPortrait(String personId) =>
       '$_characters/${_unknownPortraits[_slotOf(personId) % _unknownPortraits.length]}.png';
 
-  static String attributeBadge(PersonAttribute attribute) => switch (attribute) {
-    PersonAttribute.good => '$_icons/badge_good.png',
-    PersonAttribute.evil => '$_icons/badge_evil.png',
-    PersonAttribute.neutral => '$_icons/badge_neutral.png',
-  };
+  static String attributeBadge(PersonAttribute attribute) =>
+      switch (attribute) {
+        PersonAttribute.good => '$_icons/badge_good.png',
+        PersonAttribute.evil => '$_icons/badge_evil.png',
+        PersonAttribute.neutral => '$_icons/badge_neutral.png',
+      };
 
   static const unknownBadge = '$_icons/badge_unknown.png';
   static const eyeBadge = '$_icons/badge_eye.png';

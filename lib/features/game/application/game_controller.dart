@@ -31,8 +31,10 @@ class GameController extends Notifier<GameState?> {
 
   void restart() {
     final s = state;
-    startGame(s?.playerA.faction ?? Faction.savior,
-        vsCpu: s?.playerB.isCpu ?? false);
+    startGame(
+      s?.playerA.faction ?? Faction.savior,
+      vsCpu: s?.playerB.isCpu ?? false,
+    );
   }
 
   Future<void> confirmPeek() async {
@@ -59,8 +61,8 @@ class GameController extends Notifier<GameState?> {
     if (s == null || s.isBusy || s.phase != GamePhase.playing) return;
     if (s.currentPlayer.isCpu) return;
 
-    final peekable = s.isKnownBy(s.current, position) &&
-        !s.humanAt(position).revealed;
+    final peekable =
+        s.isKnownBy(s.current, position) && !s.humanAt(position).revealed;
     if (s.selectedActionCardId == null && peekable) {
       final set = {...s.peeked};
       if (set.contains(position)) {
@@ -125,8 +127,11 @@ class GameController extends Notifier<GameState?> {
     return _engine.score(s);
   }
 
-  GameState _rebuild(GameState s,
-      {required String? cardId, required int? position}) {
+  GameState _rebuild(
+    GameState s, {
+    required String? cardId,
+    required int? position,
+  }) {
     return GameState(
       humans: s.humans,
       playerA: s.playerA,
@@ -162,5 +167,6 @@ class GameController extends Notifier<GameState?> {
   }
 }
 
-final gameControllerProvider =
-    NotifierProvider<GameController, GameState?>(GameController.new);
+final gameControllerProvider = NotifierProvider<GameController, GameState?>(
+  GameController.new,
+);

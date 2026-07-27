@@ -90,6 +90,5 @@ class CardVisuals {
   static Color factionColor(Faction f) =>
       f == Faction.savior ? AppTheme.alive : AppTheme.evil;
 
-  static String factionLabel(Faction f) =>
-      f == Faction.savior ? '救済者' : '執行者';
+  static String factionLabel(Faction f) => f == Faction.savior ? '救済者' : '執行者';
 }

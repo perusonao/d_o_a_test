@@ -186,8 +186,6 @@ class _GameBoard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: GameMetrics.gapSm),
-                    const _Legend(),
-                    const SizedBox(height: GameMetrics.gapSm),
                     ActionPanel(controller: controller),
                   ],
                 ),
@@ -209,6 +207,11 @@ class _GameBoard extends StatelessWidget {
     final person = controller.board[index].person;
     final viewer = controller.uiViewer;
     final known = controller.knowsAttribute(person, viewer);
+    final actor = controller.currentPlayer;
+    // JUDGE's outcome is a fixed rule (savior -> alive, executor -> dead), not
+    // hidden information, so previewing it here never leaks anything the
+    // acting player doesn't already know from the rules themselves.
+    final resultState = actor == Faction.savior ? '生存確定' : '死亡確定';
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -217,8 +220,8 @@ class _GameBoard extends StatelessWidget {
         title: const Text('JUDGEを使用しますか？'),
         content: Text(
           '対象: ${controller.positionLabel(index)}\n'
-          '正体: ${known ? person.attribute.label : '正体不明'}\n\n'
-          'この人物を即時裁定します。',
+          '正体: ${known ? person.attribute.label : '正体不明'}\n'
+          '結果: ${actor.label} → $resultState',
           textAlign: TextAlign.center,
         ),
         actions: [
@@ -244,11 +247,35 @@ class _GameBoard extends StatelessWidget {
     showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('審判ボーナス'),
-        content: const Text(
-          '最初のボーナスは両者に公開されます。\n'
-          '以降は、直前の審判を確定させなかったプレイヤーが、'
-          '次の自分の手番開始時に次のボーナスを確認できます。',
+        title: const Text('遊び方のヒント'),
+        content: const SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('審判ボーナス', style: TextStyle(fontWeight: FontWeight.w900)),
+              SizedBox(height: 4),
+              Text(
+                '確定した人物1人につき1枚使われる得点です。'
+                '最初のボーナスは両者に公開されます。'
+                '以降は、直前の審判を確定させなかったプレイヤーが、'
+                '次の自分の手番開始時に次のボーナスを確認できます。',
+              ),
+              SizedBox(height: 14),
+              Text('カード下部の記号', style: TextStyle(fontWeight: FontWeight.w900)),
+              SizedBox(height: 4),
+              Text('生 ＝ LIFEを与えた履歴（生存へ寄せる）'),
+              Text('死 ＝ DEATHを与えた履歴（死亡へ寄せる）'),
+              Text('○ ＝ まだ何も行われていない'),
+              SizedBox(height: 8),
+              Text('EYEマーカー', style: TextStyle(fontWeight: FontWeight.w900)),
+              SizedBox(height: 4),
+              Text(
+                'カード右上の目印は、EYEで正体を確認した陣営を示します。'
+                '相手だけが確認した場合、あなたには正体は分かりません。',
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(
@@ -373,7 +400,7 @@ class _GameHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => SizedBox(
-    height: 74,
+    height: 68,
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -422,7 +449,8 @@ class _PlayerPanel extends StatelessWidget {
           CardAssets.crest(faction),
           fit: BoxFit.cover,
           gaplessPlayback: true,
-          errorBuilder: (_, _, _) => Icon(Icons.balance, color: color, size: 18),
+          errorBuilder: (_, _, _) =>
+              Icon(Icons.balance, color: color, size: 18),
         ),
       ),
     );
@@ -507,7 +535,7 @@ class _PlayerPanel extends StatelessWidget {
 
     return Container(
       key: Key('faction-${faction.name}'),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: isSavior ? Alignment.topLeft : Alignment.topRight,
@@ -570,25 +598,33 @@ class _TurnIndicator extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const _Diamond(),
+                  _Diamond(muted: !isHumanTurn),
                   const SizedBox(width: 6),
                   Flexible(
                     child: Text(
                       big,
+                      key: const Key('turn-big-label'),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: GameColors.gold,
+                      style: TextStyle(
+                        color: isHumanTurn
+                            ? GameColors.gold
+                            : GameColors.goldMuted,
                         fontSize: 15,
-                        fontWeight: FontWeight.w900,
+                        fontWeight: isHumanTurn
+                            ? FontWeight.w900
+                            : FontWeight.w700,
                         letterSpacing: 1,
                       ),
                     ),
                   ),
                   const SizedBox(width: 6),
-                  const _Diamond(),
+                  _Diamond(muted: !isHumanTurn),
                 ],
               ),
+              // Kept as a small, muted caption: the big headline above already
+              // states whose turn it is, so this line only adds the precise
+              // faction wording without competing for attention.
               Text(
                 owner,
                 key: const Key('turn-owner-label'),
@@ -596,8 +632,8 @@ class _TurnIndicator extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                   fontSize: 9,
-                  color: GameColors.text,
-                  fontWeight: FontWeight.w700,
+                  color: GameColors.textDim,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ],
@@ -632,7 +668,9 @@ class _TurnIndicator extends StatelessWidget {
 }
 
 class _Diamond extends StatelessWidget {
-  const _Diamond();
+  const _Diamond({this.muted = false});
+  final bool muted;
+
   @override
   Widget build(BuildContext context) => Transform.rotate(
     angle: 0.785398,
@@ -640,7 +678,9 @@ class _Diamond extends StatelessWidget {
       width: 5,
       height: 5,
       decoration: BoxDecoration(
-        border: Border.all(color: GameColors.goldSoft),
+        border: Border.all(
+          color: muted ? GameColors.textDim : GameColors.goldSoft,
+        ),
       ),
     ),
   );
@@ -664,8 +704,16 @@ class _BonusBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final viewer = controller.uiViewer;
     final bonus = controller.visibleBonusFor(viewer);
+    // The visibility label alone ("あなたのみ確認" etc.) doesn't tell a first-
+    // time player what the bonus is even FOR. Prefix a short, static purpose
+    // line — except for the very first bonus, whose own label already says
+    // "両者に公開" and doesn't need the extra context.
+    final visibility = controller.bonusVisibilityLabel(viewer);
+    final purposeLine = controller.bonusIndex == 0
+        ? visibility
+        : '次に確定した人物へ加算 ・ $visibility';
     return SizedBox(
-      height: 54,
+      height: 58,
       child: Row(
         children: [
           Expanded(
@@ -689,9 +737,7 @@ class _BonusBar extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
-                          controller.bonusIndex == 0
-                              ? '最初の裁定ボーナス'
-                              : '次の裁定ボーナス',
+                          controller.bonusIndex == 0 ? '最初の裁定ボーナス' : '次の裁定ボーナス',
                           style: const TextStyle(
                             fontSize: 9,
                             color: Color(0xFFCBB682),
@@ -709,7 +755,7 @@ class _BonusBar extends StatelessWidget {
                           ),
                         ),
                         Text(
-                          controller.bonusVisibilityLabel(viewer),
+                          purposeLine,
                           key: const Key('bonus-visibility-label'),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -856,37 +902,6 @@ class _DebugDialog extends StatelessWidget {
         child: const Text('閉じる'),
       ),
     ],
-  );
-}
-
-class _Legend extends StatelessWidget {
-  const _Legend();
-
-  @override
-  Widget build(BuildContext context) => const SizedBox(
-    height: 15,
-    child: Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        _LegendItem(text: '生 LIFE履歴', color: GameColors.alive),
-        SizedBox(width: 12),
-        _LegendItem(text: '死 DEATH履歴', color: GameColors.dead),
-        SizedBox(width: 12),
-        _LegendItem(text: '\u{1F441} EYE確認済', color: GameColors.eye),
-      ],
-    ),
-  );
-}
-
-class _LegendItem extends StatelessWidget {
-  const _LegendItem({required this.text, required this.color});
-  final String text;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) => Text(
-    text,
-    style: TextStyle(fontSize: 8, color: color, fontWeight: FontWeight.w700),
   );
 }
 
