@@ -64,6 +64,16 @@ class DownloadCenterScreen extends StatelessWidget {
                 format: 'MP4',
                 onPressed: () => _open(context, 'nine-verdicts-gameplay.mp4'),
               ),
+              _DownloadCard(
+                key: const Key('download-tutorial-video'),
+                icon: Icons.smart_display_outlined,
+                color: AppTheme.eye,
+                title: 'チュートリアル動画',
+                detail: 'EYE・介入・確定・切り札を実演する動画',
+                format: 'MP4',
+                onPressed: () =>
+                    _open(context, 'nine-verdicts-tutorial-video.mp4'),
+              ),
               const SizedBox(height: 12),
               const _DownloadHint(),
             ],

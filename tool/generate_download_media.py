@@ -305,11 +305,66 @@ def generate_video() -> None:
     writer.close()
 
 
+def generate_tutorial_video() -> None:
+    # Mirrors the real in-app tutorial script (tutorial_screen.dart `messages`
+    # and `_buttonLabel`) so the video matches what players actually see.
+    steps = [
+        ("あなたは救済者です。善人と中立を生へ、悪人を死へ導きましょう。", None),
+        ("手前のA3・B3・C3は、ゲーム開始時からあなただけが正体を知っています。", None),
+        ("未知のB2をEYEで調査します。実際のゲームと同じ知識管理を使います。", "B2にEYE"),
+        ("既知の善人B3へLIFEを置きます。", "B3にLIFE"),
+        ("CPUが同じB3へDEATHを置いて対抗します。", "CPU：B3にDEATH"),
+        ("もう一度LIFE。3枚目のチップでB3が生確定します。", "B3にLIFE"),
+        ("あなたが確定者なので、次のボーナスを知るのはCPUだけです。", None),
+        ("CPUがA1をJUDGE。今度はあなたが次のボーナスを知ります。", "CPU：A1にJUDGE"),
+        ("JUDGEは各陣営1回だけ。あなたもC1へJUDGEを使います。", "C1にJUDGE"),
+        ("救済者も1回だけ逆属性のDEATHを使用できます。", "A3に特殊DEATH"),
+        ("チュートリアル完了。情報・介入・判決の流れを実戦で試しましょう。", None),
+    ]
+    colors = [GOLD, BLUE, PURPLE, GREEN, RED, GREEN, GOLD, PURPLE, GOLD, RED, GOLD]
+    slides = []
+    for index, ((message, action), accent) in enumerate(zip(steps, colors)):
+        lines = split_japanese(message, 17)
+        if action:
+            lines += ["", f"▶ {action}"]
+        slides.append(
+            video_slide(
+                f"チュートリアル {index + 1}/11",
+                lines,
+                accent=accent,
+                screenshot=TUTORIAL_SHOT if index == 0 else None,
+            )
+        )
+    slides.append(
+        video_slide(
+            "実戦を始めよう",
+            ["ホームの「チュートリアル」から", "いつでも操作を復習できます", "perusonao.github.io/nine-verdicts/"],
+            accent=BLUE,
+            screenshot=GAME_SHOT,
+        )
+    )
+    output = OUT / "nine-verdicts-tutorial-video.mp4"
+    writer = imageio.get_writer(
+        output,
+        fps=12,
+        codec="libx264",
+        quality=7,
+        pixelformat="yuv420p",
+        ffmpeg_log_level="warning",
+    )
+    for slide in slides:
+        frame = numpy.asarray(slide)
+        for _ in range(36):
+            writer.append_data(frame)
+    writer.close()
+
+
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     generate_how_to_play()
     generate_tutorial_guide()
     generate_video()
+    generate_tutorial_video()
     print(f"Generated downloads in {OUT}")
 
 
