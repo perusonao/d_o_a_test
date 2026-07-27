@@ -26,6 +26,7 @@ void main() {
     expect(find.byKey(const Key('download-how-to')), findsOneWidget);
     expect(find.byKey(const Key('download-tutorial')), findsOneWidget);
     expect(find.byKey(const Key('download-gameplay')), findsOneWidget);
+    expect(find.byKey(const Key('download-tutorial-video')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
