@@ -8,6 +8,7 @@ import 'package:dead_or_alive/features/nine_judges/screens/handoff_screen.dart';
 import 'package:dead_or_alive/features/nine_judges/screens/mode_select_screen.dart';
 import 'package:dead_or_alive/features/nine_judges/screens/play_log_screen.dart';
 import 'package:dead_or_alive/features/nine_judges/screens/result_screen.dart';
+import 'package:dead_or_alive/features/nine_judges/services/external_test_profile.dart';
 import 'package:dead_or_alive/features/nine_judges/widgets/action_panel.dart';
 import 'package:dead_or_alive/features/nine_judges/widgets/board_area.dart';
 import 'package:dead_or_alive/features/nine_judges/widgets/card_assets.dart';
@@ -41,11 +42,38 @@ class _NineJudgesGameScreenState extends State<NineJudgesGameScreen> {
   void _startGame(NineJudgesGameSettings settings) {
     controller?.removeListener(_handleControllerChanged);
     controller?.dispose();
-    controller = NineJudgesController(
+    final newController = NineJudgesController(
       settings: settings,
       logRepository: LocalGameLogRepository.instance,
     )..addListener(_handleControllerChanged);
+    controller = newController;
     _handleControllerChanged();
+    if (mounted) setState(() {});
+    unawaited(_attachExternalTestContext(newController));
+  }
+
+  /// The external-test identity (anonymous testerId, play count, prior
+  /// tutorial state) lives in local storage, so it's loaded asynchronously
+  /// and merged into the session shortly after the game already starts —
+  /// never blocking the first turn on it.
+  Future<void> _attachExternalTestContext(NineJudgesController target) async {
+    final profile = await ExternalTestProfile.loadForNewGame();
+    if (!mounted || controller != target) return;
+    target.applyExternalTestContext(profile);
+  }
+
+  /// Best-effort abandonment: only reachable while a game is in progress
+  /// (the home button lives on [_GameBoard], never on the result screen),
+  /// and never touches scoring/turn logic — it just tags the log and swaps
+  /// back to the mode-select screen exactly like finishing normally would.
+  Future<void> _returnToMenu() async {
+    final game = controller;
+    if (game != null) {
+      await game.markAbandoned();
+    }
+    controller?.removeListener(_handleControllerChanged);
+    controller?.dispose();
+    controller = null;
     if (mounted) setState(() {});
   }
 
@@ -111,15 +139,16 @@ class _NineJudgesGameScreenState extends State<NineJudgesGameScreen> {
             onReady: game.confirmHandoff,
           );
         }
-        return _GameBoard(controller: game);
+        return _GameBoard(controller: game, onExit: _returnToMenu);
       },
     );
   }
 }
 
 class _GameBoard extends StatelessWidget {
-  const _GameBoard({required this.controller});
+  const _GameBoard({required this.controller, required this.onExit});
   final NineJudgesController controller;
+  final VoidCallback onExit;
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -160,7 +189,7 @@ class _GameBoard extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(7, 4, 7, 6),
                 child: Column(
                   children: [
-                    _GameHeader(controller: controller),
+                    _GameHeader(controller: controller, onExit: onExit),
                     const SizedBox(height: GameMetrics.gap),
                     _BonusBar(
                       controller: controller,
@@ -257,7 +286,11 @@ class _GameBoard extends StatelessWidget {
       context: context,
       builder: (dialogContext) => AlertDialog(
         key: const Key('eye-confirm-dialog'),
-        icon: const Icon(Icons.visibility_outlined, color: AppTheme.eye, size: 32),
+        icon: const Icon(
+          Icons.visibility_outlined,
+          color: AppTheme.eye,
+          size: 32,
+        ),
         title: Text('${controller.positionLabel(index)}の正体を確認しますか？'),
         content: Text(
           '残りEYE: $remainingBefore → ${remainingBefore - 1}',
@@ -434,8 +467,9 @@ class _GameBoard extends StatelessWidget {
 /// Top strip: savior on the left, executor on the right, turn state centred —
 /// laid directly over the backdrop instead of in one wide panel.
 class _GameHeader extends StatelessWidget {
-  const _GameHeader({required this.controller});
+  const _GameHeader({required this.controller, required this.onExit});
   final NineJudgesController controller;
+  final VoidCallback onExit;
 
   @override
   Widget build(BuildContext context) => SizedBox(
@@ -448,7 +482,10 @@ class _GameHeader extends StatelessWidget {
           child: _PlayerPanel(controller: controller, faction: Faction.savior),
         ),
         const SizedBox(width: 6),
-        Expanded(flex: 30, child: _TurnIndicator(controller: controller)),
+        Expanded(
+          flex: 30,
+          child: _TurnIndicator(controller: controller, onExit: onExit),
+        ),
         const SizedBox(width: 6),
         Expanded(
           flex: 32,
@@ -624,8 +661,9 @@ class _PlayerPanel extends StatelessWidget {
 /// Centre of the header: TURN counter, the big YOUR TURN / CPU line and the
 /// precise "…の手番" label the tests key on.
 class _TurnIndicator extends StatelessWidget {
-  const _TurnIndicator({required this.controller});
+  const _TurnIndicator({required this.controller, required this.onExit});
   final NineJudgesController controller;
+  final VoidCallback onExit;
 
   @override
   Widget build(BuildContext context) {
@@ -642,6 +680,23 @@ class _TurnIndicator extends StatelessWidget {
 
     return Stack(
       children: [
+        Positioned(
+          top: 0,
+          left: 0,
+          child: SizedBox(
+            width: 26,
+            height: 22,
+            child: IconButton(
+              key: const Key('game-home-button'),
+              padding: EdgeInsets.zero,
+              visualDensity: VisualDensity.compact,
+              iconSize: 14,
+              color: GameColors.textDim,
+              onPressed: () => _confirmExit(context, onExit),
+              icon: const Icon(Icons.home_outlined),
+            ),
+          ),
+        ),
         Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -725,6 +780,29 @@ class _TurnIndicator extends StatelessWidget {
       ],
     );
   }
+}
+
+Future<void> _confirmExit(BuildContext context, VoidCallback onExit) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      key: const Key('exit-confirm-dialog'),
+      title: const Text('ホームへ戻りますか？'),
+      content: const Text('現在の対局は中断として記録され、続きから再開はできません。'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext, false),
+          child: const Text('キャンセル'),
+        ),
+        FilledButton(
+          key: const Key('confirm-exit'),
+          onPressed: () => Navigator.pop(dialogContext, true),
+          child: const Text('ホームへ戻る'),
+        ),
+      ],
+    ),
+  );
+  if (confirmed == true) onExit();
 }
 
 class _Diamond extends StatelessWidget {

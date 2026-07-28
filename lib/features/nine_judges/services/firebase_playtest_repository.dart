@@ -21,12 +21,16 @@ class FirebasePlaytestRepository {
     if (await wasSent(session.gameId)) return;
     final data = session.toJson();
     data.remove('actions');
+    // `data['testerId']` is the persisted, cross-session anonymous id from
+    // ExternalTestProfile (see services/external_test_profile.dart) — keep
+    // it as-is rather than overwriting it with the Firebase Auth uid, which
+    // is a separate identity and goes in its own field instead.
     await FirebaseFirestore.instance
         .collection('playtests')
         .doc(session.gameId)
         .set({
           ...data,
-          'testerId': uid,
+          'firebaseUid': uid,
           'ratings': ratings,
           'notes': notes,
           'createdAt': FieldValue.serverTimestamp(),

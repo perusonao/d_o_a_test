@@ -1,4 +1,5 @@
 import 'package:dead_or_alive/app/theme.dart';
+import 'package:dead_or_alive/features/nine_judges/game/game_config.dart';
 import 'package:dead_or_alive/features/nine_judges/models/judge_models.dart';
 import 'package:dead_or_alive/features/nine_judges/online/online_lobby_screen.dart';
 import 'package:dead_or_alive/features/nine_judges/rules/rules_guide_screen.dart';
@@ -206,8 +207,71 @@ class _Hero extends StatelessWidget {
           fontWeight: FontWeight.w700,
         ),
       ),
+      const SizedBox(height: 8),
+      const _BetaBadge(),
     ],
   );
+}
+
+/// Small, always-visible marker that this build is the external-test cohort
+/// (see game/game_config.dart#testCohort), with a tap target explaining what
+/// data collection this implies. Never collects personal information.
+class _BetaBadge extends StatelessWidget {
+  const _BetaBadge();
+
+  @override
+  Widget build(BuildContext context) => Material(
+    color: Colors.transparent,
+    child: InkWell(
+      key: const Key('beta-badge'),
+      borderRadius: BorderRadius.circular(20),
+      onTap: () => _showAboutTest(context),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: const Color(0x33D6B25E),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: AppTheme.accent.withValues(alpha: .5)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.info_outline, size: 12, color: Color(0xFFD6B25E)),
+            const SizedBox(width: 4),
+            Text(
+              '外部テストβ　ルール ${NineJudgesConfig.rulesVersion}',
+              style: const TextStyle(
+                fontSize: 10,
+                color: Color(0xFFD6B25E),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+
+  void _showAboutTest(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('テストについて'),
+        content: const Text(
+          'このビルドは外部テストβです。ルール1.2の遊びやすさを確認するため、'
+          '対局ログと匿名のフィードバック（評価・感想）をゲーム改善の目的でのみ収集します。\n\n'
+          '氏名・メールアドレス・IPアドレスなど、個人を特定できる情報の入力は求めません。'
+          'フィードバックの送信は結果画面で任意に選べます。',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('閉じる'),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 /// Titled panel that groups related controls so the menu reads as a few tidy

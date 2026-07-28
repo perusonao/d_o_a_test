@@ -1,11 +1,21 @@
+import 'dart:convert';
+
 import 'package:dead_or_alive/features/nine_judges/logging/game_log_models.dart';
 import 'package:dead_or_alive/features/nine_judges/logging/game_log_repository.dart';
+import 'package:dead_or_alive/features/nine_judges/logging/tutorial_event_log.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 class PlayLogScreen extends StatefulWidget {
-  const PlayLogScreen({required this.repository, super.key});
+  const PlayLogScreen({
+    required this.repository,
+    this.tutorialEventRepository,
+    super.key,
+  });
   final GameLogRepository repository;
+
+  /// Injectable for tests; defaults to the real, persisted event log.
+  final TutorialEventRepository? tutorialEventRepository;
 
   @override
   State<PlayLogScreen> createState() => _PlayLogScreenState();
@@ -13,6 +23,8 @@ class PlayLogScreen extends StatefulWidget {
 
 class _PlayLogScreenState extends State<PlayLogScreen> {
   late Future<List<GameSession>> _games = widget.repository.listGames();
+  late final TutorialEventRepository _tutorialEvents =
+      widget.tutorialEventRepository ?? LocalTutorialEventRepository.instance;
 
   void _reload() => setState(() => _games = widget.repository.listGames());
 
@@ -30,6 +42,19 @@ class _PlayLogScreenState extends State<PlayLogScreen> {
             if (mounted) _message('全ログJSONをクリップボードへ書き出しました');
           },
           icon: const Icon(Icons.file_download_outlined),
+        ),
+        IconButton(
+          key: const Key('export-tutorial-events'),
+          tooltip: 'チュートリアル計測JSONを書き出す',
+          onPressed: () async {
+            final events = await _tutorialEvents.listEvents();
+            final json = const JsonEncoder.withIndent(
+              '  ',
+            ).convert(events.map((e) => e.toJson()).toList());
+            await Clipboard.setData(ClipboardData(text: json));
+            if (mounted) _message('チュートリアル計測JSONをクリップボードへ書き出しました');
+          },
+          icon: const Icon(Icons.school_outlined),
         ),
         IconButton(
           tooltip: '全件削除',

@@ -3,6 +3,20 @@ import 'package:dead_or_alive/features/nine_judges/models/judge_models.dart';
 abstract final class NineJudgesConfig {
   static const String gameVersion = '1.3.0-external-test-beta';
   static const String rulesVersion = '1.2';
+
+  /// Identifies this external-test round in logs/Firebase so results from
+  /// different rounds are never silently mixed together in analysis.
+  static const String testCohort = 'external_test_1_2';
+
+  /// Git commit hash for this build, when the build pipeline provides one
+  /// via `--dart-define=BUILD_COMMIT_HASH=...` (see deploy-pages.yml). Null
+  /// for local/dev builds that don't pass it — intentionally optional.
+  static const String _rawBuildCommitHash = String.fromEnvironment(
+    'BUILD_COMMIT_HASH',
+  );
+  static String? get buildCommitHash =>
+      _rawBuildCommitHash.isEmpty ? null : _rawBuildCommitHash;
+
   static const Faction defaultFirstPlayer = Faction.savior;
   static const int personCount = 9;
   static const int specialVerdictsPerPlayer = 1;

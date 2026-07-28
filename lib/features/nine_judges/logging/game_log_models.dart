@@ -141,6 +141,8 @@ class GameActionLog {
     this.eyeAlreadyUsedOnTargetByActor,
     this.targetZone,
     this.ruleVersion,
+    this.turnDecisionTimeMs,
+    this.eyeCandidateCount,
   });
 
   final int actionIndex;
@@ -203,6 +205,16 @@ class GameActionLog {
   final String? targetZone;
   final String? ruleVersion;
 
+  /// Wall-clock time from this turn becoming actionable to this action being
+  /// confirmed. Null for CPU-decided turns and for logs recorded before this
+  /// field existed.
+  final int? turnDecisionTimeMs;
+
+  /// For EYE actions only: how many center-row targets were legal for the
+  /// actor at this moment (1..3). Lets analysis tell a real choice (2-3
+  /// candidates) from a forced one (1 candidate). Null for non-EYE actions.
+  final int? eyeCandidateCount;
+
   Map<String, dynamic> toJson() => {
     'actionIndex': actionIndex,
     'turnNumber': turnNumber,
@@ -258,6 +270,8 @@ class GameActionLog {
     'eyeAlreadyUsedOnTargetByActor': eyeAlreadyUsedOnTargetByActor,
     'targetZone': targetZone,
     'ruleVersion': ruleVersion,
+    'turnDecisionTimeMs': turnDecisionTimeMs,
+    'eyeCandidateCount': eyeCandidateCount,
   };
 
   factory GameActionLog.fromJson(Map<String, dynamic> json) => GameActionLog(
@@ -319,6 +333,8 @@ class GameActionLog {
         json['eyeAlreadyUsedOnTargetByActor'] as bool?,
     targetZone: json['targetZone'] as String?,
     ruleVersion: json['ruleVersion'] as String?,
+    turnDecisionTimeMs: json['turnDecisionTimeMs'] as int?,
+    eyeCandidateCount: json['eyeCandidateCount'] as int?,
   );
 }
 
@@ -374,6 +390,29 @@ class GameSession {
     this.initialKnownPositionsBySavior = const [],
     this.initialKnownPositionsByExecutor = const [],
     this.experimentalRevokeMode,
+    this.ruleUnderstandingRating,
+    this.judgeUsefulnessRating,
+    this.eyeTensionRating,
+    this.strategicDepthRating,
+    this.replayIntentRating,
+    this.feedbackComment,
+    this.buildCommitHash,
+    this.testCohort,
+    this.sessionId,
+    this.testerId,
+    this.playNumber,
+    this.isFirstGame,
+    this.completedTutorial,
+    this.tutorialSkipped,
+    this.judgeOpportunityCountSavior,
+    this.judgeOpportunityCountExecutor,
+    this.maxVisibleBonusWhileJudgeAvailableSavior,
+    this.maxVisibleBonusWhileJudgeAvailableExecutor,
+    this.saviorSpecialVerdictUsed,
+    this.executorSpecialVerdictUsed,
+    this.saviorReverseActionUsed,
+    this.executorReverseActionUsed,
+    this.gameAbandoned,
   });
 
   final String gameId;
@@ -417,6 +456,54 @@ class GameSession {
   /// shipped ruleset.
   final String? experimentalRevokeMode;
 
+  /// External-test-beta survey additions (see [updatePlaytestFeedback]),
+  /// each 1-5, alongside the existing fun/reading/luck/tempo/eyeChoice.
+  final int? ruleUnderstandingRating;
+  final int? judgeUsefulnessRating;
+  final int? eyeTensionRating;
+  final int? strategicDepthRating;
+  final int? replayIntentRating;
+
+  /// Optional free-text feedback, capped client-side at ~500 characters.
+  final String? feedbackComment;
+
+  /// External-test-beta identification (see
+  /// lib/features/nine_judges/services/external_test_profile.dart). All
+  /// null on logs recorded before these fields existed, and on games not
+  /// run through the real app (e.g. simulations).
+  final String? buildCommitHash;
+  final String? testCohort;
+  final String? sessionId;
+  final String? testerId;
+  final int? playNumber;
+  final bool? isFirstGame;
+
+  /// Whether this device had completed/skipped the tutorial at the time
+  /// this game started (from local storage, not this game's own actions).
+  final bool? completedTutorial;
+  final bool? tutorialSkipped;
+
+  /// How many of this faction's turns began with JUDGE unused and legally
+  /// usable (whether or not they actually used it that turn).
+  final int? judgeOpportunityCountSavior;
+  final int? judgeOpportunityCountExecutor;
+
+  /// The highest verdict bonus this faction is known to have seen while
+  /// JUDGE was still available and unused (null if they never knew the
+  /// bonus at such a moment).
+  final int? maxVisibleBonusWhileJudgeAvailableSavior;
+  final int? maxVisibleBonusWhileJudgeAvailableExecutor;
+
+  final bool? saviorSpecialVerdictUsed;
+  final bool? executorSpecialVerdictUsed;
+  final bool? saviorReverseActionUsed;
+  final bool? executorReverseActionUsed;
+
+  /// True if the player left before the game reached its normal end (e.g.
+  /// via the in-game home button). Best-effort — not every abandonment
+  /// path (browser kill, crash) can be detected.
+  final bool? gameAbandoned;
+
   bool get isFinished => finishedAt != null;
 
   GameSession copyWith({
@@ -438,6 +525,29 @@ class GameSession {
     Map<String, int>? actionsUsed,
     Map<String, int>? actionsRemaining,
     bool? scoreVisible,
+    int? ruleUnderstandingRating,
+    int? judgeUsefulnessRating,
+    int? eyeTensionRating,
+    int? strategicDepthRating,
+    int? replayIntentRating,
+    String? feedbackComment,
+    String? buildCommitHash,
+    String? testCohort,
+    String? sessionId,
+    String? testerId,
+    int? playNumber,
+    bool? isFirstGame,
+    bool? completedTutorial,
+    bool? tutorialSkipped,
+    int? judgeOpportunityCountSavior,
+    int? judgeOpportunityCountExecutor,
+    int? maxVisibleBonusWhileJudgeAvailableSavior,
+    int? maxVisibleBonusWhileJudgeAvailableExecutor,
+    bool? saviorSpecialVerdictUsed,
+    bool? executorSpecialVerdictUsed,
+    bool? saviorReverseActionUsed,
+    bool? executorReverseActionUsed,
+    bool? gameAbandoned,
   }) => GameSession(
     gameId: gameId,
     startedAt: startedAt,
@@ -471,6 +581,40 @@ class GameSession {
     initialKnownPositionsBySavior: initialKnownPositionsBySavior,
     initialKnownPositionsByExecutor: initialKnownPositionsByExecutor,
     experimentalRevokeMode: experimentalRevokeMode,
+    ruleUnderstandingRating:
+        ruleUnderstandingRating ?? this.ruleUnderstandingRating,
+    judgeUsefulnessRating: judgeUsefulnessRating ?? this.judgeUsefulnessRating,
+    eyeTensionRating: eyeTensionRating ?? this.eyeTensionRating,
+    strategicDepthRating: strategicDepthRating ?? this.strategicDepthRating,
+    replayIntentRating: replayIntentRating ?? this.replayIntentRating,
+    feedbackComment: feedbackComment ?? this.feedbackComment,
+    buildCommitHash: buildCommitHash ?? this.buildCommitHash,
+    testCohort: testCohort ?? this.testCohort,
+    sessionId: sessionId ?? this.sessionId,
+    testerId: testerId ?? this.testerId,
+    playNumber: playNumber ?? this.playNumber,
+    isFirstGame: isFirstGame ?? this.isFirstGame,
+    completedTutorial: completedTutorial ?? this.completedTutorial,
+    tutorialSkipped: tutorialSkipped ?? this.tutorialSkipped,
+    judgeOpportunityCountSavior:
+        judgeOpportunityCountSavior ?? this.judgeOpportunityCountSavior,
+    judgeOpportunityCountExecutor:
+        judgeOpportunityCountExecutor ?? this.judgeOpportunityCountExecutor,
+    maxVisibleBonusWhileJudgeAvailableSavior:
+        maxVisibleBonusWhileJudgeAvailableSavior ??
+        this.maxVisibleBonusWhileJudgeAvailableSavior,
+    maxVisibleBonusWhileJudgeAvailableExecutor:
+        maxVisibleBonusWhileJudgeAvailableExecutor ??
+        this.maxVisibleBonusWhileJudgeAvailableExecutor,
+    saviorSpecialVerdictUsed:
+        saviorSpecialVerdictUsed ?? this.saviorSpecialVerdictUsed,
+    executorSpecialVerdictUsed:
+        executorSpecialVerdictUsed ?? this.executorSpecialVerdictUsed,
+    saviorReverseActionUsed:
+        saviorReverseActionUsed ?? this.saviorReverseActionUsed,
+    executorReverseActionUsed:
+        executorReverseActionUsed ?? this.executorReverseActionUsed,
+    gameAbandoned: gameAbandoned ?? this.gameAbandoned,
   );
 
   Map<String, dynamic> toJson() => {
@@ -500,7 +644,32 @@ class GameSession {
       'luck': luckRating,
       'tempo': tempoRating,
       'eyeChoice': eyeChoiceRating,
+      'ruleUnderstanding': ruleUnderstandingRating,
+      'judgeUsefulness': judgeUsefulnessRating,
+      'eyeTension': eyeTensionRating,
+      'strategicDepth': strategicDepthRating,
+      'replayIntent': replayIntentRating,
     },
+    'feedbackComment': feedbackComment,
+    'buildCommitHash': buildCommitHash,
+    'testCohort': testCohort,
+    'sessionId': sessionId,
+    'testerId': testerId,
+    'playNumber': playNumber,
+    'isFirstGame': isFirstGame,
+    'completedTutorial': completedTutorial,
+    'tutorialSkipped': tutorialSkipped,
+    'judgeOpportunityCountSavior': judgeOpportunityCountSavior,
+    'judgeOpportunityCountExecutor': judgeOpportunityCountExecutor,
+    'maxVisibleBonusWhileJudgeAvailableSavior':
+        maxVisibleBonusWhileJudgeAvailableSavior,
+    'maxVisibleBonusWhileJudgeAvailableExecutor':
+        maxVisibleBonusWhileJudgeAvailableExecutor,
+    'saviorSpecialVerdictUsed': saviorSpecialVerdictUsed,
+    'executorSpecialVerdictUsed': executorSpecialVerdictUsed,
+    'saviorReverseActionUsed': saviorReverseActionUsed,
+    'executorReverseActionUsed': executorReverseActionUsed,
+    'gameAbandoned': gameAbandoned,
     'initialBoard': initialBoard.map((e) => e.toJson()).toList(),
     'actions': actions.map((e) => e.toJson()).toList(),
     'finalBoard': finalBoard.map((e) => e.toJson()).toList(),
@@ -560,6 +729,32 @@ class GameSession {
       luckRating: ratings['luck'] as int?,
       tempoRating: ratings['tempo'] as int?,
       eyeChoiceRating: ratings['eyeChoice'] as int?,
+      ruleUnderstandingRating: ratings['ruleUnderstanding'] as int?,
+      judgeUsefulnessRating: ratings['judgeUsefulness'] as int?,
+      eyeTensionRating: ratings['eyeTension'] as int?,
+      strategicDepthRating: ratings['strategicDepth'] as int?,
+      replayIntentRating: ratings['replayIntent'] as int?,
+      feedbackComment: json['feedbackComment'] as String?,
+      buildCommitHash: json['buildCommitHash'] as String?,
+      testCohort: json['testCohort'] as String?,
+      sessionId: json['sessionId'] as String?,
+      testerId: json['testerId'] as String?,
+      playNumber: json['playNumber'] as int?,
+      isFirstGame: json['isFirstGame'] as bool?,
+      completedTutorial: json['completedTutorial'] as bool?,
+      tutorialSkipped: json['tutorialSkipped'] as bool?,
+      judgeOpportunityCountSavior: json['judgeOpportunityCountSavior'] as int?,
+      judgeOpportunityCountExecutor:
+          json['judgeOpportunityCountExecutor'] as int?,
+      maxVisibleBonusWhileJudgeAvailableSavior:
+          json['maxVisibleBonusWhileJudgeAvailableSavior'] as int?,
+      maxVisibleBonusWhileJudgeAvailableExecutor:
+          json['maxVisibleBonusWhileJudgeAvailableExecutor'] as int?,
+      saviorSpecialVerdictUsed: json['saviorSpecialVerdictUsed'] as bool?,
+      executorSpecialVerdictUsed: json['executorSpecialVerdictUsed'] as bool?,
+      saviorReverseActionUsed: json['saviorReverseActionUsed'] as bool?,
+      executorReverseActionUsed: json['executorReverseActionUsed'] as bool?,
+      gameAbandoned: json['gameAbandoned'] as bool?,
       initialBoard: _maps(
         json['initialBoard'],
       ).map(LoggedPerson.fromJson).toList(),
