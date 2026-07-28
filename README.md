@@ -88,3 +88,77 @@ Admin SDK秘密鍵、CIトークンはコミットしないでください。
 現段階はクライアント生成方式です。完全な不正防止と権威的な盤面進行にはCloud Functions
 が必要です。盤面・ボーナス生成、合法手検証、秘密情報配布をFunctionsへ移すことを
 オンライン正式版の必須TODOとしています。
+
+## 外部テスト管理画面 (Admin Dashboard)
+
+`playtests`に保存された外部テストデータを閲覧・集計するための、完全に読み取り専用の
+管理画面です。通常のプレイ画面からはリンクされておらず、URLを直接開いた場合のみ
+アクセスできます。
+
+- URL: `https://perusonao.github.io/nine-verdicts/#/admin`
+  (ローカル確認時は `flutter run -d chrome` 後にアドレスバーで `#/admin` を追加)
+- 認証方式: 通常プレイの匿名認証とは完全に分離された、Google Sign-In専用の
+  Firebase Authインスタンス(`lib/features/nine_judges/admin/services/admin_firebase.dart`
+  が名前付きセカンダリFirebase Appを使用)。管理画面へのログイン・ログアウトは
+  通常のゲームプレイのFirebase匿名セッションに一切影響しません。
+- 管理者判定: クライアント側の表示制御だけでなく、`firestore.rules`の`isAdmin()`
+  関数が実際のアクセス制御を行います。`admins/{request.auth.uid}`ドキュメントが
+  存在し、かつ`enabled == true`であることを必須とします。メールアドレスの
+  文字列比較による判定は行いません。
+
+### 最初の管理者を登録する手順
+
+1. Firebase Consoleで対象プロジェクトを開きます。
+2. 左メニュー「Authentication」→「Sign-in method」タブで、
+   「Google」プロバイダを有効にします。
+3. GitHub Pagesで公開している場合は、「Authentication」→「Settings」タブの
+   「承認済みドメイン (Authorized domains)」に`perusonao.github.io`を追加します
+   (`localhost`は開発用として最初から登録されています)。
+4. 管理画面(`#/admin`)を開き、「Googleでログイン」でご自身のGoogleアカウントに
+   ログインします。この時点では「このアカウントには管理権限がありません」と
+   表示されます(まだ`admins`ドキュメントが無いため、これは正しい動作です)。
+5. Firebase Consoleの「Authentication」→「Users」タブで、ログインした
+   アカウントのUID(ユーザーID列)を確認してコピーします。
+6. 「Firestore Database」→「データ」タブを開き、「コレクションを開始」で
+   コレクションID`admins`を作成します。
+7. ドキュメントIDに手順5でコピーしたUIDを貼り付け、フィールド
+   `enabled`(真偽値)を`true`に設定して保存します(`displayName`や
+   `createdAt`は任意で追加できます)。
+8. 管理画面をリロードすると管理者として認識され、ダッシュボードが表示されます。
+
+### 管理画面でできること(初期版)
+
+概要・ゲームログ・フィードバック・KPI・設定の5タブで構成され、すべて読み取り専用です
+(ログの編集・削除、コメント編集、管理者の追加・削除は今回のバージョンでは実装して
+いません)。ゲームログはFirestoreの読み取り件数を抑えるため20件ずつページングし、
+個々のゲームのアクション履歴(`playtests/{gameId}/actions`)は詳細画面を開いたときに
+のみ取得します。チュートリアルの計測データは現在Firestoreへ送信されていないため、
+このダッシュボードには表示されません(端末内Hiveストレージにのみ保存されています)。
+
+### Firestoreインデックスについて
+
+管理画面のクエリは`playtests`コレクションへの`orderBy('finishedAt')`
+単一フィールドのページングと、`actions`サブコレクションへの
+ドキュメントIDによる並び替えのみを使用しており、いずれもFirestoreが自動生成する
+単一フィールドインデックスで動作します。複合インデックス(`firestore.indexes.json`)の
+追加は不要です。
+
+### Security Rulesのテスト
+
+`fake_firebase_security_rules`(Dartのfakeライブラリ)は`function`/`get`/`exists`/
+`request.resource`を解釈できないため、`isAdmin()`を含む本物のルールをそのまま検証
+できません。そのため`firestore-tests/`にNode.js製のFirebase Emulator Suiteテストを
+別途用意しています。
+
+```sh
+cd firestore-tests
+npm install
+cd ..
+npx firebase-tools emulators:exec --only firestore \
+  "cd firestore-tests && npm test"
+```
+
+anon userによる自分のplaytest作成、firebaseUid不一致の拒否、他人のplaytestの
+読み取り拒否、管理者による全playtest読み取り、管理者によるactions読み取り、
+一般ユーザーによるadminsドキュメント作成拒否、rooms関連ルールが影響を受けていない
+ことを実際のFirestoreルールエンジンに対して検証しています。
