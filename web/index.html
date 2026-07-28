@@ -13,6 +13,26 @@
   <link rel="icon" type="image/png" href="favicon.png">
   <title>9人の審判 / Nine Verdicts</title>
   <link rel="manifest" href="manifest.json">
+  <script>
+    // Hidden routes (/showcase, /admin) get their own manifest so "Add to
+    // Home Screen" launches straight back into that route instead of the
+    // regular game's start_url. Runs before flutter_bootstrap.js so Safari
+    // sees the right manifest link as soon as the page is shared.
+    (function () {
+      var manifestForHash = function () {
+        var hash = window.location.hash || '';
+        if (hash.indexOf('#/showcase') === 0) return 'manifest_showcase.json';
+        if (hash.indexOf('#/admin') === 0) return 'manifest_admin.json';
+        return 'manifest.json';
+      };
+      var updateManifestLink = function () {
+        var link = document.querySelector('link[rel="manifest"]');
+        if (link) link.setAttribute('href', manifestForHash());
+      };
+      updateManifestLink();
+      window.addEventListener('hashchange', updateManifestLink);
+    })();
+  </script>
 </head>
 <body>
   <script src="flutter_bootstrap.js" async></script>
