@@ -1,10 +1,17 @@
+import 'dart:async';
+
 import 'package:dead_or_alive/features/nine_judges/game/game_controller.dart';
+import 'package:dead_or_alive/features/nine_judges/logging/tutorial_event_log.dart';
 import 'package:dead_or_alive/features/nine_judges/models/judge_models.dart';
+import 'package:dead_or_alive/features/nine_judges/services/external_test_profile.dart';
 import 'package:dead_or_alive/features/nine_judges/widgets/board_grid.dart';
 import 'package:flutter/material.dart';
 
 class TutorialScreen extends StatefulWidget {
-  const TutorialScreen({super.key});
+  const TutorialScreen({this.eventRepository, super.key});
+
+  /// Injectable for tests; defaults to the real, persisted event log.
+  final TutorialEventRepository? eventRepository;
 
   @override
   State<TutorialScreen> createState() => _TutorialScreenState();
@@ -12,7 +19,10 @@ class TutorialScreen extends StatefulWidget {
 
 class _TutorialScreenState extends State<TutorialScreen> {
   late final NineJudgesController game;
+  late final TutorialEventRepository _events =
+      widget.eventRepository ?? LocalTutorialEventRepository.instance;
   var step = 0;
+  bool _exitOutcomeRecorded = false;
 
   static const messages = [
     'あなたは救済者です。自陣3人（A3・B3・C3）の正体は最初から見えています。'
@@ -52,12 +62,45 @@ class _TutorialScreenState extends State<TutorialScreen> {
     final temporary = game.board[7];
     game.board[7] = game.board[goodIndex];
     game.board[goodIndex] = temporary;
+    _record('tutorialStarted', step: 1);
+    _record('tutorialStepReached', step: 1);
   }
 
   @override
   void dispose() {
+    if (!_exitOutcomeRecorded) {
+      _record('tutorialSkipped', step: step + 1);
+      unawaited(ExternalTestProfile.markTutorialSkipped());
+    }
     game.dispose();
     super.dispose();
+  }
+
+  Future<ExternalTestProfile>? _profileFuture;
+
+  void _record(String type, {required int step}) {
+    unawaited(_recordAsync(type, step));
+  }
+
+  Future<void> _recordAsync(String type, int step) async {
+    final profile = await (_profileFuture ??=
+        ExternalTestProfile.loadForNewGame());
+    await _events.record(
+      TutorialEventRecord(
+        type: type,
+        sessionId: appSessionId,
+        testerId: profile.testerId,
+        timestamp: DateTime.now(),
+        step: step,
+      ),
+    );
+  }
+
+  void _markCompleted() {
+    if (_exitOutcomeRecorded) return;
+    _exitOutcomeRecorded = true;
+    _record('tutorialCompleted', step: step + 1);
+    unawaited(ExternalTestProfile.markTutorialCompleted());
   }
 
   void _settle() {
@@ -110,6 +153,7 @@ class _TutorialScreenState extends State<TutorialScreen> {
       return;
     }
     setState(() => step = (step + 1).clamp(0, 10));
+    _record('tutorialStepReached', step: step + 1);
   }
 
   String get _buttonLabel => switch (step) {
@@ -161,7 +205,10 @@ class _TutorialScreenState extends State<TutorialScreen> {
                 children: [
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: () => Navigator.pop(context),
+                      onPressed: () {
+                        _markCompleted();
+                        Navigator.pop(context);
+                      },
                       child: const Text('ホームへ戻る'),
                     ),
                   ),
@@ -169,7 +216,10 @@ class _TutorialScreenState extends State<TutorialScreen> {
                   Expanded(
                     child: FilledButton(
                       key: const Key('tutorial-complete'),
-                      onPressed: () => Navigator.pop(context, true),
+                      onPressed: () {
+                        _markCompleted();
+                        Navigator.pop(context, true);
+                      },
                       child: const Text('CPU対戦を始める'),
                     ),
                   ),

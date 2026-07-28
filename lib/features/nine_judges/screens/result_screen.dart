@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:dead_or_alive/features/nine_judges/game/game_controller.dart';
+import 'package:dead_or_alive/features/nine_judges/models/judge_models.dart';
 import 'package:dead_or_alive/features/nine_judges/widgets/board_grid.dart';
 import 'package:dead_or_alive/features/nine_judges/screens/play_log_screen.dart';
 import 'package:dead_or_alive/features/nine_judges/services/firebase_bootstrap.dart';
@@ -53,6 +54,8 @@ class ResultScreen extends StatelessWidget {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 4),
+                  _GameSummaryLine(controller: controller),
                   const SizedBox(height: 6),
                   Expanded(
                     child: BoardGrid(controller: controller, showScores: true),
@@ -113,14 +116,19 @@ class ResultScreen extends StatelessWidget {
     var luck = controller.session.luckRating ?? 3;
     var tempo = controller.session.tempoRating ?? 3;
     var eyeChoice = controller.session.eyeChoiceRating ?? 3;
+    var ruleUnderstanding = controller.session.ruleUnderstandingRating ?? 3;
+    var judgeUsefulness = controller.session.judgeUsefulnessRating ?? 3;
+    var eyeTension = controller.session.eyeTensionRating ?? 3;
+    var strategicDepth = controller.session.strategicDepthRating ?? 3;
+    var replayIntent = controller.session.replayIntentRating ?? 3;
     var clarity = 3;
     var sending = false;
     String? sendError;
-    await showDialog<void>(
+    final sent = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
-          title: const Text('テストプレイメモ'),
+          title: const Text('この試合を評価してください'),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -132,11 +140,34 @@ class ResultScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 TextField(
+                  key: const Key('feedback-comment'),
                   controller: notes,
                   maxLines: 4,
-                  decoration: const InputDecoration(hintText: '感想（省略可能）'),
+                  maxLength: 500,
+                  decoration: const InputDecoration(
+                    hintText:
+                        '分かりづらかった点、面白かった場面、'
+                        '改善してほしい点があれば教えてください（省略可能）',
+                  ),
                 ),
-                _rating('面白さ', fun, (v) => setState(() => fun = v)),
+                _rating(
+                  '面白さ',
+                  fun,
+                  (v) => setState(() => fun = v),
+                  emphasize: true,
+                ),
+                _rating(
+                  '分かりやすさ',
+                  ruleUnderstanding,
+                  (v) => setState(() => ruleUnderstanding = v),
+                  emphasize: true,
+                ),
+                _rating(
+                  'また遊びたいか',
+                  replayIntent,
+                  (v) => setState(() => replayIntent = v),
+                  emphasize: true,
+                ),
                 _rating('読み合い', reading, (v) => setState(() => reading = v)),
                 _rating('運要素', luck, (v) => setState(() => luck = v)),
                 _rating('テンポ', tempo, (v) => setState(() => tempo = v)),
@@ -145,7 +176,22 @@ class ResultScreen extends StatelessWidget {
                   eyeChoice,
                   (v) => setState(() => eyeChoice = v),
                 ),
-                _rating('分かりやすさ', clarity, (v) => setState(() => clarity = v)),
+                _rating(
+                  'JUDGEの価値',
+                  judgeUsefulness,
+                  (v) => setState(() => judgeUsefulness = v),
+                ),
+                _rating(
+                  'EYEでどこを見るか悩んだか',
+                  eyeTension,
+                  (v) => setState(() => eyeTension = v),
+                ),
+                _rating(
+                  '読み合いの深さ',
+                  strategicDepth,
+                  (v) => setState(() => strategicDepth = v),
+                ),
+                _rating('明瞭さ', clarity, (v) => setState(() => clarity = v)),
                 if (sendError != null)
                   Text(
                     sendError!,
@@ -156,7 +202,7 @@ class ResultScreen extends StatelessWidget {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
+              onPressed: () => Navigator.pop(dialogContext, false),
               child: const Text('スキップ'),
             ),
             FilledButton(
@@ -168,8 +214,14 @@ class ResultScreen extends StatelessWidget {
                   luck: luck,
                   tempo: tempo,
                   eyeChoice: eyeChoice,
+                  ruleUnderstanding: ruleUnderstanding,
+                  judgeUsefulness: judgeUsefulness,
+                  eyeTension: eyeTension,
+                  strategicDepth: strategicDepth,
+                  replayIntent: replayIntent,
+                  feedbackComment: notes.text,
                 );
-                if (dialogContext.mounted) Navigator.pop(dialogContext);
+                if (dialogContext.mounted) Navigator.pop(dialogContext, false);
               },
               child: const Text('保存'),
             ),
@@ -190,6 +242,12 @@ class ResultScreen extends StatelessWidget {
                           luck: luck,
                           tempo: tempo,
                           eyeChoice: eyeChoice,
+                          ruleUnderstanding: ruleUnderstanding,
+                          judgeUsefulness: judgeUsefulness,
+                          eyeTension: eyeTension,
+                          strategicDepth: strategicDepth,
+                          replayIntent: replayIntent,
+                          feedbackComment: notes.text,
                         );
                         await const FirebasePlaytestRepository().send(
                           session: controller.session,
@@ -199,12 +257,17 @@ class ResultScreen extends StatelessWidget {
                             'luck': luck,
                             'tempo': tempo,
                             'eyeChoice': eyeChoice,
+                            'ruleUnderstanding': ruleUnderstanding,
+                            'judgeUsefulness': judgeUsefulness,
+                            'eyeTension': eyeTension,
+                            'strategicDepth': strategicDepth,
+                            'replayIntent': replayIntent,
                             'clarity': clarity,
                           },
                           notes: notes.text,
                         );
                         if (dialogContext.mounted) {
-                          Navigator.pop(dialogContext);
+                          Navigator.pop(dialogContext, true);
                         }
                       } catch (_) {
                         setState(() {
@@ -213,18 +276,36 @@ class ResultScreen extends StatelessWidget {
                         });
                       }
                     },
-              child: const Text('プレイデータを送信'),
+              child: const Text('フィードバックを送信'),
             ),
           ],
         ),
       ),
     );
     notes.dispose();
+    if (sent == true && context.mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('ご協力ありがとうございました')));
+    }
   }
 
-  Widget _rating(String label, int value, ValueChanged<int> onChanged) => Row(
+  Widget _rating(
+    String label,
+    int value,
+    ValueChanged<int> onChanged, {
+    bool emphasize = false,
+  }) => Row(
     children: [
-      SizedBox(width: 58, child: Text(label)),
+      SizedBox(
+        width: 58,
+        child: Text(
+          label,
+          style: emphasize
+              ? const TextStyle(fontWeight: FontWeight.w900)
+              : null,
+        ),
+      ),
       Expanded(
         child: Slider(
           value: value.toDouble(),
@@ -238,6 +319,34 @@ class ResultScreen extends StatelessWidget {
       Text('$value'),
     ],
   );
+}
+
+/// "今回の試合": ターン数・EYE使用回数・JUDGE使用有無・reverse使用有無 の一行サマリ。
+class _GameSummaryLine extends StatelessWidget {
+  const _GameSummaryLine({required this.controller});
+  final NineJudgesController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final eyeCount = controller.session.actions
+        .where((action) => action.actionType == ActionType.eye.name)
+        .length;
+    final judgeUsed =
+        controller.specialVerdictUsed[Faction.savior]! ||
+        controller.specialVerdictUsed[Faction.executor]!;
+    final reverseUsed =
+        controller.reverseActionUsed[Faction.savior]! ||
+        controller.reverseActionUsed[Faction.executor]!;
+    return Text(
+      '今回の試合　ターン ${controller.session.totalTurns}　'
+      'EYE $eyeCount回　JUDGE ${judgeUsed ? '使用' : '未使用'}　'
+      'reverse ${reverseUsed ? '使用' : '未使用'}',
+      key: const Key('result-summary'),
+      textAlign: TextAlign.center,
+      maxLines: 2,
+      style: const TextStyle(fontSize: 11, color: Colors.white70),
+    );
+  }
 }
 
 void showGameLogs(BuildContext context, NineJudgesController controller) {

@@ -1,7 +1,14 @@
+import 'dart:async';
+
+import 'package:dead_or_alive/features/nine_judges/logging/tutorial_event_log.dart';
+import 'package:dead_or_alive/features/nine_judges/services/external_test_profile.dart';
 import 'package:flutter/material.dart';
 
 class RulesGuideScreen extends StatefulWidget {
-  const RulesGuideScreen({super.key});
+  const RulesGuideScreen({this.eventRepository, super.key});
+
+  /// Injectable for tests; defaults to the real, persisted event log.
+  final TutorialEventRepository? eventRepository;
 
   @override
   State<RulesGuideScreen> createState() => _RulesGuideScreenState();
@@ -9,7 +16,11 @@ class RulesGuideScreen extends StatefulWidget {
 
 class _RulesGuideScreenState extends State<RulesGuideScreen> {
   final _controller = PageController();
+  late final TutorialEventRepository _events =
+      widget.eventRepository ?? LocalTutorialEventRepository.instance;
+  late final DateTime _openedAt;
   var _page = 0;
+  var _closedRecorded = false;
 
   static const _pages = <({String title, IconData icon, List<String> lines})>[
     (
@@ -80,9 +91,46 @@ class _RulesGuideScreenState extends State<RulesGuideScreen> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _openedAt = DateTime.now();
+    _record('rulesOpened');
+  }
+
+  @override
   void dispose() {
+    _recordClosedOnce();
     _controller.dispose();
     super.dispose();
+  }
+
+  Future<ExternalTestProfile>? _profileFuture;
+
+  void _record(String type, {int? rulesReadDurationMs}) {
+    unawaited(_recordAsync(type, rulesReadDurationMs));
+  }
+
+  Future<void> _recordAsync(String type, int? rulesReadDurationMs) async {
+    final profile = await (_profileFuture ??=
+        ExternalTestProfile.loadForNewGame());
+    await _events.record(
+      TutorialEventRecord(
+        type: type,
+        sessionId: appSessionId,
+        testerId: profile.testerId,
+        timestamp: DateTime.now(),
+        rulesReadDurationMs: rulesReadDurationMs,
+      ),
+    );
+  }
+
+  void _recordClosedOnce() {
+    if (_closedRecorded) return;
+    _closedRecorded = true;
+    _record(
+      'rulesClosed',
+      rulesReadDurationMs: DateTime.now().difference(_openedAt).inMilliseconds,
+    );
   }
 
   @override

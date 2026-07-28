@@ -8,6 +8,7 @@ import 'package:dead_or_alive/features/nine_judges/game/game_rules.dart';
 import 'package:dead_or_alive/features/nine_judges/logging/game_log_models.dart';
 import 'package:dead_or_alive/features/nine_judges/logging/game_log_repository.dart';
 import 'package:dead_or_alive/features/nine_judges/models/judge_models.dart';
+import 'package:dead_or_alive/features/nine_judges/services/external_test_profile.dart';
 import 'package:flutter/foundation.dart';
 
 class NineJudgesController extends ChangeNotifier {
@@ -65,6 +66,20 @@ class NineJudgesController extends ChangeNotifier {
   final Map<Faction, int> scores = {Faction.savior: 0, Faction.executor: 0};
   final List<GameLogEntry> logs = [];
   final List<VerdictBonusResult> bonusHistory = [];
+
+  /// External-test-beta analysis bookkeeping (see task: "9. JUDGE未使用理由
+  /// の分析ログ"). Purely observational — never affects legal moves, scoring,
+  /// or the RNG streams, so simulations are unaffected.
+  final Map<Faction, int> judgeOpportunityCount = {
+    Faction.savior: 0,
+    Faction.executor: 0,
+  };
+  final Map<Faction, int?> maxVisibleBonusWhileJudgeAvailable = {
+    Faction.savior: null,
+    Faction.executor: null,
+  };
+  DateTime? _turnStartedAt;
+  ExternalTestProfile? _externalTestProfile;
 
   late Faction currentPlayer;
   late GameSession session;
@@ -176,6 +191,8 @@ class NineJudgesController extends ChangeNotifier {
       privateBonusKnowledge[faction] = bonusDeck.first;
       pendingBonusReveal[faction] = false;
       scores[faction] = 0;
+      judgeOpportunityCount[faction] = 0;
+      maxVisibleBonusWhileJudgeAvailable[faction] = null;
     }
     final humanOrSavior = isCpuGame ? humanFaction : Faction.savior;
     final cpuOrExecutor = humanOrSavior.opponent;
@@ -240,11 +257,45 @@ class NineJudgesController extends ChangeNotifier {
             ),
       },
       initialKnownPositionsBySavior: initialKnownPositions[Faction.savior]!,
-      initialKnownPositionsByExecutor:
-          initialKnownPositions[Faction.executor]!,
+      initialKnownPositionsByExecutor: initialKnownPositions[Faction.executor]!,
       experimentalRevokeMode: 'disabled',
       scoreVisible: false,
+      buildCommitHash: NineJudgesConfig.buildCommitHash,
+      testCohort: NineJudgesConfig.testCohort,
+      sessionId: appSessionId,
     );
+    _beginCurrentTurn();
+    notifyListeners();
+  }
+
+  /// Enriches [session] with this device's external-test identity once it's
+  /// available (loaded asynchronously from local storage — see
+  /// [ExternalTestProfile.loadForNewGame] — so this is called by the UI
+  /// layer shortly after construction, never from the constructor itself).
+  void applyExternalTestContext(ExternalTestProfile profile) {
+    _externalTestProfile = profile;
+    session = session.copyWith(
+      testerId: profile.testerId,
+      playNumber: profile.playNumber,
+      isFirstGame: profile.isFirstGame,
+      completedTutorial: profile.hasCompletedTutorial,
+      tutorialSkipped: profile.hasSkippedTutorial,
+    );
+    notifyListeners();
+  }
+
+  /// Best-effort "left before the game ended" signal (e.g. an explicit
+  /// return-to-home action). Never called for a game that already finished
+  /// normally, and never blocks or reverses any game-logic state.
+  Future<void> markAbandoned() async {
+    if (_finished || _saved) return;
+    _saved = true;
+    session = session.copyWith(
+      finishedAt: DateTime.now(),
+      endReason: 'abandoned',
+      gameAbandoned: true,
+    );
+    await logRepository.saveGame(session);
     notifyListeners();
   }
 
@@ -433,6 +484,7 @@ class NineJudgesController extends ChangeNotifier {
     }
     selectedAction = action;
     selectedSlot = index;
+    _turnStartedAt = DateTime.now();
     _applyAction(index);
     return true;
   }
@@ -449,6 +501,26 @@ class NineJudgesController extends ChangeNotifier {
     ).contains(index);
     final eyeAlreadyUsedOnTargetByActor = eyeSeenSlots[actor]!.contains(index);
     final zone = targetZone(index, actor);
+    final eyeCandidateCountAtTime = action == ActionType.eye
+        ? _legalTargets(ActionType.eye, actor).length
+        : null;
+    final isHumanDecision = !isCpuGame || actor != settings.cpuFaction;
+    final turnDecisionTimeMs = isHumanDecision && _turnStartedAt != null
+        ? DateTime.now().difference(_turnStartedAt!).inMilliseconds
+        : null;
+    final judgeAvailableAtTurnStart =
+        !specialVerdictUsed[actor]! &&
+        _legalTargets(ActionType.specialVerdict, actor).isNotEmpty;
+    if (judgeAvailableAtTurnStart) {
+      judgeOpportunityCount[actor] = judgeOpportunityCount[actor]! + 1;
+      final visibleBonus = visibleBonusFor(actor);
+      if (visibleBonus != null) {
+        final currentMax = maxVisibleBonusWhileJudgeAvailable[actor];
+        if (currentMax == null || visibleBonus > currentMax) {
+          maxVisibleBonusWhileJudgeAvailable[actor] = visibleBonus;
+        }
+      }
+    }
     final before = board[index].person;
     var after = before;
     if (action == ActionType.eye) {
@@ -529,6 +601,8 @@ class NineJudgesController extends ChangeNotifier {
       eyeEligibleAtTime: eyeEligibleAtTime,
       eyeAlreadyUsedOnTargetByActor: eyeAlreadyUsedOnTargetByActor,
       targetZoneAtTime: zone,
+      turnDecisionTimeMs: turnDecisionTimeMs,
+      eyeCandidateCount: eyeCandidateCountAtTime,
     );
     _finishAction(detail, action: action, targetIndex: index);
   }
@@ -561,6 +635,8 @@ class NineJudgesController extends ChangeNotifier {
     required bool eyeEligibleAtTime,
     required bool eyeAlreadyUsedOnTargetByActor,
     required String targetZoneAtTime,
+    required int? turnDecisionTimeMs,
+    required int? eyeCandidateCount,
   }) {
     session = session.copyWith(
       actions: [
@@ -572,6 +648,8 @@ class NineJudgesController extends ChangeNotifier {
           eyeEligibleAtTime: eyeEligibleAtTime,
           eyeAlreadyUsedOnTargetByActor: eyeAlreadyUsedOnTargetByActor,
           targetZone: targetZoneAtTime,
+          turnDecisionTimeMs: turnDecisionTimeMs,
+          eyeCandidateCount: eyeCandidateCount,
           ruleVersion: settings.ruleVersion.label,
           turnNumber: turn,
           actingPlayer: isCpuGame && actor == settings.cpuFaction
@@ -731,6 +809,7 @@ class NineJudgesController extends ChangeNotifier {
   }
 
   void _beginCurrentTurn() {
+    _turnStartedAt = DateTime.now();
     if (!pendingBonusReveal[currentPlayer]!) return;
     privateBonusKnowledge[currentPlayer] = currentBonus;
     pendingBonusReveal[currentPlayer] = false;
@@ -757,6 +836,16 @@ class NineJudgesController extends ChangeNotifier {
       executorScore: score.executor,
       totalTurns: turn,
       endReason: endReason,
+      judgeOpportunityCountSavior: judgeOpportunityCount[Faction.savior],
+      judgeOpportunityCountExecutor: judgeOpportunityCount[Faction.executor],
+      maxVisibleBonusWhileJudgeAvailableSavior:
+          maxVisibleBonusWhileJudgeAvailable[Faction.savior],
+      maxVisibleBonusWhileJudgeAvailableExecutor:
+          maxVisibleBonusWhileJudgeAvailable[Faction.executor],
+      saviorSpecialVerdictUsed: specialVerdictUsed[Faction.savior],
+      executorSpecialVerdictUsed: specialVerdictUsed[Faction.executor],
+      saviorReverseActionUsed: reverseActionUsed[Faction.savior],
+      executorReverseActionUsed: reverseActionUsed[Faction.executor],
       actionsUsed: const {},
       actionsRemaining: {
         for (final faction in Faction.values) ...{
@@ -795,6 +884,9 @@ class NineJudgesController extends ChangeNotifier {
       _saved = true;
       _saveFuture = logRepository.saveGame(session);
       unawaited(_saveFuture);
+      if (_externalTestProfile case final profile?) {
+        unawaited(profile.recordGameFinished());
+      }
     }
   }
 
@@ -807,6 +899,12 @@ class NineJudgesController extends ChangeNotifier {
     int? luck,
     int? tempo,
     int? eyeChoice,
+    int? ruleUnderstanding,
+    int? judgeUsefulness,
+    int? eyeTension,
+    int? strategicDepth,
+    int? replayIntent,
+    String? feedbackComment,
   }) async {
     session = session.copyWith(
       notes: notes,
@@ -815,6 +913,12 @@ class NineJudgesController extends ChangeNotifier {
       luckRating: luck,
       tempoRating: tempo,
       eyeChoiceRating: eyeChoice,
+      ruleUnderstandingRating: ruleUnderstanding,
+      judgeUsefulnessRating: judgeUsefulness,
+      eyeTensionRating: eyeTension,
+      strategicDepthRating: strategicDepth,
+      replayIntentRating: replayIntent,
+      feedbackComment: feedbackComment,
     );
     await logRepository.saveGame(session);
     notifyListeners();
