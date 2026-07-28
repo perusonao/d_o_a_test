@@ -163,6 +163,8 @@ class _NineJudgesModeSelectScreenState
                       ],
                     ),
                   ),
+                  const SizedBox(height: 16),
+                  const _ComingSoonRow(),
                 ],
               ),
             ),
@@ -171,6 +173,72 @@ class _NineJudgesModeSelectScreenState
       ),
     );
   }
+}
+
+/// 履歴/ランキング/実績/クレジット: reserved for future features, per the
+/// official menu key visual. Each opens a short "準備中" notice for now so
+/// the icon row is real and tappable without implying data that doesn't
+/// exist yet.
+class _ComingSoonRow extends StatelessWidget {
+  const _ComingSoonRow();
+
+  static const _items = [
+    (key: 'history', icon: Icons.menu_book_outlined, label: '履歴'),
+    (key: 'ranking', icon: Icons.bar_chart_outlined, label: 'ランキング'),
+    (key: 'achievements', icon: Icons.emoji_events_outlined, label: '実績'),
+    (key: 'credits', icon: Icons.workspace_premium_outlined, label: 'クレジット'),
+  ];
+
+  void _showComingSoon(BuildContext context, String label) {
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(label),
+        content: const Text('この機能は準備中です。今後のアップデートで追加予定です。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('閉じる'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => Row(
+    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+    children: [
+      for (final item in _items)
+        InkWell(
+          key: Key('coming-soon-${item.key}'),
+          borderRadius: BorderRadius.circular(12),
+          onTap: () => _showComingSoon(context, item.label),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  item.icon,
+                  size: 20,
+                  color: AppTheme.accent.withValues(alpha: .8),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  item.label,
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: AppTheme.accent.withValues(alpha: .7),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+    ],
+  );
 }
 
 class _Hero extends StatelessWidget {
