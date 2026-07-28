@@ -1,0 +1,13 @@
+{
+  "name": "nine-verdicts-firestore-rules-tests",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Firebase Emulator Suite tests for firestore.rules (admin isAdmin()/playtests/actions/admins). Run via: npm install && npm test (requires the Firestore emulator; see package.json scripts).",
+  "scripts": {
+    "test": "node --test rules.test.mjs"
+  },
+  "type": "module",
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^3.0.4"
+  }
+}
