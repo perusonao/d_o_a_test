@@ -54,6 +54,21 @@ class EyeAnalysis {
 
   final int bothFactionsSameTargetGames;
 
+  Map<String, Object?> toJson() => {
+    'sampleSize': sampleSize,
+    'avgUsesPerGame': avgUsesPerGame,
+    'avgUsesPerGamePlayerSide': avgUsesPerGamePlayerSide,
+    'avgUsesPerGameCpuSide': avgUsesPerGameCpuSide,
+    'usedUpToCapRate': usedUpToCapRate,
+    'avgCandidateCount': avgCandidateCount,
+    'candidateCountOneRate': candidateCountOneRate,
+    'avgDecisionTimeMs': avgDecisionTimeMs,
+    'selectionCountByCenterPosition': selectionCountByCenterPosition.map(
+      (k, v) => MapEntry('$k', v),
+    ),
+    'bothFactionsSameTargetGames': bothFactionsSameTargetGames,
+  };
+
   factory EyeAnalysis.compute(List<PlaytestRecord> records) {
     final withActions = records.where((r) => r.actions != null).toList();
     final eyeActionsPerGame = withActions
@@ -193,6 +208,22 @@ class JudgeAnalysis {
   final double? avgDecisionTimeMsOfUse;
   final int turnOfUseSampleSize;
 
+  Map<String, Object?> toJson() => {
+    'saviorUsageRate': saviorUsageRate,
+    'executorUsageRate': executorUsageRate,
+    'bothUnusedRate': bothUnusedRate,
+    'usedGamesCount': usedGamesCount,
+    'unusedGamesCount': unusedGamesCount,
+    'avgOpportunityCountSavior': avgOpportunityCountSavior,
+    'avgOpportunityCountExecutor': avgOpportunityCountExecutor,
+    'avgMaxVisibleBonusWhileAvailable': avgMaxVisibleBonusWhileAvailable,
+    'highBonusThreshold': highBonusThreshold,
+    'highBonusRate': highBonusRate,
+    'avgTurnOfUse': avgTurnOfUse,
+    'avgDecisionTimeMsOfUse': avgDecisionTimeMsOfUse,
+    'turnOfUseSampleSize': turnOfUseSampleSize,
+  };
+
   factory JudgeAnalysis.compute(List<PlaytestRecord> records) {
     final games = records.map((r) => r.session).toList();
     final saviorTracked = games
@@ -301,6 +332,16 @@ class ReverseAnalysis {
   final double? loserSideUsageRate;
   final double? avgTurnUsed;
   final int avgTurnUsedSampleSize;
+
+  Map<String, Object?> toJson() => {
+    'saviorUsageRate': saviorUsageRate,
+    'executorUsageRate': executorUsageRate,
+    'neitherUsedRate': neitherUsedRate,
+    'winnerSideUsageRate': winnerSideUsageRate,
+    'loserSideUsageRate': loserSideUsageRate,
+    'avgTurnUsed': avgTurnUsed,
+    'avgTurnUsedSampleSize': avgTurnUsedSampleSize,
+  };
 
   factory ReverseAnalysis.compute(List<PlaytestRecord> records) {
     final games = records.map((r) => r.session).toList();

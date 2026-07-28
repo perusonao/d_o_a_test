@@ -39,7 +39,9 @@ void main(List<String> arguments) {
     exitCode = 64;
     return;
   }
-  final oneSidedThreshold = int.parse(options['one-sided-threshold'] ?? '15');
+  final oneSidedThreshold = int.parse(
+    options['one-sided-threshold'] ?? '$defaultOneSidedThreshold',
+  );
   final outputDir = options['output-dir'] ?? 'external_test_output';
 
   final sessions = _loadSessions(inputPath);
