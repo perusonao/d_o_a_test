@@ -180,34 +180,25 @@ class _Hero extends StatelessWidget {
   Widget build(BuildContext context) => Column(
     children: [
       ClipRRect(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(18),
         child: Image.asset(
-          'assets/branding/app_icon.png',
-          width: 84,
-          height: 84,
+          'assets/branding/menu_hero.png',
+          fit: BoxFit.cover,
+          semanticLabel: '9人の審判 NINE VERDICTS - 善人を救い、悪人を裁け。',
         ),
       ),
-      const SizedBox(height: 12),
+      const SizedBox(height: 10),
       const Text(
         '9人の審判',
         textAlign: TextAlign.center,
         style: TextStyle(
           color: Color(0xFFD6B25E),
-          fontSize: 28,
+          fontSize: 15,
           fontWeight: FontWeight.w900,
+          letterSpacing: 1,
         ),
       ),
-      const Text(
-        'NINE VERDICTS',
-        textAlign: TextAlign.center,
-        style: TextStyle(
-          color: Colors.white54,
-          fontSize: 11,
-          letterSpacing: 3,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-      const SizedBox(height: 8),
+      const SizedBox(height: 6),
       const _BetaBadge(),
     ],
   );
