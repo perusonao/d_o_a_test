@@ -93,6 +93,24 @@ class AdminOverviewStats {
   static bool isExperiencedSession(GameSession s) =>
       s.isFirstGame == false || (s.playNumber != null && s.playNumber! >= 2);
 
+  /// The raw 1-5 rating value for [key] (one of [ratingKeys]) on session
+  /// [s], or null if that rating wasn't answered. Public so other
+  /// admin-analysis code (e.g. the AI-analysis report) reads ratings via
+  /// this single switch rather than re-deriving its own field mapping.
+  static int? ratingValue(GameSession s, String key) => switch (key) {
+    'fun' => s.funRating,
+    'reading' => s.readingRating,
+    'luck' => s.luckRating,
+    'tempo' => s.tempoRating,
+    'eyeChoice' => s.eyeChoiceRating,
+    'ruleUnderstanding' => s.ruleUnderstandingRating,
+    'judgeUsefulness' => s.judgeUsefulnessRating,
+    'eyeTension' => s.eyeTensionRating,
+    'strategicDepth' => s.strategicDepthRating,
+    'replayIntent' => s.replayIntentRating,
+    _ => null,
+  };
+
   static double? _average(Iterable<num?> values) {
     final present = values.whereType<num>().toList();
     return present.isEmpty
@@ -133,24 +151,11 @@ class AdminOverviewStats {
         .where((g) => g.gameAbandoned != null)
         .toList();
 
-    double? ratingValue(GameSession s, String key) => switch (key) {
-      'fun' => s.funRating?.toDouble(),
-      'reading' => s.readingRating?.toDouble(),
-      'luck' => s.luckRating?.toDouble(),
-      'tempo' => s.tempoRating?.toDouble(),
-      'eyeChoice' => s.eyeChoiceRating?.toDouble(),
-      'ruleUnderstanding' => s.ruleUnderstandingRating?.toDouble(),
-      'judgeUsefulness' => s.judgeUsefulnessRating?.toDouble(),
-      'eyeTension' => s.eyeTensionRating?.toDouble(),
-      'strategicDepth' => s.strategicDepthRating?.toDouble(),
-      'replayIntent' => s.replayIntentRating?.toDouble(),
-      _ => null,
-    };
     final ratings = <String, RatingAverage>{
       for (final key in ratingKeys)
         key: () {
           final values = games
-              .map((s) => ratingValue(s, key))
+              .map((s) => ratingValue(s, key)?.toDouble())
               .whereType<double>()
               .toList();
           return RatingAverage(

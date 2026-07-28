@@ -6,6 +6,13 @@ import 'package:dead_or_alive/features/nine_judges/logging/tutorial_event_record
 /// two can never disagree on a definition. Kept free of `dart:io` so it can
 /// be imported from `lib/` code that compiles to Flutter Web.
 
+/// A game counts as "one-sided" when the winning margin is at least this
+/// many points. This is the CLI's existing default (`tool/run_external_test_
+/// analysis.dart`'s `--one-sided-threshold`, previously an inline literal) —
+/// named here so every caller (CLI, admin dashboard, admin analysis report)
+/// references the exact same number.
+const int defaultOneSidedThreshold = 15;
+
 /// A metric's judgement against its target — never auto-adjusts the rules,
 /// only reports where things stand.
 enum KpiVerdict { pass, watch, fail, noData }

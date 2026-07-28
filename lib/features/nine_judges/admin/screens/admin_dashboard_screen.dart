@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:dead_or_alive/features/nine_judges/admin/analysis/screens/admin_analysis_screen.dart';
 import 'package:dead_or_alive/features/nine_judges/admin/models/playtest_record.dart';
 import 'package:dead_or_alive/features/nine_judges/admin/screens/admin_feedback_tab.dart';
 import 'package:dead_or_alive/features/nine_judges/admin/screens/admin_kpi_tab.dart';
@@ -41,7 +42,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
       widget.repository ?? AdminPlaytestRepository();
   final TesterAnonymizer anonymizer = TesterAnonymizer();
   late final TabController _tabController = TabController(
-    length: 5,
+    length: 6,
     vsync: this,
   );
 
@@ -160,6 +161,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
             Tab(text: 'ゲームログ'),
             Tab(text: 'フィードバック'),
             Tab(text: 'KPI'),
+            Tab(text: '分析レポート'),
             Tab(text: '設定・接続状況'),
           ],
         ),
@@ -189,6 +191,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                 ),
                 AdminFeedbackTab(records: records, anonymizer: anonymizer),
                 AdminKpiTab(records: records),
+                AdminAnalysisScreen(
+                  repository: _repository,
+                  anonymizer: anonymizer,
+                  loadedRecords: records,
+                  projectId: AdminFirebase.projectId,
+                ),
                 AdminSettingsTab(
                   userEmail: widget.userEmail,
                   projectId: AdminFirebase.projectId,
