@@ -8,11 +8,16 @@ service cloud.firestore {
     }
 
     match /playtests/{gameId} {
-      allow create: if signedIn() && request.resource.data.testerId == request.auth.uid;
-      allow read, update, delete: if signedIn() && resource.data.testerId == request.auth.uid;
+      // `firebaseUid` is the Firebase Auth anonymous uid FirebasePlaytestRepository
+      // writes on every playtest doc — the only field these rules can verify
+      // against request.auth.uid. `testerId` is a separate, persisted
+      // per-device id (see services/external_test_profile.dart) that is NOT
+      // tied to Firebase Auth, so it must never be used for access control.
+      allow create: if signedIn() && request.resource.data.firebaseUid == request.auth.uid;
+      allow read, update, delete: if signedIn() && resource.data.firebaseUid == request.auth.uid;
       match /actions/{actionId} {
         allow create, read: if signedIn()
-          && get(/databases/$(database)/documents/playtests/$(gameId)).data.testerId == request.auth.uid;
+          && get(/databases/$(database)/documents/playtests/$(gameId)).data.firebaseUid == request.auth.uid;
       }
     }
 
