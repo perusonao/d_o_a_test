@@ -3,6 +3,7 @@
 import 'dart:io';
 
 import 'package:dead_or_alive/features/nine_judges/models/judge_models.dart';
+import 'package:dead_or_alive/features/nine_judges/simulation/eye_zone_report.dart';
 import 'package:dead_or_alive/features/nine_judges/simulation/simulation_config.dart';
 import 'package:dead_or_alive/features/nine_judges/simulation/simulation_exporter.dart';
 import 'package:dead_or_alive/features/nine_judges/simulation/simulation_runner.dart';
@@ -10,15 +11,20 @@ import 'package:dead_or_alive/features/nine_judges/simulation/simulation_runner.
 void main(List<String> arguments) {
   final options = _parse(arguments);
   final games = int.parse(options['games'] ?? '100');
+  final ruleVersion = _ruleVersion(options['rules'] ?? '1.1');
   final config = SimulationConfig(
     gameCount: games,
     baseSeed: int.parse(options['seed'] ?? '1000'),
     saviorDifficulty: _difficulty(options['savior'] ?? 'balanced'),
     executorDifficulty: _difficulty(options['executor'] ?? 'balanced'),
     firstPlayer: _firstPlayer(options['first'] ?? 'alternate'),
+    ruleVersion: ruleVersion,
   );
   final run = const SimulationRunner().run(config);
   print(run.statistics.toConsoleReport());
+  if (ruleVersion == NineJudgesRuleVersion.v1_2) {
+    print(EyeZoneReport.fromResults(run.results).toConsoleReport());
+  }
   final seconds = run.elapsed.inMicroseconds / Duration.microsecondsPerSecond;
   print('Elapsed: ${seconds.toStringAsFixed(3)} sec');
   print(
@@ -83,6 +89,12 @@ SimulationFirstPlayer _firstPlayer(String value) =>
       'executor' => SimulationFirstPlayer.executor,
       _ => throw ArgumentError('Unknown first-player mode: $value'),
     };
+
+NineJudgesRuleVersion _ruleVersion(String value) => switch (value) {
+  '1.1' => NineJudgesRuleVersion.v1_1,
+  '1.2' => NineJudgesRuleVersion.v1_2,
+  _ => throw ArgumentError('Unknown rules version: $value'),
+};
 
 String _outputPath(String? option, String fallbackName) {
   if (option != null && option.isNotEmpty) return option;

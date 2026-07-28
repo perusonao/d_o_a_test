@@ -158,12 +158,19 @@ abstract final class CpuEvaluator {
   }) {
     final bonus = (view.currentBonus ?? 5).toDouble();
     return switch (action) {
-      ActionType.eye => profile.eyeValue,
+      ActionType.eye => profile.eyeValue + _eyeUrgency(view.eyeUsesRemaining),
       ActionType.specialVerdict => _judgeScore(view, slot, bonus, profile),
       ActionType.life ||
       ActionType.death => _verdictScore(view, action, slot, bonus, profile),
     };
   }
+
+  /// rulesVersion 1.2: with only a handful of EYE uses allowed all game,
+  /// spending the very last one is slightly favoured over other options of
+  /// similar value, since — unlike v1.1 — there is no "look later instead"
+  /// option once it's gone.
+  static double _eyeUrgency(int? remaining) =>
+      remaining != null && remaining <= 1 ? 1.0 : 0.0;
 
   static double _verdictScore(
     CpuGameView view,

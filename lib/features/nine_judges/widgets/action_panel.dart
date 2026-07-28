@@ -107,14 +107,17 @@ class _ActionButton extends StatelessWidget {
         controller.canSelectAction(action) ||
         controller.canSwitchAction(action);
     final selected = controller.selectedAction == action;
+    final eyeRemaining = action == ActionType.eye
+        ? controller.eyeUsesRemaining(faction)
+        : null;
     final used = asReverse
         ? !controller.reverseActionAvailable(faction)
         : action == ActionType.specialVerdict
         ? !controller.specialVerdictAvailable(faction)
-        : false;
+        : eyeRemaining == 0;
     final colors = _colors(action);
     final title = action.label;
-    final subtitle = _subtitle(used);
+    final subtitle = _subtitle(used, eyeRemaining: eyeRemaining);
     final iconAsset = CardAssets.actionIcon(action);
 
     // Stacking icon+title above the subtitle (rather than cramming both into
@@ -275,12 +278,15 @@ class _ActionButton extends StatelessWidget {
     );
   }
 
-  String _subtitle(bool used) {
+  String _subtitle(bool used, {int? eyeRemaining}) {
     if (used) return '使用済み';
     if (asReverse) return '1回限定・残り1回';
     // JUDGE and the special (reverse) action are always rendered compact;
     // keep their status short so it never risks truncation.
     if (compact) return '残り1回';
+    if (action == ActionType.eye && eyeRemaining != null) {
+      return '残り$eyeRemaining回';
+    }
     return switch (action) {
       ActionType.life => '命を与える',
       ActionType.death => '死を与える',

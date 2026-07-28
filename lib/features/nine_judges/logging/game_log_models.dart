@@ -135,6 +135,12 @@ class GameActionLog {
     this.bonusViewer,
     this.revealedBonus,
     this.wasReverseAction = false,
+    this.eyeUsesRemainingBefore,
+    this.eyeUsesRemainingAfter,
+    this.eyeEligibleAtTime,
+    this.eyeAlreadyUsedOnTargetByActor,
+    this.targetZone,
+    this.ruleVersion,
   });
 
   final int actionIndex;
@@ -186,6 +192,17 @@ class GameActionLog {
   final int? revealedBonus;
   final bool wasReverseAction;
 
+  /// rulesVersion 1.2 EYE bookkeeping. Null on rulesVersion 1.1 games (no
+  /// cap) and on older logs recorded before these fields existed.
+  final int? eyeUsesRemainingBefore;
+  final int? eyeUsesRemainingAfter;
+  final bool? eyeEligibleAtTime;
+  final bool? eyeAlreadyUsedOnTargetByActor;
+
+  /// 'self' / 'center' / 'opponent', relative to the acting player.
+  final String? targetZone;
+  final String? ruleVersion;
+
   Map<String, dynamic> toJson() => {
     'actionIndex': actionIndex,
     'turnNumber': turnNumber,
@@ -235,6 +252,12 @@ class GameActionLog {
     'bonusViewer': bonusViewer,
     'revealedBonus': revealedBonus,
     'wasReverseAction': wasReverseAction,
+    'eyeUsesRemainingBefore': eyeUsesRemainingBefore,
+    'eyeUsesRemainingAfter': eyeUsesRemainingAfter,
+    'eyeEligibleAtTime': eyeEligibleAtTime,
+    'eyeAlreadyUsedOnTargetByActor': eyeAlreadyUsedOnTargetByActor,
+    'targetZone': targetZone,
+    'ruleVersion': ruleVersion,
   };
 
   factory GameActionLog.fromJson(Map<String, dynamic> json) => GameActionLog(
@@ -289,6 +312,13 @@ class GameActionLog {
     bonusViewer: json['bonusViewer'] as String?,
     revealedBonus: json['revealedBonus'] as int?,
     wasReverseAction: json['wasReverseAction'] as bool? ?? false,
+    eyeUsesRemainingBefore: json['eyeUsesRemainingBefore'] as int?,
+    eyeUsesRemainingAfter: json['eyeUsesRemainingAfter'] as int?,
+    eyeEligibleAtTime: json['eyeEligibleAtTime'] as bool?,
+    eyeAlreadyUsedOnTargetByActor:
+        json['eyeAlreadyUsedOnTargetByActor'] as bool?,
+    targetZone: json['targetZone'] as String?,
+    ruleVersion: json['ruleVersion'] as String?,
   );
 }
 
@@ -334,12 +364,16 @@ class GameSession {
     this.readingRating,
     this.luckRating,
     this.tempoRating,
+    this.eyeChoiceRating,
     this.actions = const [],
     this.finalBoard = const [],
     this.initialKnowledge = const {},
     this.actionsUsed = const {},
     this.actionsRemaining = const {},
     this.scoreVisible = true,
+    this.initialKnownPositionsBySavior = const [],
+    this.initialKnownPositionsByExecutor = const [],
+    this.experimentalRevokeMode,
   });
 
   final String gameId;
@@ -363,6 +397,7 @@ class GameSession {
   final int? readingRating;
   final int? luckRating;
   final int? tempoRating;
+  final int? eyeChoiceRating;
   final List<LoggedPerson> initialBoard;
   final List<GameActionLog> actions;
   final List<LoggedPerson> finalBoard;
@@ -370,6 +405,17 @@ class GameSession {
   final Map<String, int> actionsUsed;
   final Map<String, int> actionsRemaining;
   final bool scoreVisible;
+
+  /// rulesVersion 1.2 board-zone bookkeeping: which positionIndex values
+  /// each faction knew from the start (see [NineJudgesController.reset]).
+  /// Empty on logs recorded before these fields existed.
+  final List<int> initialKnownPositionsBySavior;
+  final List<int> initialKnownPositionsByExecutor;
+
+  /// The simulation-only REVOKE experiment setting this game ran under, if
+  /// any. Always null/'disabled' for real games — REVOKE is not part of any
+  /// shipped ruleset.
+  final String? experimentalRevokeMode;
 
   bool get isFinished => finishedAt != null;
 
@@ -385,6 +431,7 @@ class GameSession {
     int? readingRating,
     int? luckRating,
     int? tempoRating,
+    int? eyeChoiceRating,
     List<GameActionLog>? actions,
     List<LoggedPerson>? finalBoard,
     Map<String, InitialKnowledgeLog>? initialKnowledge,
@@ -413,6 +460,7 @@ class GameSession {
     readingRating: readingRating ?? this.readingRating,
     luckRating: luckRating ?? this.luckRating,
     tempoRating: tempoRating ?? this.tempoRating,
+    eyeChoiceRating: eyeChoiceRating ?? this.eyeChoiceRating,
     initialBoard: initialBoard,
     actions: actions ?? this.actions,
     finalBoard: finalBoard ?? this.finalBoard,
@@ -420,6 +468,9 @@ class GameSession {
     actionsUsed: actionsUsed ?? this.actionsUsed,
     actionsRemaining: actionsRemaining ?? this.actionsRemaining,
     scoreVisible: scoreVisible ?? this.scoreVisible,
+    initialKnownPositionsBySavior: initialKnownPositionsBySavior,
+    initialKnownPositionsByExecutor: initialKnownPositionsByExecutor,
+    experimentalRevokeMode: experimentalRevokeMode,
   );
 
   Map<String, dynamic> toJson() => {
@@ -440,11 +491,15 @@ class GameSession {
     'endReason': endReason,
     'seed': seed,
     'notes': notes,
+    'initialKnownPositionsBySavior': initialKnownPositionsBySavior,
+    'initialKnownPositionsByExecutor': initialKnownPositionsByExecutor,
+    'experimentalRevokeMode': experimentalRevokeMode,
     'ratings': {
       'fun': funRating,
       'reading': readingRating,
       'luck': luckRating,
       'tempo': tempoRating,
+      'eyeChoice': eyeChoiceRating,
     },
     'initialBoard': initialBoard.map((e) => e.toJson()).toList(),
     'actions': actions.map((e) => e.toJson()).toList(),
@@ -504,6 +559,7 @@ class GameSession {
       readingRating: ratings['reading'] as int?,
       luckRating: ratings['luck'] as int?,
       tempoRating: ratings['tempo'] as int?,
+      eyeChoiceRating: ratings['eyeChoice'] as int?,
       initialBoard: _maps(
         json['initialBoard'],
       ).map(LoggedPerson.fromJson).toList(),
@@ -518,6 +574,13 @@ class GameSession {
       actionsUsed: _optionalIntMap(json['actionsUsed']),
       actionsRemaining: _optionalIntMap(json['actionsRemaining']),
       scoreVisible: json['scoreVisible'] as bool? ?? true,
+      initialKnownPositionsBySavior:
+          (json['initialKnownPositionsBySavior'] as List?)?.cast<int>() ??
+          const [],
+      initialKnownPositionsByExecutor:
+          (json['initialKnownPositionsByExecutor'] as List?)?.cast<int>() ??
+          const [],
+      experimentalRevokeMode: json['experimentalRevokeMode'] as String?,
     );
   }
 }

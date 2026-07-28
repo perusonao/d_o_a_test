@@ -20,6 +20,7 @@ class CpuGameView {
     required this.currentBonus,
     required this.specialVerdictAvailable,
     this.reverseActionAvailable = true,
+    this.eyeUsesRemaining,
   });
 
   final Faction faction;
@@ -28,6 +29,10 @@ class CpuGameView {
   final int? currentBonus;
   final bool specialVerdictAvailable;
   final bool reverseActionAvailable;
+
+  /// EYE uses this faction has left this game, or `null` when the ruleset
+  /// has no cap (rulesVersion 1.1).
+  final int? eyeUsesRemaining;
 }
 
 class CpuDecision {

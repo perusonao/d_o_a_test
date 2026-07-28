@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:dead_or_alive/features/nine_judges/cpu/cpu_player.dart';
 import 'package:dead_or_alive/features/nine_judges/cpu/cpu_strategy.dart';
+import 'package:dead_or_alive/features/nine_judges/game/game_config.dart';
 import 'package:dead_or_alive/features/nine_judges/game/game_rules.dart';
 import 'package:dead_or_alive/features/nine_judges/models/judge_models.dart';
 import 'package:dead_or_alive/features/nine_judges/simulation/simulation_config.dart';
@@ -78,6 +79,11 @@ class SimulationRunner {
       Faction.savior: false,
       Faction.executor: false,
     };
+    final eyeMax = NineJudgesConfig.eyeMaxUsesPerPlayer(config.ruleVersion);
+    final eyeZoneRestricted = NineJudgesConfig.eyeZoneRestricted(
+      config.ruleVersion,
+    );
+    final eyeUsedCount = <Faction, int>{Faction.savior: 0, Faction.executor: 0};
     final scores = <Faction, int>{Faction.savior: 0, Faction.executor: 0};
     final privateBonus = <Faction, int?>{
       Faction.savior: bonuses.first,
@@ -114,6 +120,12 @@ class SimulationRunner {
                 specialVerdictUsed: specialUsed[actor]!,
                 reverseActionUsed:
                     _isReverse(action, actor) && reverseUsed[actor]!,
+                eyeAllowedForZone:
+                    !eyeZoneRestricted ||
+                    NineJudgesConfig.centerIndices.contains(index),
+                eyeUsesRemaining: eyeMax == null
+                    ? null
+                    : eyeMax - eyeUsedCount[actor]!,
               ))
                 index,
           ],
@@ -136,6 +148,7 @@ class SimulationRunner {
         currentBonus: privateBonus[actor],
         specialVerdictAvailable: !specialUsed[actor]!,
         reverseActionAvailable: !reverseUsed[actor]!,
+        eyeUsesRemaining: eyeMax == null ? null : eyeMax - eyeUsedCount[actor]!,
       );
       final decision = strategies[actor]!.decideAction(view);
       if (!(legalTargets[decision.action] ?? const []).contains(
@@ -152,6 +165,7 @@ class SimulationRunner {
       var after = before;
       if (decision.action == ActionType.eye) {
         known[actor]!.add(index);
+        eyeUsedCount[actor] = eyeUsedCount[actor]! + 1;
       } else if (decision.action == ActionType.specialVerdict) {
         specialUsed[actor] = true;
         after = NineJudgesRules.applySpecialVerdict(
