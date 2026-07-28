@@ -20,13 +20,13 @@ abstract final class GameColors {
   /// never competes visually with the emphasized YOUR TURN.
   static const goldMuted = Color(0xFF8A7A55);
 
-  // Factions.
-  static const savior = Color(0xFF5AA9E6);
-  static const saviorPanelTop = Color(0xFF15293F);
-  static const saviorPanelBottom = Color(0xFF091321);
-  static const executor = Color(0xFFDB5750);
-  static const executorPanelTop = Color(0xFF3A1418);
-  static const executorPanelBottom = Color(0xFF16090B);
+  // Factions — 救済者(白・金) / 執行者(黒・紫), per the official key visual.
+  static const savior = Color(0xFFF2E0A8);
+  static const saviorPanelTop = Color(0xFF2E2712);
+  static const saviorPanelBottom = Color(0xFF120F07);
+  static const executor = Color(0xFFC79EF0);
+  static const executorPanelTop = Color(0xFF1E1030);
+  static const executorPanelBottom = Color(0xFF0B0714);
 
   // Actions.
   static const life = Color(0xFF55D9ED);
