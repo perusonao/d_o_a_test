@@ -924,29 +924,33 @@ class NineJudgesController extends ChangeNotifier {
     notifyListeners();
   }
 
-  CpuGameView cpuView() {
-    final faction = settings.cpuFaction;
+  /// [faction] defaults to [NineJudgesGameSettings.cpuFaction] (the real
+  /// CPU's own view, used by [performCpuAction]). [performAutoAction] passes
+  /// [currentPlayer] instead so the same view-building logic works for
+  /// whichever faction is acting, without changing this default for any
+  /// existing caller.
+  CpuGameView cpuView({Faction? faction}) {
+    final f = faction ?? settings.cpuFaction;
     return CpuGameView(
-      faction: faction,
+      faction: f,
       slots: [
         for (var i = 0; i < board.length; i++)
           CpuSlotView(
             index: i,
             person: board[i].person,
-            knownAttribute: knowsAttribute(board[i].person, faction)
+            knownAttribute: knowsAttribute(board[i].person, f)
                 ? board[i].person.attribute
                 : null,
           ),
       ],
       legalTargets: {
         for (final action in ActionType.values)
-          if (_legalTargets(action, faction).isNotEmpty)
-            action: _legalTargets(action, faction),
+          if (_legalTargets(action, f).isNotEmpty) action: _legalTargets(action, f),
       },
-      currentBonus: visibleBonusFor(faction),
-      specialVerdictAvailable: specialVerdictAvailable(faction),
-      reverseActionAvailable: reverseActionAvailable(faction),
-      eyeUsesRemaining: eyeUsesRemaining(faction),
+      currentBonus: visibleBonusFor(f),
+      specialVerdictAvailable: specialVerdictAvailable(f),
+      reverseActionAvailable: reverseActionAvailable(f),
+      eyeUsesRemaining: eyeUsesRemaining(f),
     );
   }
 
@@ -956,6 +960,28 @@ class NineJudgesController extends ChangeNotifier {
     final view = cpuView();
     lastCpuEvaluations = strategy.evaluateActions(view)
       ..sort((a, b) => b.score.compareTo(a.score));
+    final decision = strategy.decideAction(view);
+    cpuActing = true;
+    chooseAction(decision.action);
+    selectSlot(decision.targetIndex);
+    cpuActing = false;
+    notifyListeners();
+    return decision;
+  }
+
+  /// Demo/recording-only: runs the exact same CPU decision logic
+  /// [performCpuAction] uses, but for whichever faction's turn it currently
+  /// is — regardless of [NineJudgesGameSettings.cpuFaction]. Used only by
+  /// the hidden showcase screen (see features/nine_judges/showcase/) to
+  /// auto-play a fixed-seed match deterministically for recording; it
+  /// changes no rule, no scoring, and no CPU decision algorithm — it only
+  /// lets that same, unmodified decision function act for both sides.
+  /// Regular gameplay never calls this.
+  CpuDecision? performAutoAction() {
+    if (isFinished || phase != TurnPhase.selectingAction) return null;
+    final actor = currentPlayer;
+    final strategy = CpuPlayer.strategyFor(settings.cpuLevel, _random);
+    final view = cpuView(faction: actor);
     final decision = strategy.decideAction(view);
     cpuActing = true;
     chooseAction(decision.action);
