@@ -42,7 +42,12 @@ class _RulesGuideScreenState extends State<RulesGuideScreen> {
     (
       title: 'EYE',
       icon: Icons.visibility_outlined,
-      lines: ['未確定の人物を選び、属性を確認します。', '結果を知るのは自分だけ。', '相手には「どこを見たか」だけ伝わります。'],
+      lines: [
+        '中央3人のうち、正体を知らない人物1人を確認します。',
+        '各プレイヤー2回まで。同じ人物への再使用はできません。',
+        '3人全員を見ることはできないため、残り1人は推理しましょう。',
+        '結果を知るのは自分だけ。相手には「どこを見たか」だけ伝わります。',
+      ],
     ),
     (
       title: 'JUDGE',

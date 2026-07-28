@@ -112,6 +112,7 @@ class ResultScreen extends StatelessWidget {
     var reading = controller.session.readingRating ?? 3;
     var luck = controller.session.luckRating ?? 3;
     var tempo = controller.session.tempoRating ?? 3;
+    var eyeChoice = controller.session.eyeChoiceRating ?? 3;
     var clarity = 3;
     var sending = false;
     String? sendError;
@@ -139,6 +140,11 @@ class ResultScreen extends StatelessWidget {
                 _rating('読み合い', reading, (v) => setState(() => reading = v)),
                 _rating('運要素', luck, (v) => setState(() => luck = v)),
                 _rating('テンポ', tempo, (v) => setState(() => tempo = v)),
+                _rating(
+                  'EYEの悩ましさ',
+                  eyeChoice,
+                  (v) => setState(() => eyeChoice = v),
+                ),
                 _rating('分かりやすさ', clarity, (v) => setState(() => clarity = v)),
                 if (sendError != null)
                   Text(
@@ -161,6 +167,7 @@ class ResultScreen extends StatelessWidget {
                   reading: reading,
                   luck: luck,
                   tempo: tempo,
+                  eyeChoice: eyeChoice,
                 );
                 if (dialogContext.mounted) Navigator.pop(dialogContext);
               },
@@ -182,6 +189,7 @@ class ResultScreen extends StatelessWidget {
                           reading: reading,
                           luck: luck,
                           tempo: tempo,
+                          eyeChoice: eyeChoice,
                         );
                         await const FirebasePlaytestRepository().send(
                           session: controller.session,
@@ -190,6 +198,7 @@ class ResultScreen extends StatelessWidget {
                             'reading': reading,
                             'luck': luck,
                             'tempo': tempo,
+                            'eyeChoice': eyeChoice,
                             'clarity': clarity,
                           },
                           notes: notes.text,

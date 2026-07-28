@@ -22,12 +22,21 @@ abstract final class NineJudgesRules {
     required bool actorKnowsAttribute,
     required bool specialVerdictUsed,
     bool reverseActionUsed = false,
+    // rulesVersion 1.2: EYE may be restricted to a zone (the center row) and
+    // capped at a fixed number of uses per player. Both default to the
+    // unrestricted rulesVersion 1.1 behaviour, so every existing caller that
+    // doesn't pass them is unaffected.
+    bool eyeAllowedForZone = true,
+    int? eyeUsesRemaining,
   }) {
     if (person.isConfirmed) return false;
     return switch (action) {
       ActionType.life => actor == Faction.savior || !reverseActionUsed,
       ActionType.death => actor == Faction.executor || !reverseActionUsed,
-      ActionType.eye => !actorKnowsAttribute,
+      ActionType.eye =>
+        !actorKnowsAttribute &&
+            eyeAllowedForZone &&
+            (eyeUsesRemaining == null || eyeUsesRemaining > 0),
       ActionType.specialVerdict =>
         !specialVerdictUsed &&
             person.verdictState == VerdictState.deliberating &&

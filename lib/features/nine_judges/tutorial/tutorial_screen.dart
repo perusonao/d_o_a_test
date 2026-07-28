@@ -15,17 +15,24 @@ class _TutorialScreenState extends State<TutorialScreen> {
   var step = 0;
 
   static const messages = [
-    'あなたは救済者です。善人と中立を生へ、悪人を死へ導きましょう。',
-    '手前のA3・B3・C3は、ゲーム開始時からあなただけが正体を知っています。',
-    '未知のB2をEYEで調査します。実際のゲームと同じ知識管理を使います。',
-    '既知の善人B3へLIFEを置きます。',
-    'CPUが同じB3へDEATHを置いて対抗します。',
-    'もう一度LIFE。3枚目のチップでB3が生確定します。',
-    'あなたが確定者なので、次のボーナスを知るのはCPUだけです。',
-    'CPUがA1をJUDGE。今度はあなたが次のボーナスを知ります。',
-    'JUDGEは各陣営1回だけ。あなたもC1へJUDGEを使います。',
-    '救済者も1回だけ逆属性のDEATHを使用できます。',
-    'チュートリアル完了。情報・介入・判決の流れを実戦で試しましょう。',
+    'あなたは救済者です。自陣3人（A3・B3・C3）の正体は最初から見えています。'
+        '善人と中立を生へ、悪人を死へ導きましょう。',
+    'まず、既知の善人B3へLIFEを使ってみましょう。1回だけでは確定しません。',
+    'EYEが使えるのは中央のA2・B2・C2だけ。自陣にも相手陣にも使えません。'
+        'まずB2を確認しましょう。',
+    'EYEの結果はあなただけに見えます。相手の画面には伝わりません。次はCPUの番です。',
+    'CPUが中央のA2へEYEを使いました。CPUが見たことは分かりますが、'
+        '属性はあなたには見えません。',
+    'EYEは1ゲームにつき2回まで。あなたの残りEYEは1回です。',
+    '中央のC2はまだ誰も見ていません。3人全員を確認することはできないため、'
+        '残り1人は行動や相手の反応から推理しましょう。',
+    'CPUが同じB3へDEATHで対抗し、あなたがもう一度LIFEで押し返します。'
+        '3回目の判定でB3は生確定します。',
+    'CPUがA1をJUDGEで確定させます。あなたもC1へJUDGEを使ってみましょう。',
+    '確定するたびに審判ボーナスが入ります。最初のボーナスは両者に公開、'
+        '以降は確定させなかった側だけが次の値を先に知ります。',
+    'チュートリアル完了。中央3人のうち2人しか見られない読み合いを意識して、'
+        '実戦に挑みましょう。',
   ];
 
   @override
@@ -60,7 +67,14 @@ class _TutorialScreenState extends State<TutorialScreen> {
     if (game.awaitingHandoff) game.confirmHandoff();
   }
 
-  bool _act(ActionType action, int target) {
+  /// Forces the actor for this scripted step: hotseat mode alternates
+  /// [NineJudgesController.currentPlayer] after every real action, but this
+  /// fixed lesson needs specific back-to-back actors (e.g. the player using
+  /// two of their own actions in a row) regardless of whichever turn the
+  /// engine would naturally be on. `currentPlayer` is plain mutable state on
+  /// the controller — same liberty [initState] already takes with the board.
+  bool _act(Faction actor, ActionType action, int target) {
+    game.currentPlayer = actor;
     final applied = game.performTutorialAction(action, target);
     if (applied) _settle();
     return applied;
@@ -69,28 +83,24 @@ class _TutorialScreenState extends State<TutorialScreen> {
   void _advance() {
     var applied = true;
     switch (step) {
+      case 1:
+        applied = _act(Faction.savior, ActionType.life, 7);
+        break;
       case 2:
-        applied = _act(ActionType.eye, 4);
-        if (applied) applied = _act(ActionType.eye, 3); // scripted CPU turn
+        applied = _act(Faction.savior, ActionType.eye, 4);
         break;
       case 3:
-        applied = _act(ActionType.life, 7);
-        break;
-      case 4:
-        applied = _act(ActionType.death, 7);
-        break;
-      case 5:
-        applied = _act(ActionType.life, 7);
+        applied = _act(Faction.executor, ActionType.eye, 3);
         break;
       case 7:
-        applied = _act(ActionType.specialVerdict, 0);
+        applied = _act(Faction.executor, ActionType.death, 7);
+        if (applied) applied = _act(Faction.savior, ActionType.life, 7);
         break;
       case 8:
-        applied = _act(ActionType.specialVerdict, 2);
-        break;
-      case 9:
-        applied = _act(ActionType.eye, 5); // scripted CPU turn
-        if (applied) applied = _act(ActionType.death, 6);
+        applied = _act(Faction.executor, ActionType.specialVerdict, 0);
+        if (applied) {
+          applied = _act(Faction.savior, ActionType.specialVerdict, 2);
+        }
         break;
     }
     if (!applied) {
@@ -103,13 +113,11 @@ class _TutorialScreenState extends State<TutorialScreen> {
   }
 
   String get _buttonLabel => switch (step) {
+    1 => 'B3にLIFE',
     2 => 'B2にEYE',
-    3 => 'B3にLIFE',
-    4 => 'CPU：B3にDEATH',
-    5 => 'B3にLIFE',
-    7 => 'CPU：A1にJUDGE',
+    3 => 'CPU：A2にEYE',
+    7 => 'B3で攻防',
     8 => 'C1にJUDGE',
-    9 => 'A3に特殊DEATH',
     _ => '次へ',
   };
 
@@ -140,9 +148,9 @@ class _TutorialScreenState extends State<TutorialScreen> {
                 key: const Key('tutorial-next'),
                 onPressed: _advance,
                 icon: Icon(
-                  step == 2
+                  step == 2 || step == 3
                       ? Icons.visibility
-                      : step == 7 || step == 8
+                      : step == 8
                       ? Icons.gavel
                       : Icons.touch_app,
                 ),

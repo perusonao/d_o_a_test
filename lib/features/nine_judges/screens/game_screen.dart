@@ -200,6 +200,11 @@ class _GameBoard extends StatelessWidget {
   );
 
   Future<void> _handleTargetTap(BuildContext context, int index) async {
+    if (controller.selectedAction == ActionType.eye &&
+        controller.eyeZoneRestricted) {
+      await _handleEyeTap(context, index);
+      return;
+    }
     if (controller.selectedAction != ActionType.specialVerdict) {
       controller.selectSlot(index);
       return;
@@ -234,6 +239,40 @@ class _GameBoard extends StatelessWidget {
             onPressed: () => Navigator.pop(dialogContext, true),
             icon: const Icon(Icons.balance),
             label: const Text('JUDGE'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && controller.canTarget(index)) {
+      controller.selectSlot(index);
+    }
+  }
+
+  /// rulesVersion 1.2 only: EYE is capped at 2 uses per player, so a short
+  /// confirmation (mirroring JUDGE's) guards against spending one by mistake.
+  Future<void> _handleEyeTap(BuildContext context, int index) async {
+    final actor = controller.currentPlayer;
+    final remainingBefore = controller.eyeUsesRemaining(actor) ?? 0;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        key: const Key('eye-confirm-dialog'),
+        icon: const Icon(Icons.visibility_outlined, color: AppTheme.eye, size: 32),
+        title: Text('${controller.positionLabel(index)}の正体を確認しますか？'),
+        content: Text(
+          '残りEYE: $remainingBefore → ${remainingBefore - 1}',
+          textAlign: TextAlign.center,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('キャンセル'),
+          ),
+          FilledButton.icon(
+            key: const Key('confirm-eye'),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            icon: const Icon(Icons.visibility_outlined),
+            label: const Text('EYE'),
           ),
         ],
       ),

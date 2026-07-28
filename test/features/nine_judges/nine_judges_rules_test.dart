@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import 'package:dead_or_alive/features/nine_judges/game/game_config.dart';
 import 'package:dead_or_alive/features/nine_judges/game/game_controller.dart';
 import 'package:dead_or_alive/features/nine_judges/game/game_rules.dart';
 import 'package:dead_or_alive/features/nine_judges/logging/game_log_repository.dart';
@@ -344,7 +345,7 @@ void main() {
       expect(person.scoringFaction, Faction.executor);
       expect(person.awardedBonus, isNotNull);
       expect(game.session.actions.single.actionType, 'specialVerdict');
-      expect(game.session.rulesVersion, '1.1');
+      expect(game.session.rulesVersion, NineJudgesConfig.rulesVersion);
       expect(game.session.actions.single.verdictHistoryBefore, isEmpty);
       expect(game.session.actions.single.confirmedBy, 'savior');
     });

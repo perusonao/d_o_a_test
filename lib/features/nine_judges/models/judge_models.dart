@@ -52,6 +52,23 @@ enum VerdictActionType {
   final String label;
 }
 
+/// Which ruleset a game is played under. v1.1 is kept in full (never
+/// deleted) so the two remain directly comparable; v1.2 is the version
+/// players get by default.
+///
+/// v1.2 changes exactly one thing versus v1.1: EYE may only target the
+/// center row (the 3 slots neither side knows at game start), capped at 2
+/// uses per player, at most once per player per person. Everything else
+/// (LIFE/DEATH, JUDGE, the one-shot reverse action, scoring, the bonus deck)
+/// is untouched.
+enum NineJudgesRuleVersion {
+  v1_1('1.1'),
+  v1_2('1.2');
+
+  const NineJudgesRuleVersion(this.label);
+  final String label;
+}
+
 enum TurnPhase { selectingAction, selectingActionTarget }
 
 enum FactionSelection { savior, executor, random }
@@ -84,6 +101,7 @@ class NineJudgesGameSettings {
     this.cpuLevel = CpuLevel.balanced,
     this.skipCpuDelays = false,
     this.showCpuEvaluations = false,
+    this.ruleVersion = NineJudgesRuleVersion.v1_2,
   });
 
   final GameMode mode;
@@ -95,6 +113,11 @@ class NineJudgesGameSettings {
   final bool skipCpuDelays;
   final bool showCpuEvaluations;
 
+  /// Which ruleset this game plays under. Defaults to the current, normal
+  /// ruleset (v1.2); pass [NineJudgesRuleVersion.v1_1] to play/simulate the
+  /// previous ruleset for comparison.
+  final NineJudgesRuleVersion ruleVersion;
+
   NineJudgesGameSettings copyWith({
     GameMode? mode,
     Faction? cpuFaction,
@@ -104,6 +127,7 @@ class NineJudgesGameSettings {
     CpuLevel? cpuLevel,
     bool? skipCpuDelays,
     bool? showCpuEvaluations,
+    NineJudgesRuleVersion? ruleVersion,
   }) => NineJudgesGameSettings(
     mode: mode ?? this.mode,
     cpuFaction: cpuFaction ?? this.cpuFaction,
@@ -113,6 +137,7 @@ class NineJudgesGameSettings {
     cpuLevel: cpuLevel ?? this.cpuLevel,
     skipCpuDelays: skipCpuDelays ?? this.skipCpuDelays,
     showCpuEvaluations: showCpuEvaluations ?? this.showCpuEvaluations,
+    ruleVersion: ruleVersion ?? this.ruleVersion,
   );
 }
 

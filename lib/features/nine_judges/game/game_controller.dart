@@ -45,6 +45,7 @@ class NineJudgesController extends ChangeNotifier {
   late List<int> bonusDeck;
   late Map<Faction, bool> specialVerdictUsed;
   late Map<Faction, bool> reverseActionUsed;
+  late Map<Faction, List<int>> initialKnownPositions;
   final Map<Faction, Set<int>> knownAttributeSlots = {
     Faction.savior: <int>{},
     Faction.executor: <int>{},
@@ -125,6 +126,27 @@ class NineJudgesController extends ChangeNotifier {
 
   bool reverseActionAvailable(Faction faction) => !reverseActionUsed[faction]!;
 
+  bool get eyeZoneRestricted =>
+      NineJudgesConfig.eyeZoneRestricted(settings.ruleVersion);
+
+  int? get eyeMaxUsesPerPlayer =>
+      NineJudgesConfig.eyeMaxUsesPerPlayer(settings.ruleVersion);
+
+  /// EYE uses [faction] has left this game, or `null` when this ruleset has
+  /// no cap (rulesVersion 1.1).
+  int? eyeUsesRemaining(Faction faction) {
+    final max = eyeMaxUsesPerPlayer;
+    if (max == null) return null;
+    return max - eyeSeenSlots[faction]!.length;
+  }
+
+  /// [index]'s zone relative to [actor]: the actor's own known row ('self'),
+  /// the center row ('center'), or the opponent's known row ('opponent').
+  String targetZone(int index, Faction actor) {
+    if (NineJudgesConfig.centerIndices.contains(index)) return 'center';
+    return initialKnownPositions[actor]!.contains(index) ? 'self' : 'opponent';
+  }
+
   bool isReverseAction(ActionType action, Faction actor) =>
       (actor == Faction.savior && action == ActionType.death) ||
       (actor == Faction.executor && action == ActionType.life);
@@ -159,6 +181,10 @@ class NineJudgesController extends ChangeNotifier {
     final cpuOrExecutor = humanOrSavior.opponent;
     knownAttributeSlots[humanOrSavior]!.addAll(const [6, 7, 8]);
     knownAttributeSlots[cpuOrExecutor]!.addAll(const [0, 1, 2]);
+    initialKnownPositions = {
+      for (final faction in Faction.values)
+        faction: knownAttributeSlots[faction]!.toList()..sort(),
+    };
     currentPlayer = settings.firstPlayer;
     turn = 1;
     bonusIndex = 0;
@@ -188,7 +214,7 @@ class NineJudgesController extends ChangeNotifier {
       gameId: '${now.microsecondsSinceEpoch}-$seed',
       startedAt: now,
       gameVersion: NineJudgesConfig.gameVersion,
-      rulesVersion: NineJudgesConfig.rulesVersion,
+      rulesVersion: settings.ruleVersion.label,
       mode: settings.mode.name,
       playerFaction: isCpuGame ? humanFaction.name : Faction.savior.name,
       cpuFaction: isCpuGame ? settings.cpuFaction.name : '',
@@ -213,6 +239,10 @@ class NineJudgesController extends ChangeNotifier {
               attribute: board[index].person.attribute.name,
             ),
       },
+      initialKnownPositionsBySavior: initialKnownPositions[Faction.savior]!,
+      initialKnownPositionsByExecutor:
+          initialKnownPositions[Faction.executor]!,
+      experimentalRevokeMode: 'disabled',
       scoreVisible: false,
     );
     notifyListeners();
@@ -343,6 +373,9 @@ class NineJudgesController extends ChangeNotifier {
         specialVerdictUsed: specialVerdictUsed[viewer]!,
         reverseActionUsed:
             isReverseAction(action, viewer) && reverseActionUsed[viewer]!,
+        eyeAllowedForZone:
+            !eyeZoneRestricted || NineJudgesConfig.centerIndices.contains(i),
+        eyeUsesRemaining: eyeUsesRemaining(viewer),
       ))
         i,
   ];
@@ -409,6 +442,13 @@ class NineJudgesController extends ChangeNotifier {
     final actor = currentPlayer;
     final actorKnewAttributeBefore = knowsAttribute(board[index].person, actor);
     final reverseWasUsedBefore = reverseActionUsed[actor]!;
+    final eyeUsesRemainingBefore = eyeUsesRemaining(actor);
+    final eyeEligibleAtTime = _legalTargets(
+      ActionType.eye,
+      actor,
+    ).contains(index);
+    final eyeAlreadyUsedOnTargetByActor = eyeSeenSlots[actor]!.contains(index);
+    final zone = targetZone(index, actor);
     final before = board[index].person;
     var after = before;
     if (action == ActionType.eye) {
@@ -484,6 +524,11 @@ class NineJudgesController extends ChangeNotifier {
       after,
       actorKnewAttributeBefore: actorKnewAttributeBefore,
       reverseWasUsedBefore: reverseWasUsedBefore,
+      eyeUsesRemainingBefore: eyeUsesRemainingBefore,
+      eyeUsesRemainingAfter: eyeUsesRemaining(actor),
+      eyeEligibleAtTime: eyeEligibleAtTime,
+      eyeAlreadyUsedOnTargetByActor: eyeAlreadyUsedOnTargetByActor,
+      targetZoneAtTime: zone,
     );
     _finishAction(detail, action: action, targetIndex: index);
   }
@@ -511,12 +556,23 @@ class NineJudgesController extends ChangeNotifier {
     PersonCard after, {
     required bool actorKnewAttributeBefore,
     required bool reverseWasUsedBefore,
+    required int? eyeUsesRemainingBefore,
+    required int? eyeUsesRemainingAfter,
+    required bool eyeEligibleAtTime,
+    required bool eyeAlreadyUsedOnTargetByActor,
+    required String targetZoneAtTime,
   }) {
     session = session.copyWith(
       actions: [
         ...session.actions,
         GameActionLog(
           actionIndex: session.actions.length + 1,
+          eyeUsesRemainingBefore: eyeUsesRemainingBefore,
+          eyeUsesRemainingAfter: eyeUsesRemainingAfter,
+          eyeEligibleAtTime: eyeEligibleAtTime,
+          eyeAlreadyUsedOnTargetByActor: eyeAlreadyUsedOnTargetByActor,
+          targetZone: targetZoneAtTime,
+          ruleVersion: settings.ruleVersion.label,
           turnNumber: turn,
           actingPlayer: isCpuGame && actor == settings.cpuFaction
               ? 'cpu'
@@ -750,6 +806,7 @@ class NineJudgesController extends ChangeNotifier {
     int? reading,
     int? luck,
     int? tempo,
+    int? eyeChoice,
   }) async {
     session = session.copyWith(
       notes: notes,
@@ -757,6 +814,7 @@ class NineJudgesController extends ChangeNotifier {
       readingRating: reading,
       luckRating: luck,
       tempoRating: tempo,
+      eyeChoiceRating: eyeChoice,
     );
     await logRepository.saveGame(session);
     notifyListeners();
@@ -784,6 +842,7 @@ class NineJudgesController extends ChangeNotifier {
       currentBonus: visibleBonusFor(faction),
       specialVerdictAvailable: specialVerdictAvailable(faction),
       reverseActionAvailable: reverseActionAvailable(faction),
+      eyeUsesRemaining: eyeUsesRemaining(faction),
     );
   }
 
