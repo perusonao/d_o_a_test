@@ -48,6 +48,9 @@ void main() {
     for (var i = 0; i < 10; i++) {
       await tester.tap(find.byKey(const Key('tutorial-next')));
       await tester.pump();
+      // Steps that chain a CPU action then the player's own follow-up hold
+      // two ~800ms non-blocking beats in a row before advancing.
+      await tester.pump(const Duration(seconds: 2));
     }
     expect(find.byKey(const Key('tutorial-complete')), findsOneWidget);
     // Previously this pop result was silently discarded
@@ -83,6 +86,9 @@ void main() {
     for (var i = 0; i < 10; i++) {
       await tester.tap(find.byKey(const Key('tutorial-next')));
       await tester.pump();
+      // Steps that chain a CPU action then the player's own follow-up hold
+      // two ~800ms non-blocking beats in a row before advancing.
+      await tester.pump(const Duration(seconds: 2));
     }
     await tester.tap(find.byKey(const Key('tutorial-go-home')));
     await tester.pump();

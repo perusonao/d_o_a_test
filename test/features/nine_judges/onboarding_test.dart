@@ -30,6 +30,12 @@ void main() {
     for (var i = 0; i < 10; i++) {
       await tester.tap(find.byKey(const Key('tutorial-next')));
       await tester.pump();
+      // Some steps hold a non-blocking "see what happened" beat (CPU pause /
+      // card badge / bonus banner) — up to two ~800ms beats in a row for the
+      // steps that chain a CPU action then the player's own follow-up — so
+      // give the async _advance() call enough fake-clock time to fully
+      // resolve before the next tap.
+      await tester.pump(const Duration(seconds: 2));
     }
 
     expect(find.byKey(const Key('tutorial-complete')), findsOneWidget);
