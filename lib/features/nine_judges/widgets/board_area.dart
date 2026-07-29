@@ -1,3 +1,4 @@
+import 'package:dead_or_alive/features/nine_judges/effects/card_action_effect.dart';
 import 'package:dead_or_alive/features/nine_judges/game/game_controller.dart';
 import 'package:dead_or_alive/features/nine_judges/models/judge_models.dart';
 import 'package:dead_or_alive/features/nine_judges/widgets/game_style.dart';
@@ -11,11 +12,26 @@ class BoardArea extends StatelessWidget {
   const BoardArea({
     required this.controller,
     required this.onTargetTap,
+    this.effectIndex,
+    this.effectAction,
+    this.effectSerial = 0,
+    this.onEffectDone,
     super.key,
   });
 
   final NineJudgesController controller;
   final ValueChanged<int> onTargetTap;
+
+  /// Section ④: the board slot (if any) currently showing a brief,
+  /// non-blocking LIFE/DEATH/EYE flash (see [CardActionEffect]) — set by
+  /// the real game screen right after that action resolves, cleared again
+  /// via [onEffectDone] once the flash finishes on its own. [effectSerial]
+  /// changes on every trigger (even a repeat of the same slot/action) so the
+  /// effect widget always remounts and restarts instead of being reused.
+  final int? effectIndex;
+  final ActionType? effectAction;
+  final int effectSerial;
+  final VoidCallback? onEffectDone;
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
@@ -71,7 +87,7 @@ class BoardArea extends StatelessWidget {
   Widget _card(int index) {
     final person = controller.board[index].person;
     final viewer = controller.uiViewer;
-    return PersonCardWidget(
+    final card = PersonCardWidget(
       person: person,
       coordinate: controller.positionLabel(index),
       attributeVisible: controller.knowsAttribute(person, viewer),
@@ -84,6 +100,19 @@ class BoardArea extends StatelessWidget {
       enabled: controller.canTarget(index),
       targeting: controller.phase == TurnPhase.selectingActionTarget,
       onTap: () => onTargetTap(index),
+    );
+    if (index != effectIndex || effectAction == null) return card;
+    return Stack(
+      children: [
+        card,
+        Positioned.fill(
+          child: CardActionEffect(
+            key: ValueKey('card-effect-$effectSerial'),
+            action: effectAction!,
+            onDone: onEffectDone ?? () {},
+          ),
+        ),
+      ],
     );
   }
 }

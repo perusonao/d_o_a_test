@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:dead_or_alive/app/theme.dart';
 import 'package:dead_or_alive/features/nine_judges/game/game_config.dart';
 import 'package:dead_or_alive/features/nine_judges/models/judge_models.dart';
@@ -5,6 +7,7 @@ import 'package:dead_or_alive/features/nine_judges/online/online_lobby_screen.da
 import 'package:dead_or_alive/features/nine_judges/rules/rules_guide_screen.dart';
 import 'package:dead_or_alive/features/nine_judges/screens/download_center_screen.dart';
 import 'package:dead_or_alive/features/nine_judges/tutorial/tutorial_screen.dart';
+import 'package:dead_or_alive/features/nine_judges/widgets/game_style.dart';
 import 'package:flutter/material.dart';
 
 /// Title screen: hero art (with the full 9-judge key visual), quick
@@ -99,10 +102,36 @@ class _NineJudgesModeSelectScreenState
 /// (accessibility/tests — the wordmark in the image itself isn't readable by
 /// screen readers), folded into a slim caption strip under the artwork
 /// alongside the beta badge instead of taking its own separate row.
-class _HeroArea extends StatelessWidget {
+class _HeroArea extends StatefulWidget {
   const _HeroArea();
 
+  @override
+  State<_HeroArea> createState() => _HeroAreaState();
+}
+
+class _HeroAreaState extends State<_HeroArea> with TickerProviderStateMixin {
   static const _aspectRatio = 853 / 895;
+
+  // Section ⑦: additions-only cinematic layer over the static hero art —
+  // slow ambient particles and a gently swaying balance icon, so the title
+  // screen reads as a living backdrop rather than a still image. Both loop
+  // continuously but paint only a handful of simple shapes, so they stay
+  // cheap enough to never compete with input handling (section ⑩).
+  late final AnimationController _ambient = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 7),
+  )..repeat();
+  late final AnimationController _sway = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 4),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _ambient.dispose();
+    _sway.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) => Column(
@@ -111,11 +140,60 @@ class _HeroArea extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         child: AspectRatio(
           aspectRatio: _aspectRatio,
-          child: Image.asset(
-            'assets/branding/menu_hero.png',
-            fit: BoxFit.cover,
-            width: double.infinity,
-            semanticLabel: '9人の審判 NINE VERDICTS - 善人を救い、悪人を裁け。',
+          child: Stack(
+            children: [
+              Image.asset(
+                'assets/branding/menu_hero.png',
+                fit: BoxFit.cover,
+                width: double.infinity,
+                semanticLabel: '9人の審判 NINE VERDICTS - 善人を救い、悪人を裁け。',
+              ),
+              // 救済者側は光、執行者側は闇 — a very soft static tint split,
+              // layered over the artwork without changing it.
+              const Positioned.fill(
+                child: IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                        colors: [
+                          Color(0x33F2E0A8),
+                          Colors.transparent,
+                          Color(0x40140A24),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: AnimatedBuilder(
+                    animation: _ambient,
+                    builder: (context, _) => CustomPaint(
+                      painter: _HeroParticlePainter(progress: _ambient.value),
+                    ),
+                  ),
+                ),
+              ),
+              Align(
+                alignment: const Alignment(0, -0.6),
+                child: IgnorePointer(
+                  child: AnimatedBuilder(
+                    animation: _sway,
+                    builder: (context, _) => Transform.rotate(
+                      angle: (_sway.value - 0.5) * 0.12,
+                      child: Icon(
+                        Icons.balance,
+                        size: 30,
+                        color: Colors.white.withValues(alpha: 0.26),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -137,6 +215,53 @@ class _HeroArea extends StatelessWidget {
       ),
     ],
   );
+}
+
+/// A handful of faint motes drifting slowly upward and looping — the hero's
+/// ambient "light particle" layer (section ⑦). Deliberately cheap: a fixed
+/// small count of plain circles, repainted from one [progress] value.
+class _HeroParticlePainter extends CustomPainter {
+  _HeroParticlePainter({required this.progress});
+  final double progress;
+
+  static final List<_Mote> _motes = [
+    for (var i = 0; i < 14; i++) _Mote(Random(i * 104729 + 7)),
+  ];
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    for (final mote in _motes) {
+      final t = (progress * mote.speed + mote.phase) % 1.0;
+      final dx = mote.x * size.width;
+      final dy = size.height * (1 - t);
+      final fade = t < 0.12
+          ? t / 0.12
+          : (t > 0.85 ? (1 - t) / 0.15 : 1.0);
+      final opacity = fade.clamp(0.0, 1.0) * 0.45;
+      canvas.drawCircle(
+        Offset(dx, dy),
+        mote.radius,
+        Paint()..color = Colors.white.withValues(alpha: opacity),
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _HeroParticlePainter oldDelegate) =>
+      oldDelegate.progress != progress;
+}
+
+class _Mote {
+  _Mote(Random random)
+    : x = random.nextDouble(),
+      phase = random.nextDouble(),
+      speed = 0.6 + random.nextDouble() * 0.5,
+      radius = 1 + random.nextDouble() * 1.6;
+
+  final double x;
+  final double phase;
+  final double speed;
+  final double radius;
 }
 
 /// Small, always-visible marker that this build is the external-test cohort
@@ -451,6 +576,11 @@ class _MainActionArea extends StatelessWidget {
         aspectRatio: 795 / 125,
         semanticLabel: 'ゲーム開始',
         onTap: onStart,
+        // Section ⑥: the single most important tap target gets a gentle
+        // idle "heartbeat" pulse, and a gold glow + ripple + slight sink on
+        // press — the artwork itself is untouched, only layered on top.
+        pulse: true,
+        glowColor: GameColors.gold,
       ),
       const SizedBox(height: 8),
       _MockupButton(
@@ -459,6 +589,11 @@ class _MainActionArea extends StatelessWidget {
         aspectRatio: 795 / 80,
         semanticLabel: 'オンライン対戦 β',
         onTap: onOpenOnline,
+        // Section ⑥: a persistent, soft purple glow (rather than the start
+        // button's pulse) plus a small β badge marking it as still in beta.
+        glowColor: GameColors.executor,
+        glowBaseAlpha: 0.28,
+        badge: 'β',
       ),
     ],
   );
@@ -466,14 +601,20 @@ class _MainActionArea extends StatelessWidget {
 
 /// A button whose entire visual (background, border, glow, label) is the
 /// artwork cropped straight from the official mockup, wrapped in a real tap
-/// target sized to match.
-class _MockupButton extends StatelessWidget {
+/// target sized to match. Section ⑥ layers a few lightweight, purely
+/// decorative animations on top — an optional idle pulse, a press-triggered
+/// glow/sink, and an optional badge — without altering that artwork.
+class _MockupButton extends StatefulWidget {
   const _MockupButton({
     required this.buttonKey,
     required this.asset,
     required this.aspectRatio,
     required this.semanticLabel,
     required this.onTap,
+    this.pulse = false,
+    this.glowColor,
+    this.glowBaseAlpha = 0,
+    this.badge,
   });
 
   final Key buttonKey;
@@ -481,24 +622,121 @@ class _MockupButton extends StatelessWidget {
   final double aspectRatio;
   final String semanticLabel;
   final VoidCallback onTap;
+  final bool pulse;
+  final Color? glowColor;
+  final double glowBaseAlpha;
+  final String? badge;
 
   @override
-  Widget build(BuildContext context) => Material(
-    color: Colors.transparent,
-    child: InkWell(
-      key: buttonKey,
-      borderRadius: BorderRadius.circular(30),
-      onTap: onTap,
-      child: Semantics(
-        button: true,
-        label: semanticLabel,
-        child: AspectRatio(
-          aspectRatio: aspectRatio,
-          child: Image.asset(asset, fit: BoxFit.fill),
-        ),
-      ),
-    ),
+  State<_MockupButton> createState() => _MockupButtonState();
+}
+
+class _MockupButtonState extends State<_MockupButton>
+    with TickerProviderStateMixin {
+  late final AnimationController _idle = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1500),
+  )..repeat(reverse: true);
+  late final AnimationController _press = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 160),
   );
+
+  @override
+  void dispose() {
+    _idle.dispose();
+    _press.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final button = Semantics(
+      button: true,
+      label: widget.semanticLabel,
+      child: AspectRatio(
+        aspectRatio: widget.aspectRatio,
+        child: Image.asset(widget.asset, fit: BoxFit.fill),
+      ),
+    );
+    return AnimatedBuilder(
+      animation: Listenable.merge([_idle, _press]),
+      builder: (context, child) {
+        final heartbeat = widget.pulse
+            ? 1 + 0.025 * Curves.easeInOut.transform(_idle.value)
+            : 1.0;
+        final sink = 1 - 0.04 * _press.value;
+        final glowColor = widget.glowColor;
+        return Transform.scale(
+          scale: heartbeat * sink,
+          child: Container(
+            decoration: glowColor == null
+                ? null
+                : BoxDecoration(
+                    borderRadius: BorderRadius.circular(30),
+                    boxShadow: [
+                      BoxShadow(
+                        color: glowColor.withValues(
+                          alpha: widget.glowBaseAlpha + 0.4 * _press.value,
+                        ),
+                        blurRadius: 16 + 14 * _press.value,
+                        spreadRadius: 1 + 2 * _press.value,
+                      ),
+                    ],
+                  ),
+            child: child,
+          ),
+        );
+      },
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              key: widget.buttonKey,
+              borderRadius: BorderRadius.circular(30),
+              onTapDown: (_) => _press.forward(),
+              onTapCancel: () => _press.reverse(),
+              onTap: () {
+                _press.reverse();
+                widget.onTap();
+              },
+              child: button,
+            ),
+          ),
+          if (widget.badge != null)
+            Positioned(
+              top: -6,
+              right: 4,
+              child: IgnorePointer(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: GameColors.executor,
+                    borderRadius: BorderRadius.circular(10),
+                    boxShadow: [
+                      BoxShadow(
+                        color: GameColors.executor.withValues(alpha: .6),
+                        blurRadius: 8,
+                      ),
+                    ],
+                  ),
+                  child: Text(
+                    widget.badge!,
+                    style: const TextStyle(
+                      color: Colors.black,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 }
 
 /// Section ④: 遊び方/チュートリアル/ダウンロード/プレイログ as a single row of
