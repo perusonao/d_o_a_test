@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:dead_or_alive/features/nine_judges/admin/analysis/screens/admin_analysis_screen.dart';
 import 'package:dead_or_alive/features/nine_judges/admin/models/playtest_record.dart';
@@ -6,6 +8,7 @@ import 'package:dead_or_alive/features/nine_judges/admin/screens/admin_kpi_tab.d
 import 'package:dead_or_alive/features/nine_judges/admin/screens/admin_logs_tab.dart';
 import 'package:dead_or_alive/features/nine_judges/admin/screens/admin_overview_tab.dart';
 import 'package:dead_or_alive/features/nine_judges/admin/screens/admin_settings_tab.dart';
+import 'package:dead_or_alive/features/nine_judges/admin/screens/admin_tester_history_screen.dart';
 import 'package:dead_or_alive/features/nine_judges/admin/services/admin_firebase.dart';
 import 'package:dead_or_alive/features/nine_judges/admin/services/admin_playtest_repository.dart';
 import 'package:dead_or_alive/features/nine_judges/admin/services/tester_anonymizer.dart';
@@ -55,10 +58,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
   DateTime? lastUpdated;
   bool _refreshing = false;
 
+  int? _tutorialCompletionCount;
+  bool _tutorialCompletionFailed = false;
+
   @override
   void initState() {
     super.initState();
     _loadFirstPage();
+    unawaited(_loadTutorialCompletionCount());
   }
 
   @override
@@ -119,8 +126,26 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     // Section 23: refresh must not multi-fetch on repeat clicks.
     if (_refreshing) return;
     _refreshing = true;
-    await _loadFirstPage();
+    await Future.wait([_loadFirstPage(), _loadTutorialCompletionCount()]);
     _refreshing = false;
+  }
+
+  /// Best-effort: a failure here (e.g. Firebase unavailable) must never
+  /// affect the rest of the dashboard, mirroring _loadFirstPage's own
+  /// try/catch — the KPI tab just keeps showing this one figure as
+  /// unavailable instead.
+  Future<void> _loadTutorialCompletionCount() async {
+    try {
+      final count = await _repository.fetchTutorialCompletionCount();
+      if (mounted) {
+        setState(() {
+          _tutorialCompletionCount = count;
+          _tutorialCompletionFailed = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _tutorialCompletionFailed = true);
+    }
   }
 
   Future<void> fetchActionsFor(PlaytestRecord record) async {
@@ -130,6 +155,18 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     if (index != -1 && mounted) {
       setState(() => records[index] = records[index].withActions(actions));
     }
+  }
+
+  void _openTesterHistory(String testerId) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => AdminTesterHistoryScreen(
+          repository: _repository,
+          anonymizer: anonymizer,
+          testerId: testerId,
+        ),
+      ),
+    );
   }
 
   @override
@@ -188,9 +225,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                   loading: _loadState == _LoadState.loading,
                   onLoadMore: loadMore,
                   onOpenDetail: fetchActionsFor,
+                  onViewTesterHistory: _openTesterHistory,
                 ),
                 AdminFeedbackTab(records: records, anonymizer: anonymizer),
-                AdminKpiTab(records: records),
+                AdminKpiTab(
+                  records: records,
+                  tutorialCompletionCount: _tutorialCompletionCount,
+                  tutorialCompletionFailed: _tutorialCompletionFailed,
+                ),
                 AdminAnalysisScreen(
                   repository: _repository,
                   anonymizer: anonymizer,

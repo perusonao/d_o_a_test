@@ -4,6 +4,7 @@ import 'package:dead_or_alive/features/nine_judges/game/game_controller.dart';
 import 'package:dead_or_alive/features/nine_judges/logging/tutorial_event_log.dart';
 import 'package:dead_or_alive/features/nine_judges/models/judge_models.dart';
 import 'package:dead_or_alive/features/nine_judges/services/external_test_profile.dart';
+import 'package:dead_or_alive/features/nine_judges/services/tutorial_completion_repository.dart';
 import 'package:dead_or_alive/features/nine_judges/showcase/widgets/showcase_effects.dart'
     show ParticleBurstEffect;
 import 'package:dead_or_alive/features/nine_judges/widgets/board_grid.dart';
@@ -51,12 +52,19 @@ class _TutorialStep {
 class TutorialScreen extends StatefulWidget {
   const TutorialScreen({
     this.eventRepository,
+    this.tutorialCompletionRepository = const TutorialCompletionRepository(),
     this.beatDuration = const Duration(milliseconds: 800),
     super.key,
   });
 
   /// Injectable for tests; defaults to the real, persisted event log.
   final TutorialEventRepository? eventRepository;
+
+  /// Records a durable, cross-device "this user completed the tutorial"
+  /// count (see tutorial_completion_repository.dart) — a no-op whenever
+  /// Firebase isn't available/configured, which is always true in tests
+  /// unless a fake is injected here.
+  final TutorialCompletionRepository tutorialCompletionRepository;
 
   /// How long each non-blocking "see what just happened" beat holds — the
   /// LIFE/DEATH progress badge, EYE's reveal, JUDGE's confirm flash, the
@@ -216,6 +224,15 @@ class _TutorialScreenState extends State<TutorialScreen> {
     _exitOutcomeRecorded = true;
     _record('tutorialCompleted', step: step + 1);
     unawaited(ExternalTestProfile.markTutorialCompleted());
+    unawaited(_recordRemoteCompletion());
+  }
+
+  Future<void> _recordRemoteCompletion() async {
+    final profile = await (_profileFuture ??=
+        ExternalTestProfile.loadForNewGame());
+    await widget.tutorialCompletionRepository.recordCompletion(
+      testerId: profile.testerId,
+    );
   }
 
   void _settle() {

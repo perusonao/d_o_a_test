@@ -40,6 +40,18 @@ service cloud.firestore {
       }
     }
 
+    match /tutorialCompletions/{uid} {
+      // One doc per Firebase Auth uid (see
+      // services/tutorial_completion_repository.dart): a durable,
+      // cross-device count of users who completed the tutorial, independent
+      // of whether they ever submitted a playtest. Same owner-or-admin
+      // pattern as `playtests` above; `testerId` here is informational only
+      // (never used for access control, same rule as `playtests`).
+      allow create, update: if signedIn() && uid == request.auth.uid;
+      allow read: if signedIn() && (uid == request.auth.uid || isAdmin());
+      allow delete: if false;
+    }
+
     match /admins/{uid} {
       // No client may create/update/delete admin docs from this app — the
       // initial admin dashboard is read-only and has no "add/remove admin"

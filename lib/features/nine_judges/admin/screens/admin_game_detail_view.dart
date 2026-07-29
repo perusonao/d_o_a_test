@@ -11,12 +11,19 @@ class AdminGameDetailView extends StatelessWidget {
     required this.record,
     required this.anonymizer,
     required this.actionsLoading,
+    this.onViewTesterHistory,
     super.key,
   });
 
   final PlaytestRecord record;
   final TesterAnonymizer anonymizer;
   final bool actionsLoading;
+
+  /// Opens this game's tester's complete match history (faction/first-or-
+  /// second/result across every game, not just currently-loaded pages).
+  /// Null (the default) hides the button entirely — used by callers that
+  /// don't wire up navigation for it.
+  final ValueChanged<String>? onViewTesterHistory;
 
   @override
   Widget build(BuildContext context) {
@@ -43,6 +50,16 @@ class AdminGameDetailView extends StatelessWidget {
         const SizedBox(height: 8),
         _kv('プレイヤー', anonymizer.label(s.testerId)),
         _kv('testerId(短縮)', TesterAnonymizer.shortId(s.testerId)),
+        if (onViewTesterHistory != null && (s.testerId?.isNotEmpty ?? false))
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              key: const Key('view-tester-history'),
+              onPressed: () => onViewTesterHistory!(s.testerId!),
+              icon: const Icon(Icons.history, size: 16),
+              label: const Text('この人の全戦歴を見る'),
+            ),
+          ),
         _kv('playNumber', '${s.playNumber ?? '-'}'),
         _kv('isFirstGame', '${s.isFirstGame ?? '-'}'),
         _kv('testCohort', s.testCohort ?? '-'),

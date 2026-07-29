@@ -1,8 +1,11 @@
+import 'package:dead_or_alive/features/nine_judges/services/tutorial_completion_repository.dart';
 import 'package:dead_or_alive/features/nine_judges/tutorial/tutorial_screen.dart';
 import 'package:dead_or_alive/features/nine_judges/widgets/board_grid.dart';
 import 'package:dead_or_alive/features/nine_judges/widgets/person_card_widget.dart';
+import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Section: improved first-time tutorial UX — a "今回覚えること" headline per
 /// step, a spotlighted target card + glowing single advance button, a STEP
@@ -21,13 +24,20 @@ void main() {
   Future<void> pumpTutorial(
     WidgetTester tester, {
     Duration beatDuration = Duration.zero,
+    TutorialCompletionRepository tutorialCompletionRepository =
+        const TutorialCompletionRepository(),
   }) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(
-      MaterialApp(home: TutorialScreen(beatDuration: beatDuration)),
+      MaterialApp(
+        home: TutorialScreen(
+          beatDuration: beatDuration,
+          tutorialCompletionRepository: tutorialCompletionRepository,
+        ),
+      ),
     );
   }
 
@@ -241,6 +251,37 @@ void main() {
     expect(find.byKey(const Key('tutorial-practice-again')), findsOneWidget);
     expect(find.byKey(const Key('tutorial-go-home')), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('最終ステップまで進むとチュートリアル完了ユーザー数がFirestoreへ記録される', (tester) async {
+    // ExternalTestProfile.loadForNewGame() reads SharedPreferences — without
+    // a mock, getInstance() never resolves in this test environment, which
+    // would otherwise leave _recordRemoteCompletion's chain pending forever.
+    SharedPreferences.setMockInitialValues({});
+    final firestore = FakeFirebaseFirestore();
+    await pumpTutorial(
+      tester,
+      tutorialCompletionRepository: TutorialCompletionRepository(
+        firestore: firestore,
+        uidOverride: 'firebase-auth-uid-1',
+        availableOverride: true,
+      ),
+    );
+    for (var i = 0; i < 10; i++) {
+      await tapNext(tester);
+    }
+    // _markCompleted fires the Firestore write fire-and-forget (unawaited),
+    // chained behind its own SharedPreferences profile load — a few settle
+    // pumps let that async chain finish before asserting.
+    await tester.pump(const Duration(milliseconds: 1));
+    await tester.pump(const Duration(milliseconds: 1));
+    await tester.pump(const Duration(milliseconds: 1));
+
+    final doc = await firestore
+        .collection('tutorialCompletions')
+        .doc('firebase-auth-uid-1')
+        .get();
+    expect(doc.exists, isTrue);
   });
 
   testWidgets('「もう一度練習」で最初のステップからやり直せる', (tester) async {

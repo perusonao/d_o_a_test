@@ -86,4 +86,73 @@ void main() {
       expect(actions.map((a) => a.actionIndex).toList(), [0, 1, 2]);
     });
   });
+
+  group('AdminPlaytestRepository.fetchByTester', () {
+    test('testerIdで絞り込み、playNumberの昇順で返す(ページネーションに依存しない)', () async {
+      final firestore = FakeFirebaseFirestore();
+      await _seedPlaytest(
+        firestore,
+        gameId: 'g1',
+        finishedAt: DateTime(2026, 1, 1),
+        overrideData: {'testerId': 'tester-a', 'playNumber': 3},
+      );
+      await _seedPlaytest(
+        firestore,
+        gameId: 'g2',
+        finishedAt: DateTime(2026, 1, 2),
+        overrideData: {'testerId': 'tester-a', 'playNumber': 1},
+      );
+      await _seedPlaytest(
+        firestore,
+        gameId: 'g3',
+        finishedAt: DateTime(2026, 1, 3),
+        overrideData: {'testerId': 'tester-a', 'playNumber': 2},
+      );
+      await _seedPlaytest(
+        firestore,
+        gameId: 'g4',
+        finishedAt: DateTime(2026, 1, 4),
+        overrideData: {'testerId': 'tester-b', 'playNumber': 1},
+      );
+
+      final repository = AdminPlaytestRepository(firestore: firestore);
+      final records = await repository.fetchByTester('tester-a');
+
+      expect(records.map((r) => r.gameId).toList(), ['g2', 'g3', 'g1']);
+    });
+
+    test('該当するゲームが無ければ空配列を返す', () async {
+      final firestore = FakeFirebaseFirestore();
+      await _seedPlaytest(firestore, gameId: 'g1', finishedAt: DateTime(2026, 1, 1));
+
+      final repository = AdminPlaytestRepository(firestore: firestore);
+      final records = await repository.fetchByTester('nobody');
+
+      expect(records, isEmpty);
+    });
+  });
+
+  group('AdminPlaytestRepository.fetchTutorialCompletionCount', () {
+    test('tutorialCompletionsコレクションの件数をcount()集計で返す', () async {
+      final firestore = FakeFirebaseFirestore();
+      await firestore.collection('tutorialCompletions').doc('uid-1').set({
+        'testerId': 'tester-1',
+      });
+      await firestore.collection('tutorialCompletions').doc('uid-2').set({
+        'testerId': 'tester-2',
+      });
+
+      final repository = AdminPlaytestRepository(firestore: firestore);
+      final count = await repository.fetchTutorialCompletionCount();
+
+      expect(count, 2);
+    });
+
+    test('0件のときは0を返す', () async {
+      final firestore = FakeFirebaseFirestore();
+      final repository = AdminPlaytestRepository(firestore: firestore);
+      final count = await repository.fetchTutorialCompletionCount();
+      expect(count, 0);
+    });
+  });
 }
