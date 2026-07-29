@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="description" content="9人の審判 / Nine Verdicts - 録画用の固定シード自動再生デモ画面">
+  <meta name="theme-color" content="#0B0B10">
+  <!-- Home-screen install metadata: this file's own URL
+       (/nine-verdicts/showcase/) is a real, distinct path (not just a hash
+       fragment), so iOS Safari's "Add to Home Screen" reliably bookmarks
+       and re-launches *this* page — unlike swapping <link rel="manifest">
+       via JS on a single shared index.html, which iOS does not reliably
+       pick up. See manifest.json's start_url/scope for the installed app's
+       identity. -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="NV Showcase">
+  <link rel="apple-touch-icon" href="../icons/Icon-192.png">
+  <link rel="icon" type="image/png" href="../favicon.png">
+  <link rel="manifest" href="manifest.json">
+  <title>Nine Verdicts Showcase</title>
+  <meta http-equiv="refresh" content="0; url=/nine-verdicts/#/showcase">
+  <script>
+    // Immediate redirect into the real Flutter app with the target hash
+    // route already set, so the app boots directly into the showcase
+    // screen (exactly like manually typing the #/showcase URL, which
+    // already works) instead of flashing the normal title screen first.
+    // location.replace() (not href=) so this stub never becomes a
+    // back-button entry.
+    location.replace('/nine-verdicts/#/showcase');
+  </script>
+  <style>
+    html, body { background: #0B0B10; height: 100%; margin: 0; }
+  </style>
+</head>
+<body>
+  <noscript>
+    JavaScriptを有効にしてください。<a href="/nine-verdicts/#/showcase">ショーケースを開く</a>
+  </noscript>
+</body>
+</html>
