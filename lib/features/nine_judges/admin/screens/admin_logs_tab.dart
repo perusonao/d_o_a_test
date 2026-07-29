@@ -17,6 +17,7 @@ class AdminLogsTab extends StatefulWidget {
     required this.loading,
     required this.onLoadMore,
     required this.onOpenDetail,
+    this.onViewTesterHistory,
     super.key,
   });
 
@@ -26,6 +27,10 @@ class AdminLogsTab extends StatefulWidget {
   final bool loading;
   final VoidCallback onLoadMore;
   final Future<void> Function(PlaytestRecord record) onOpenDetail;
+
+  /// Opens a tester's complete match history. Null hides the button on
+  /// [AdminGameDetailView].
+  final ValueChanged<String>? onViewTesterHistory;
 
   @override
   State<AdminLogsTab> createState() => _AdminLogsTabState();
@@ -84,6 +89,7 @@ class _AdminLogsTabState extends State<AdminLogsTab> {
                     record: record0,
                     anonymizer: widget.anonymizer,
                     actionsLoading: false,
+                    onViewTesterHistory: widget.onViewTesterHistory,
                   ),
                 ),
               ),
@@ -111,6 +117,7 @@ class _AdminLogsTabState extends State<AdminLogsTab> {
                       record: selected,
                       anonymizer: widget.anonymizer,
                       actionsLoading: _detailLoading,
+                      onViewTesterHistory: widget.onViewTesterHistory,
                     ),
             ),
           ],

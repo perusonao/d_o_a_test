@@ -100,4 +100,45 @@ class AdminPlaytestRepository {
         .map((doc) => GameActionLog.fromJson(doc.data()))
         .toList();
   }
+
+  /// One tester's complete match history (faction/first-or-second/result
+  /// per game) — fetched directly from Firestore rather than relying on
+  /// whatever pages the dashboard's own pagination happens to have loaded,
+  /// since a tester's earlier games can easily fall off the currently
+  /// loaded window. A single-field `where` (no `orderBy`) so no composite
+  /// Firestore index is required; sorted client-side by `playNumber`
+  /// instead.
+  Future<List<PlaytestRecord>> fetchByTester(String testerId) async {
+    final firestore = await _firestore;
+    final snapshot = await firestore
+        .collection('playtests')
+        .where('testerId', isEqualTo: testerId)
+        .get();
+    final records = <PlaytestRecord>[];
+    for (final doc in snapshot.docs) {
+      try {
+        records.add(PlaytestRecord.fromFirestore(doc.data()));
+      } catch (_) {
+        // Malformed docs are skipped here too (see _toPage above).
+      }
+    }
+    records.sort(
+      (a, b) => (a.session.playNumber ?? 0).compareTo(b.session.playNumber ?? 0),
+    );
+    return records;
+  }
+
+  /// A durable, cross-device count of how many distinct users have
+  /// completed the tutorial (see
+  /// services/tutorial_completion_repository.dart) — computed with
+  /// Firestore's server-side `count()` aggregation so this never needs to
+  /// download every `tutorialCompletions` document.
+  Future<int> fetchTutorialCompletionCount() async {
+    final firestore = await _firestore;
+    final aggregate = await firestore
+        .collection('tutorialCompletions')
+        .count()
+        .get();
+    return aggregate.count ?? 0;
+  }
 }

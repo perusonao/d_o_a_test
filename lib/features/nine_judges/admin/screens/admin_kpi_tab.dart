@@ -10,19 +10,66 @@ import 'package:flutter/material.dart';
 /// analysis (see eye_judge_reverse_analysis.dart's doc comments for exactly
 /// which figures need actions to already be loaded vs. which don't).
 class AdminKpiTab extends StatelessWidget {
-  const AdminKpiTab({required this.records, super.key});
+  const AdminKpiTab({
+    required this.records,
+    this.tutorialCompletionCount,
+    this.tutorialCompletionFailed = false,
+    super.key,
+  });
 
   final List<PlaytestRecord> records;
 
+  /// A durable, cross-device count of users who completed the tutorial
+  /// (see AdminPlaytestRepository.fetchTutorialCompletionCount) — null
+  /// while still loading (or if the caller never fetches it).
+  final int? tutorialCompletionCount;
+
+  /// True once a fetch for [tutorialCompletionCount] has failed — shown
+  /// distinctly from "still loading" so this KPI can't be misread as 0.
+  final bool tutorialCompletionFailed;
+
   @override
   Widget build(BuildContext context) {
-    if (records.isEmpty) {
-      return const Center(
-        child: Text(
-          'データがありません(0件)',
-          key: Key('admin-kpi-empty'),
-          style: TextStyle(color: Colors.white70),
+    // Section (this round): a durable, cross-device count of users who
+    // completed the tutorial, independent of whether they ever submitted a
+    // playtest — so it's always shown, even when [records] is empty.
+    final tutorialCard = Card(
+      color: Colors.white10,
+      margin: const EdgeInsets.symmetric(vertical: 3),
+      child: ListTile(
+        dense: true,
+        leading: const Icon(Icons.school_outlined, color: Colors.white38),
+        title: const Text(
+          'チュートリアル完了ユーザー数',
+          style: TextStyle(color: Colors.white, fontSize: 13),
         ),
+        subtitle: Text(
+          tutorialCompletionFailed
+              ? '取得に失敗しました'
+              : (tutorialCompletionCount == null
+                    ? '取得中…'
+                    : '$tutorialCompletionCount 人が完了'),
+          key: const Key('tutorial-completion-count'),
+          style: const TextStyle(color: Colors.white60, fontSize: 11),
+        ),
+      ),
+    );
+
+    if (records.isEmpty) {
+      return ListView(
+        key: const Key('admin-kpi-list'),
+        padding: const EdgeInsets.all(12),
+        children: [
+          tutorialCard,
+          const SizedBox(height: 16),
+          const Center(
+            child: Text(
+              'データがありません(0件)',
+              key: Key('admin-kpi-empty'),
+              style: TextStyle(color: Colors.white70),
+            ),
+          ),
+        ],
       );
     }
     final report = buildAdminKpiReport(records);
@@ -57,21 +104,7 @@ class AdminKpiTab extends StatelessWidget {
             ),
           ),
         const SizedBox(height: 8),
-        Card(
-          color: Colors.white10,
-          child: ListTile(
-            dense: true,
-            leading: const Icon(Icons.school_outlined, color: Colors.white38),
-            title: const Text(
-              'tutorialCompletionRate',
-              style: TextStyle(color: Colors.white, fontSize: 13),
-            ),
-            subtitle: const Text(
-              'チュートリアルデータは現在Firestoreへ送信されていません',
-              style: TextStyle(color: Colors.white38, fontSize: 11),
-            ),
-          ),
-        ),
+        tutorialCard,
         const SizedBox(height: 16),
         const _SectionTitle('EYE分析'),
         Text(

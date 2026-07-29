@@ -11,6 +11,7 @@ import 'package:dead_or_alive/features/nine_judges/screens/mode_select_screen.da
 import 'package:dead_or_alive/features/nine_judges/screens/play_log_screen.dart';
 import 'package:dead_or_alive/features/nine_judges/screens/result_screen.dart';
 import 'package:dead_or_alive/features/nine_judges/services/external_test_profile.dart';
+import 'package:dead_or_alive/features/nine_judges/tutorial/tutorial_screen.dart';
 import 'package:dead_or_alive/features/nine_judges/widgets/action_panel.dart';
 import 'package:dead_or_alive/features/nine_judges/widgets/board_area.dart';
 import 'package:dead_or_alive/features/nine_judges/widgets/card_assets.dart';
@@ -18,8 +19,22 @@ import 'package:dead_or_alive/features/nine_judges/widgets/game_style.dart';
 import 'package:flutter/material.dart';
 
 class NineJudgesGameScreen extends StatefulWidget {
-  const NineJudgesGameScreen({this.initialSettings, super.key});
+  const NineJudgesGameScreen({
+    this.initialSettings,
+    this.autoStartTutorial = false,
+    super.key,
+  });
   final NineJudgesGameSettings? initialSettings;
+
+  /// When true, a device that has never completed or skipped the tutorial
+  /// (see [ExternalTestProfile]) is taken straight into it — instead of the
+  /// mode-select menu — right after the first frame; the tutorial's own
+  /// skip button/confirm dialog (and any back navigation) still let the
+  /// player leave it at any time, same as opening it manually. Defaults to
+  /// false so every existing direct-construction test (which never mocks a
+  /// "first launch" profile) keeps seeing the mode-select screen
+  /// immediately; the real app (see lib/app/app.dart) opts in.
+  final bool autoStartTutorial;
 
   @override
   State<NineJudgesGameScreen> createState() => _NineJudgesGameScreenState();
@@ -29,11 +44,46 @@ class _NineJudgesGameScreenState extends State<NineJudgesGameScreen> {
   NineJudgesController? controller;
   bool _cpuSequenceRunning = false;
   bool _showingIntro = false;
+  bool _autoTutorialAttempted = false;
 
   @override
   void initState() {
     super.initState();
-    if (widget.initialSettings case final settings?) _startGame(settings);
+    if (widget.initialSettings case final settings?) {
+      _startGame(settings);
+    } else if (widget.autoStartTutorial) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _maybeAutoStartTutorial(),
+      );
+    }
+  }
+
+  /// First-ever launch — before this device has completed or skipped the
+  /// tutorial even once — opens it automatically. Every later launch
+  /// (including right after finishing/skipping it) goes straight to the
+  /// menu as normal.
+  Future<void> _maybeAutoStartTutorial() async {
+    if (_autoTutorialAttempted) return;
+    _autoTutorialAttempted = true;
+    final profile = await ExternalTestProfile.loadForNewGame();
+    if (!mounted || controller != null) return;
+    if (profile.hasCompletedTutorial || profile.hasSkippedTutorial) return;
+    final startCpuMatch = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => const TutorialScreen()),
+    );
+    if (!mounted || startCpuMatch != true) return;
+    // Mirrors mode_select_screen.dart's own "open-tutorial" tile: the
+    // tutorial always teaches savior play against the CPU, so its "start a
+    // CPU match" exit uses those same settings.
+    _startGame(
+      const NineJudgesGameSettings(
+        mode: GameMode.cpu,
+        factionSelection: FactionSelection.savior,
+        firstPlayerSelection: FirstPlayerSelection.human,
+      ),
+      showIntro: true,
+    );
   }
 
   @override

@@ -28,13 +28,20 @@ class NineVerdictsApp extends StatelessWidget {
       // resolve to a real route instead of silently falling through to the
       // game via onUnknownRoute.
       routes: {
-        '/': (context) => const NineJudgesGameScreen(),
+        // autoStartTutorial: true — a brand-new player who has never
+        // completed/skipped the tutorial is taken straight into it instead
+        // of the mode-select menu (see game_screen.dart); every later
+        // launch goes straight to the menu as before.
+        '/': (context) =>
+            const NineJudgesGameScreen(autoStartTutorial: true),
         '/admin': (context) => const AdminScreen(),
         '/admins': (context) => const AdminScreen(),
         '/showcase': (context) => const DemoShowcaseScreen(),
       },
-      onUnknownRoute: (settings) =>
-          MaterialPageRoute(builder: (context) => const NineJudgesGameScreen()),
+      onUnknownRoute: (settings) => MaterialPageRoute(
+        builder: (context) =>
+            const NineJudgesGameScreen(autoStartTutorial: true),
+      ),
     );
   }
 }
