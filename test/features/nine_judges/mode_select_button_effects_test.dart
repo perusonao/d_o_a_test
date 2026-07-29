@@ -1,9 +1,39 @@
+import 'package:dead_or_alive/features/nine_judges/admin/screens/admin_screen.dart';
 import 'package:dead_or_alive/features/nine_judges/models/judge_models.dart';
 import 'package:dead_or_alive/features/nine_judges/screens/mode_select_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  testWidgets('βバッジの通常タップは「テストについて」ダイアログを表示する(長押しと区別される)', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(home: NineJudgesModeSelectScreen(onStart: (_) {})),
+    );
+    await tester.tap(find.byKey(const Key('beta-badge')));
+    await tester.pump();
+    expect(find.text('テストについて'), findsOneWidget);
+  });
+
+  testWidgets('βバッジの長押しで管理画面(/admin)へ遷移する', (tester) async {
+    // Mirrors app.dart's real route table for '/admin' — the badge's
+    // long-press is now the only way in (see mode_select_screen.dart's
+    // _BetaBadge doc comment), replacing the previous URL/PWA-install
+    // approach that testers found unreliable.
+    await tester.pumpWidget(
+      MaterialApp(
+        home: NineJudgesModeSelectScreen(onStart: (_) {}),
+        routes: {'/admin': (context) => const AdminScreen()},
+      ),
+    );
+    await tester.longPress(find.byKey(const Key('beta-badge')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.byType(AdminScreen), findsOneWidget);
+  });
+
   testWidgets('ゲーム開始/オンライン対戦ボタンは鼓動/グロー演出があってもタップが機能する', (tester) async {
     NineJudgesGameSettings? started;
     await tester.pumpWidget(
