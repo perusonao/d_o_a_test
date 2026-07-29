@@ -92,10 +92,14 @@ Admin SDK秘密鍵、CIトークンはコミットしないでください。
 ## 外部テスト管理画面 (Admin Dashboard)
 
 `playtests`に保存された外部テストデータを閲覧・集計するための、完全に読み取り専用の
-管理画面です。通常のプレイ画面からはリンクされておらず、URLを直接開いた場合のみ
-アクセスできます。
+管理画面です。通常のプレイ画面からはリンクされていません。
 
-- URL: `https://perusonao.github.io/nine-verdicts/#/admin`
+- **開き方**: タイトル画面(モード選択画面)右上の「外部テストβ　ルール1.2」バッジを
+  **長押し**します(通常タップは説明ダイアログのままです)。以前用意していたURL直接
+  入力・専用PWAインストール導線(`web/admin/`配下の別ページ・別manifest)は実運用で
+  うまく機能しなかったため廃止し、アプリ内操作のみに一本化しました。
+- ローカル確認・直接URLでの起動も引き続き可能です:
+  `https://perusonao.github.io/nine-verdicts/#/admin`
   (ローカル確認時は `flutter run -d chrome` 後にアドレスバーで `#/admin` を追加)
 - 認証方式: 通常プレイの匿名認証とは完全に分離された、Google Sign-In専用の
   Firebase Authインスタンス(`lib/features/nine_judges/admin/services/admin_firebase.dart`
@@ -114,9 +118,10 @@ Admin SDK秘密鍵、CIトークンはコミットしないでください。
 3. GitHub Pagesで公開している場合は、「Authentication」→「Settings」タブの
    「承認済みドメイン (Authorized domains)」に`perusonao.github.io`を追加します
    (`localhost`は開発用として最初から登録されています)。
-4. 管理画面(`#/admin`)を開き、「Googleでログイン」でご自身のGoogleアカウントに
-   ログインします。この時点では「このアカウントには管理権限がありません」と
-   表示されます(まだ`admins`ドキュメントが無いため、これは正しい動作です)。
+4. 管理画面(タイトル画面の「外部テストβ」バッジ長押し、または`#/admin`)を開き、
+   「Googleでログイン」でご自身のGoogleアカウントにログインします。この時点では
+   「このアカウントには管理権限がありません」と表示されます(まだ`admins`
+   ドキュメントが無いため、これは正しい動作です)。
 5. Firebase Consoleの「Authentication」→「Users」タブで、ログインした
    アカウントのUID(ユーザーID列)を確認してコピーします。
 6. 「Firestore Database」→「データ」タブを開き、「コレクションを開始」で

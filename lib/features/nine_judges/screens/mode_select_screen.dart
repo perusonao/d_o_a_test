@@ -283,6 +283,13 @@ class _Mote {
 /// Small, always-visible marker that this build is the external-test cohort
 /// (see game/game_config.dart#testCohort), with a tap target explaining what
 /// data collection this implies. Never collects personal information.
+///
+/// A long-press also opens the admin dashboard (`/admin`, see app.dart) —
+/// the only way into it now that a browser URL/PWA-install approach proved
+/// unreliable for testers in practice. Nothing here weakens access control:
+/// `AdminScreen` still gates on Google Sign-In + firestore.rules' isAdmin(),
+/// so a non-admin who finds this gesture just sees "権限がありません", not
+/// the dashboard itself.
 class _BetaBadge extends StatelessWidget {
   const _BetaBadge();
 
@@ -293,6 +300,7 @@ class _BetaBadge extends StatelessWidget {
       key: const Key('beta-badge'),
       borderRadius: BorderRadius.circular(20),
       onTap: () => _showAboutTest(context),
+      onLongPress: () => Navigator.pushNamed(context, '/admin'),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
         decoration: BoxDecoration(

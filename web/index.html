@@ -14,15 +14,21 @@
   <title>9人の審判 / Nine Verdicts</title>
   <link rel="manifest" href="manifest.json">
   <script>
-    // Hidden routes (/showcase, /admin) get their own manifest so "Add to
-    // Home Screen" launches straight back into that route instead of the
-    // regular game's start_url. Runs before flutter_bootstrap.js so Safari
-    // sees the right manifest link as soon as the page is shared.
+    // The /showcase hidden route gets its own manifest so "Add to Home
+    // Screen" launches straight back into it instead of the regular game's
+    // start_url. Runs before flutter_bootstrap.js so Safari sees the right
+    // manifest link as soon as the page is shared.
+    //
+    // The admin dashboard previously had the same treatment (a dedicated
+    // web/admin/ subdirectory + manifest_admin.json), but that separate
+    // PWA-install path proved unreliable for testers in practice — admins
+    // now reach the dashboard via a long-press on the title screen's beta
+    // badge instead (see mode_select_screen.dart's _BetaBadge), which needs
+    // no special manifest handling at all.
     (function () {
       var manifestForHash = function () {
         var hash = window.location.hash || '';
         if (hash.indexOf('#/showcase') === 0) return 'manifest_showcase.json';
-        if (hash.indexOf('#/admin') === 0) return 'manifest_admin.json';
         return 'manifest.json';
       };
       var updateManifestLink = function () {
