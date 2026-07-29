@@ -19,12 +19,34 @@ class HeuristicCpuStrategy implements CpuStrategy {
   CpuDecision decideAction(CpuGameView view) {
     final candidates = evaluateActions(view)
       ..sort((a, b) => b.score.compareTo(a.score));
-    final selected = candidates.first;
+    final selected = _select(candidates);
     return CpuDecision(
       action: selected.action,
       targetIndex: selected.targetIndex,
       score: selected.score,
+      reasons: selected.reasons,
     );
+  }
+
+  /// Section 14/15: rather than always taking the literal best move, sample
+  /// among the top-ranked candidates according to [CpuProfile.selectionWeights]
+  /// — the same shared, seeded [Random] every other CPU decision uses, so a
+  /// fixed seed still reproduces the exact same sequence of choices. Falls
+  /// back to the single best candidate whenever no [_random] was supplied
+  /// (e.g. simulation/test call sites that construct a strategy without one).
+  CpuCandidateScore _select(List<CpuCandidateScore> candidates) {
+    final random = _random;
+    final weights = profile.selectionWeights;
+    if (random == null || weights.length <= 1 || candidates.length <= 1) {
+      return candidates.first;
+    }
+    final roll = random.nextDouble();
+    var cumulative = 0.0;
+    for (var i = 0; i < weights.length && i < candidates.length; i++) {
+      cumulative += weights[i];
+      if (roll < cumulative) return candidates[i];
+    }
+    return candidates.first;
   }
 
   @override
@@ -35,25 +57,33 @@ class HeuristicCpuStrategy implements CpuStrategy {
       for (final entry in view.legalTargets.entries)
         for (final target in entry.value)
           () {
-            var score = CpuEvaluator.actionScore(
+            final scored = CpuEvaluator.actionScoreDetailed(
               view,
               entry.key,
               view.slots[target],
               profile: profile,
             );
+            var score = scored.score;
+            final reasons = [...scored.reasons];
             if (profile.threatWeight > 0) {
               final after = _projectedBoard(view, entry.key, target);
-              score -=
-                  profile.threatWeight *
-                  CpuEvaluator.opponentThreat(after, view.faction, bonus);
+              final threat = CpuEvaluator.opponentThreat(after, view.faction, bonus);
+              if (threat > 0) {
+                final threatAdjustment = -profile.threatWeight * threat;
+                score += threatAdjustment;
+                reasons.add(CpuScoreReason('opponentThreat', threatAdjustment));
+              }
             }
             if (random != null && profile.jitter > 0) {
-              score += random.nextDouble() * profile.jitter;
+              final jitterValue = random.nextDouble() * profile.jitter;
+              score += jitterValue;
+              reasons.add(CpuScoreReason('jitter', jitterValue));
             }
             return CpuCandidateScore(
               action: entry.key,
               targetIndex: target,
               score: score,
+              reasons: reasons,
             );
           }(),
     ];

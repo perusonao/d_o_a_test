@@ -136,9 +136,25 @@ class _NineJudgesGameScreenState extends State<NineJudgesGameScreen> {
     if (mounted) setState(() {});
   }
 
+  /// Reachable only from [ResultScreen]'s "ホームへ戻る" — the game already
+  /// finished normally, so (unlike [_returnToMenu]) this never calls
+  /// `markAbandoned()`.
+  void _returnToMenuFromResult() {
+    controller?.removeListener(_handleControllerChanged);
+    controller?.dispose();
+    controller = null;
+    if (mounted) setState(() {});
+  }
+
   void _handleControllerChanged() {
     final game = controller;
     if (game == null ||
+        // While the pre-game intro is up, defer even the CPU's very first
+        // move until it's done (see the intro's onDone below) — otherwise a
+        // CPU-goes-first game could resolve and clear its own turn message
+        // while the intro is still covering the board, so the player would
+        // never actually see it happen.
+        _showingIntro ||
         !game.isCpuTurn ||
         game.awaitingHandoff ||
         game.awaitingConfirmationReveal ||
@@ -190,7 +206,10 @@ class _NineJudgesGameScreenState extends State<NineJudgesGameScreen> {
       animation: game,
       builder: (context, _) {
         if (game.isFinished && !game.awaitingConfirmationReveal) {
-          return ResultScreen(controller: game);
+          return ResultScreen(
+            controller: game,
+            onGoHome: _returnToMenuFromResult,
+          );
         }
         if (game.awaitingHandoff && !game.awaitingConfirmationReveal) {
           return HandoffScreen(
@@ -207,7 +226,12 @@ class _NineJudgesGameScreenState extends State<NineJudgesGameScreen> {
               child: CharacterIntroOverlay(
                 humanFaction: game.isCpuGame ? game.humanFaction : null,
                 onDone: () {
-                  if (mounted) setState(() => _showingIntro = false);
+                  if (!mounted) return;
+                  setState(() => _showingIntro = false);
+                  // A CPU-goes-first turn was deferred by the intro guard
+                  // in _handleControllerChanged — pick it up now that the
+                  // intro is actually gone.
+                  _handleControllerChanged();
                 },
               ),
             ),
@@ -1179,6 +1203,14 @@ class _DebugDialog extends StatelessWidget {
                   'bonus=${controller.board[i].person.awardedBonus}',
             for (final log in controller.logs)
               'Turn ${log.turn} ${log.player.name}: ${log.message}',
+            if (controller.lastCpuEvaluations.isNotEmpty) ...[
+              '',
+              'CPU評価(上位候補・非表示は一般プレイヤーには出さない):',
+              for (final candidate in controller.lastCpuEvaluations.take(5))
+                '${candidate.action.name} -> slot${candidate.targetIndex}: '
+                    '${candidate.score.toStringAsFixed(1)} '
+                    '(${candidate.reasons.map((r) => '${r.key}:${r.value.toStringAsFixed(1)}').join(', ')})',
+            ],
           ].join('\n'),
           style: const TextStyle(fontSize: 10),
         ),

@@ -111,6 +111,13 @@ class NineJudgesController extends ChangeNotifier {
   ActionType? lastConfirmationAction;
   Faction? lastConfirmationActor;
   List<CpuCandidateScore> lastCpuEvaluations = const [];
+
+  /// The [CpuDecision] behind the very next [_applyAction] call, if that
+  /// action was chosen by [performCpuAction]/[performAutoAction] — read and
+  /// cleared by [_recordAction] so its score/reasons reach `GameActionLog`
+  /// (see `cpuEvaluationScore`/`cpuDecisionReason`) only for the action it
+  /// actually produced, never leaking onto a human's subsequent move.
+  CpuDecision? _pendingCpuDecision;
   bool _bonusRevealTriggeredThisTurn = false;
   Faction? _bonusViewerThisTurn;
   int? _revealedBonusThisTurn;
@@ -650,6 +657,11 @@ class NineJudgesController extends ChangeNotifier {
     required int? turnDecisionTimeMs,
     required int? eyeCandidateCount,
   }) {
+    // Only ever set immediately before the exact action it produced (see
+    // performCpuAction/performAutoAction) — cleared here on every action
+    // (human or CPU) so it can never leak onto a later, unrelated move.
+    final cpuDecision = _pendingCpuDecision;
+    _pendingCpuDecision = null;
     session = session.copyWith(
       actions: [
         ...session.actions,
@@ -764,12 +776,27 @@ class NineJudgesController extends ChangeNotifier {
           bonusViewer: _bonusViewerThisTurn?.name,
           revealedBonus: _revealedBonusThisTurn,
           wasReverseAction: isReverseAction(action, actor),
-          cpuDecisionReason: action == ActionType.eye
-              ? 'unknown attribute'
-              : 'state and bonus evaluation',
+          cpuEvaluationScore: cpuDecision?.score,
+          cpuDecisionReason: cpuDecision == null
+              ? null
+              : _formatCpuReasons(cpuDecision.reasons),
         ),
       ],
     );
+  }
+
+  /// A short, human-readable summary of a CPU decision's top-magnitude
+  /// score contributions (see [CpuScoreReason]), for `GameActionLog`'s
+  /// existing free-text `cpuDecisionReason` field (debug/analysis use only
+  /// — never shown to a normal player).
+  String _formatCpuReasons(List<CpuScoreReason> reasons) {
+    if (reasons.isEmpty) return 'evaluation';
+    final sorted = [...reasons]
+      ..sort((a, b) => b.value.abs().compareTo(a.value.abs()));
+    return sorted
+        .take(3)
+        .map((r) => '${r.key}:${r.value.toStringAsFixed(1)}')
+        .join(', ');
   }
 
   void _finishAction(
@@ -976,6 +1003,7 @@ class NineJudgesController extends ChangeNotifier {
       ..sort((a, b) => b.score.compareTo(a.score));
     final decision = strategy.decideAction(view);
     cpuActing = true;
+    _pendingCpuDecision = decision;
     chooseAction(decision.action);
     selectSlot(decision.targetIndex);
     cpuActing = false;
@@ -998,6 +1026,7 @@ class NineJudgesController extends ChangeNotifier {
     final view = cpuView(faction: actor);
     final decision = strategy.decideAction(view);
     cpuActing = true;
+    _pendingCpuDecision = decision;
     chooseAction(decision.action);
     selectSlot(decision.targetIndex);
     cpuActing = false;

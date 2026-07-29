@@ -35,15 +35,28 @@ class CpuGameView {
   final int? eyeUsesRemaining;
 }
 
+/// One labelled contribution to a candidate's total score (e.g.
+/// `('lockBonus', 8.5)`) — kept alongside the score itself so the CPU's
+/// reasoning can be logged/inspected (debug dialog, `GameActionLog`)
+/// without re-deriving it from scratch. Never influences gameplay; purely
+/// explanatory.
+class CpuScoreReason {
+  const CpuScoreReason(this.key, this.value);
+  final String key;
+  final double value;
+}
+
 class CpuDecision {
   const CpuDecision({
     required this.action,
     required this.targetIndex,
     required this.score,
+    this.reasons = const [],
   });
   final ActionType action;
   final int targetIndex;
   final double score;
+  final List<CpuScoreReason> reasons;
 }
 
 class CpuCandidateScore {
@@ -51,10 +64,12 @@ class CpuCandidateScore {
     required this.action,
     required this.targetIndex,
     required this.score,
+    this.reasons = const [],
   });
   final ActionType action;
   final int targetIndex;
   final double score;
+  final List<CpuScoreReason> reasons;
 }
 
 abstract interface class CpuStrategy {

@@ -42,6 +42,32 @@ void main() {
     expect(find.textContaining('あなたは'), findsNothing);
   });
 
+  testWidgets('CPUが先手のとき、演出が表示されている間は初手を行わず、演出終了後に開始する', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const MaterialApp(home: NineJudgesGameScreen()));
+    await tester.tap(find.text('CPU')); // 先攻セレクタでCPUを選ぶ
+    await tester.ensureVisible(find.byKey(const Key('start-game')));
+    await tester.tap(find.byKey(const Key('start-game')));
+    await tester.pump();
+    expect(find.byKey(const Key('character-intro-overlay')), findsOneWidget);
+
+    // 演出表示中は、CPUの通常の着手待ち時間(550ms)を優に超えて待っても
+    // 初手はまだ処理されない — 演出とCPUの初手が競合しないことの確認。
+    await tester.pump(const Duration(milliseconds: 700));
+    await tester.pump(const Duration(milliseconds: 700));
+    expect(find.byKey(const Key('cpu-action-message')), findsNothing);
+
+    // 演出をスキップすると、そこから初めてCPUの初手が処理される。
+    await tester.tap(find.byKey(const Key('character-intro-overlay')));
+    await tester.pump();
+    await tester.pump();
+    expect(find.byKey(const Key('character-intro-overlay')), findsNothing);
+    await tester.pump(const Duration(milliseconds: 700));
+    expect(find.byKey(const Key('cpu-action-message')), findsOneWidget);
+    await tester.pump(const Duration(seconds: 1));
+  });
+
   testWidgets('ResultCharacterOverlay: 勝利時は勝者の陣営とメッセージを表示しタップで完了する', (
     tester,
   ) async {
