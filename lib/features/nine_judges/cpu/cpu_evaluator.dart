@@ -76,21 +76,22 @@ class CpuProfile {
 
   /// Difficulty-tiered choice variance (spec sections 14/15): probability of
   /// picking the 1st/2nd/3rd/... ranked candidate (by score, best first)
-  /// instead of always taking the literal top score. `[1]` (the default)
-  /// always takes the best. Values need not sum to 1 — any leftover
-  /// probability mass falls back to the top candidate.
+  /// instead of always taking the literal top score. `[1]` (the default,
+  /// and every current profile's value) always takes the best. Values need
+  /// not sum to 1 — any leftover probability mass falls back to the top
+  /// candidate.
   ///
-  /// [CpuLevel] predates the requested RANDOM/BASIC/BALANCED/HARD/EXPERT
-  /// difficulty ladder, and renaming/reordering it would break existing
-  /// saves and logs that reference these names — so instead each existing
-  /// profile is tuned along this new axis to approximate that ladder:
-  /// [balanced] (this game's default, most commonly played tier) gets the
-  /// widest spread — closest to "pick a good move, not always THE move".
-  /// [aggressive]/[defensive] sit tighter around the top choice. [expert]
-  /// is nearly deterministic ("principally always the top move"), matching
-  /// spec's EXPERT description. [CpuLevel.random] never reaches this at all
-  /// — [RandomCpuStrategy] already samples uniformly over every legal move,
-  /// which already matches the requested RANDOM/EASY tier as-is.
+  /// An earlier tuning gave [balanced] only a 45% chance of taking the top
+  /// move specifically to manufacture a difficulty gradient, but cross-play
+  /// testing against the pre-evaluator-rewrite CPU showed that any amount of
+  /// this variance costs real win rate against a deterministic opponent —
+  /// every profile now takes the literal top move every time, matching the
+  /// old CPU's selection behaviour, so the evaluator's own scoring quality
+  /// is what has to carry both strength and any future difficulty spread.
+  /// The mechanism is kept (rather than removed) since it's tested and the
+  /// spec explicitly asks for it as a future difficulty-tuning knob — see
+  /// [strengthLabel]-ordered tiers in [CpuLevel] for the current, purely
+  /// weight-driven difficulty ladder.
   final List<double> selectionWeights;
 
   static const balanced = CpuProfile(
@@ -107,7 +108,7 @@ class CpuProfile {
     blindValue: 2,
     threatWeight: 0,
     jitter: 0.3,
-    selectionWeights: [0.45, 0.25, 0.15, 0.10, 0.05],
+    selectionWeights: [1],
   );
 
   static const aggressive = CpuProfile(
@@ -124,7 +125,7 @@ class CpuProfile {
     blindValue: 3,
     threatWeight: 0,
     jitter: 0.4,
-    selectionWeights: [0.65, 0.20, 0.10, 0.05],
+    selectionWeights: [1],
   );
 
   static const defensive = CpuProfile(
@@ -141,7 +142,7 @@ class CpuProfile {
     blindValue: 1,
     threatWeight: 0.6,
     jitter: 0.3,
-    selectionWeights: [0.65, 0.20, 0.10, 0.05],
+    selectionWeights: [1],
   );
 
   static const expert = CpuProfile(
@@ -158,7 +159,7 @@ class CpuProfile {
     blindValue: 1.5,
     threatWeight: 0.9,
     jitter: 0.15,
-    selectionWeights: [0.88, 0.09, 0.03],
+    selectionWeights: [1],
   );
 }
 
@@ -242,9 +243,8 @@ abstract final class CpuEvaluator {
   /// target is worth less to scout once the remaining pool makes its
   /// attribute nearly obvious (e.g. only one attribute left among the
   /// unknowns), and worth more while the pool is still close to an even
-  /// three-way split. Also nudged up slightly for a target several actions
-  /// have already been spent on blind (someone may confirm it without ever
-  /// learning its attribute) and for the very last EYE use available.
+  /// three-way split. Also nudged up slightly for the very last EYE use
+  /// available.
   static CpuScoredAction _eyeScore(
     CpuGameView view,
     CpuSlotView slot,
@@ -260,15 +260,17 @@ abstract final class CpuEvaluator {
     final uncertainty = unknownCount == 0
         ? 0.0
         : (1.0 - (maxShare - 1 / 3) / (2 / 3)).clamp(0.0, 1.0);
-    final uncertaintyFactor = 0.4 + 0.9 * uncertainty; // in [0.4, 1.3]
+    // Kept close to the old flat multiplier (1.0) at the midpoint — a wider
+    // swing measured out weaker than the pre-rewrite flat valuation in
+    // cross-play testing — so only a target whose attribute is already
+    // close to fully determined scores meaningfully below that baseline.
+    final uncertaintyFactor = 0.9 + 0.3 * uncertainty; // in [0.9, 1.2]
     final infoValue = profile.eyeValue * uncertaintyFactor;
-    final urgencyValue = 0.15 * slot.person.verdictActionCount;
     final lastUseValue = _eyeUrgency(view.eyeUsesRemaining);
     return (
-      score: infoValue + urgencyValue + lastUseValue,
+      score: infoValue + lastUseValue,
       reasons: [
         CpuScoreReason('infoValue', infoValue),
-        if (urgencyValue > 0) CpuScoreReason('targetUrgency', urgencyValue),
         if (lastUseValue > 0) CpuScoreReason('lastEyeUse', lastUseValue),
       ],
     );

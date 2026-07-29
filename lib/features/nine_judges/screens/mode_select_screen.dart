@@ -567,7 +567,7 @@ class _CpuLevelDropdown extends StatelessWidget {
               key: Key('cpu-level-${option.name}'),
               value: option,
               child: Text(
-                '${option.strategyLabel}（${option.uiLabel}）',
+                '${option.uiLabel}（${option.strengthLabel}）',
                 overflow: TextOverflow.ellipsis,
               ),
             ),

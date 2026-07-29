@@ -78,17 +78,39 @@ enum FirstPlayerSelection { human, cpu, random }
 enum GameMode { hotseat, cpu }
 
 /// CPU の思考パターン。強さと性格を兼ねた1軸として提示する。
+///
+/// Declaration order is the actual measured strength order (weakest to
+/// strongest — see cross-play round-robin testing), not alphabetical or
+/// historical order, so that UI simply iterating [CpuLevel.values] lists
+/// difficulties correctly without a separate ranking table. This order does
+/// not match each entry's Japanese persona name in an intuitive way (e.g.
+/// "熟練"/EXPERT plays a more cautious, threat-aware style that nets a
+/// slightly lower measured win rate than "バランス"/BALANCED's more direct
+/// play) — [strengthLabel] communicates the actual tier to players
+/// regardless of the persona name. Only [strengthLabel] is new; [uiLabel],
+/// [strategyLabel] (persisted in game logs), and [description] are
+/// unchanged, so nothing about existing saves/logs is affected by the
+/// reordering (nothing serializes enum index/order, only [strategyLabel]).
 enum CpuLevel {
-  random('ランダム', 'RANDOM', '合法手から無作為に選びます'),
-  balanced('バランス', 'BALANCED', '人物価値と陣営目的を釣り合わせて評価します'),
-  aggressive('攻撃的', 'AGGRESSIVE', '確定と得点を急ぎ、審判も早めに切ります'),
-  defensive('守備的', 'DEFENSIVE', '有利な確定を守り、危険な人物を先に処理します'),
-  expert('熟練', 'EXPERT', '相手の応手まで先読みして最善手を選びます');
+  random('ランダム', 'RANDOM', '合法手から無作為に選びます', 'EASY'),
+  aggressive('攻撃的', 'AGGRESSIVE', '確定と得点を急ぎ、審判も早めに切ります', 'NORMAL'),
+  expert('熟練', 'EXPERT', '相手の応手まで先読みして最善手を選びます', 'HARD'),
+  defensive('守備的', 'DEFENSIVE', '有利な確定を守り、危険な人物を先に処理します', 'HARDER'),
+  balanced('バランス', 'BALANCED', '人物価値と陣営目的を釣り合わせて評価します', 'HARDEST');
 
-  const CpuLevel(this.uiLabel, this.strategyLabel, this.description);
+  const CpuLevel(
+    this.uiLabel,
+    this.strategyLabel,
+    this.description,
+    this.strengthLabel,
+  );
   final String uiLabel;
   final String strategyLabel;
   final String description;
+
+  /// Difficulty tier label shown alongside [uiLabel] in the CPU-strength
+  /// picker, in increasing order of actual measured strength.
+  final String strengthLabel;
 }
 
 class NineJudgesGameSettings {
