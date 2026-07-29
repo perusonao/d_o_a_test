@@ -6,11 +6,13 @@
 enum ShowcaseEvent {
   titleShown,
   catchCopyShown,
+  characterIntroShown,
   cardsPlaced,
   eyeUsed,
   judgeUsed,
   reversalUsed,
   scoreAwarded,
+  resultCharacterShown,
   victory,
   defeat,
   ratingShown,

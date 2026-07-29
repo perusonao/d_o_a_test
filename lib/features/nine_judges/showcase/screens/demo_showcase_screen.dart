@@ -1,5 +1,8 @@
 import 'dart:async';
 
+import 'package:dead_or_alive/features/nine_judges/characters/character_intro_overlay.dart';
+import 'package:dead_or_alive/features/nine_judges/characters/result_character_overlay.dart';
+import 'package:dead_or_alive/features/nine_judges/characters/special_verdict_overlay.dart';
 import 'package:dead_or_alive/features/nine_judges/game/game_controller.dart';
 import 'package:dead_or_alive/features/nine_judges/logging/game_log_models.dart';
 import 'package:dead_or_alive/features/nine_judges/models/judge_models.dart';
@@ -12,7 +15,15 @@ import 'package:dead_or_alive/features/nine_judges/widgets/board_area.dart';
 import 'package:dead_or_alive/features/nine_judges/widgets/game_style.dart';
 import 'package:flutter/material.dart';
 
-enum _Phase { intro, board, result, rating, recruitment }
+enum _Phase {
+  intro,
+  characterIntro,
+  board,
+  resultCharacter,
+  result,
+  rating,
+  recruitment,
+}
 
 /// Section ⑧: a hidden, recording-only route (never linked from any normal
 /// player screen — reached only by typing `#/showcase` directly, matching
@@ -20,9 +31,14 @@ enum _Phase { intro, board, result, rating, recruitment }
 /// CPU-vs-CPU match end to end via [NineJudgesController.performAutoAction]
 /// (added solely for this screen — see game_controller.dart) so the exact
 /// same sequence reproduces every time it's recorded: title(2.0s) +
-/// catch-copy(0.8s) + board(~10.9s) + result(1.8s) + rating(1.5s) +
-/// recruitment(2.5s) ≈ 19.5s total, comfortably inside section 8's "20秒以内"
-/// target. Layers the section ③-⑦ visual effects on top of the real
+/// catch-copy(0.8s) + character-intro(2.0s) + board(~10.9s) +
+/// result-character(3.0s) + result(1.8s) + rating(1.5s) + recruitment(2.5s)
+/// ≈ 24.5s total. Originally tuned to ~19.5s for section 8's "20秒以内"
+/// recruitment-clip target; the character-intro and result-character beats
+/// (the real [CharacterIntroOverlay]/[ResultCharacterOverlay]/
+/// [SpecialVerdictOverlay] widgets, not mockups) push it over that, an
+/// explicit tradeoff so this screen can also demo/record those moments
+/// properly. Layers the section ③-⑦ visual effects on top of the real
 /// board/card widgets so the footage shows the actual product, not a
 /// mockup.
 ///
@@ -74,15 +90,20 @@ class _DemoShowcaseScreenState extends State<DemoShowcaseScreen> {
   bool _judgeSpotlightShown = false;
   bool _reverseSpotlightShown = false;
 
-  // Section 8 asks for "20秒程度" total; these sum to ~19.5s (see
-  // DemoShowcaseScreen's doc comment) so real playback stays at/under 20s
-  // even with rounding.
+  // Originally tuned to ~19.5s for the "20秒以内" recruitment-video target.
+  // Adding the character-intro and result-character beats (below) pushes
+  // the full sequence to ~24.5s — an explicit tradeoff to properly show off
+  // those two new moments when this screen is used to demo/record them,
+  // rather than trimming them down to protect the original recruitment-clip
+  // length.
   static const _titleDuration = Duration(milliseconds: 2000);
   static const _catchCopyDuration = Duration(milliseconds: 800);
+  static const _characterIntroDuration = Duration(milliseconds: 2000);
   static const _boardBudget = Duration(milliseconds: 10900);
   static const _eyeSpotlight = Duration(milliseconds: 1500);
   static const _judgeSpotlight = Duration(milliseconds: 1800);
   static const _reverseSpotlight = Duration(milliseconds: 1300);
+  static const _resultCharacterDuration = Duration(milliseconds: 3000);
   static const _resultDuration = Duration(milliseconds: 1800);
   static const _ratingDuration = Duration(milliseconds: 1500);
   static const _recruitmentDuration = Duration(milliseconds: 2500);
@@ -120,6 +141,18 @@ class _DemoShowcaseScreenState extends State<DemoShowcaseScreen> {
     if (_disposed) return;
     _fire(ShowcaseEvent.catchCopyShown);
     await Future<void>.delayed(_catchCopyDuration);
+    if (_disposed) return;
+    await _runCharacterIntro();
+  }
+
+  /// The real [CharacterIntroOverlay], personalized as the savior (this
+  /// fixed seed's eventual winner) so the demo reads as one coherent story:
+  /// "you are the savior" → the match plays out → "victory".
+  Future<void> _runCharacterIntro() async {
+    if (!mounted) return;
+    setState(() => _phase = _Phase.characterIntro);
+    _fire(ShowcaseEvent.characterIntroShown);
+    await Future<void>.delayed(_characterIntroDuration);
     if (_disposed) return;
     await _runBoard();
   }
@@ -165,7 +198,7 @@ class _DemoShowcaseScreenState extends State<DemoShowcaseScreen> {
       if (mounted) setState(() => _activeEffect = null);
     }
     if (_disposed) return;
-    await _runResult();
+    await _runResultCharacter();
   }
 
   /// Returns how long to hold on this beat, and schedules whichever effect
@@ -201,17 +234,12 @@ class _DemoShowcaseScreenState extends State<DemoShowcaseScreen> {
       _fire(ShowcaseEvent.scoreAwarded);
       setState(() {
         _shake = true;
-        _activeEffect = Stack(
-          children: [
-            const JudgeShockwaveEffect(duration: _judgeSpotlight),
-            const ParticleBurstEffect(duration: _judgeSpotlight, particleCount: 24),
-            EffectCaption(
-              title: 'JUDGE',
-              subtitle: '運命を確定',
-              accent: GameColors.gold,
-              duration: _judgeSpotlight,
-            ),
-          ],
+        // The real SpecialVerdictOverlay (see characters/), not a bespoke
+        // mockup effect — this is exactly what a real SPECIAL VERDICT
+        // confirmation looks like during actual play.
+        _activeEffect = SpecialVerdictOverlay(
+          actor: Faction.values.byName(action.faction),
+          onDone: () {},
         );
       });
       Future<void>.delayed(
@@ -234,6 +262,19 @@ class _DemoShowcaseScreenState extends State<DemoShowcaseScreen> {
       return _reverseSpotlight;
     }
     return Duration(milliseconds: regularMs);
+  }
+
+  /// The real [ResultCharacterOverlay], shown once right as the match ends
+  /// and before the existing result banner — matches the personalized
+  /// savior intro with a savior-victory payoff (this seed always ends in a
+  /// savior win, so `isVictory` is always true here).
+  Future<void> _runResultCharacter() async {
+    if (!mounted) return;
+    setState(() => _phase = _Phase.resultCharacter);
+    _fire(ShowcaseEvent.resultCharacterShown);
+    await Future<void>.delayed(_resultCharacterDuration);
+    if (_disposed) return;
+    await _runResult();
   }
 
   Future<void> _runResult() async {
@@ -281,8 +322,21 @@ class _DemoShowcaseScreenState extends State<DemoShowcaseScreen> {
           catchCopyDuration: _catchCopyDuration,
           catchCopy: _catchCopies[DemoShowcaseScreen.demoSeed % _catchCopies.length],
         );
+      case _Phase.characterIntro:
+        return CharacterIntroOverlay(
+          humanFaction: Faction.savior,
+          onDone: () {},
+        );
       case _Phase.board:
         return _boardLayer();
+      case _Phase.resultCharacter:
+        final winner = _controller.score.winner;
+        return ResultCharacterOverlay(
+          faction: winner ?? Faction.savior,
+          message: winner == Faction.savior ? '希望は未来へ受け継がれる。' : '裁きは完遂された。',
+          isVictory: true,
+          onDone: () {},
+        );
       case _Phase.result:
         final winner = _controller.score.winner;
         return ResultBannerView(
