@@ -82,7 +82,23 @@ class _NineJudgesModeSelectScreenState
                     ),
                   ),
                   const SizedBox(height: 8),
-                  _SubMenuArea(onOpenLogs: widget.onOpenLogs),
+                  _SubMenuArea(
+                    onOpenLogs: widget.onOpenLogs,
+                    // The tutorial always teaches savior play against the
+                    // CPU (see tutorial_screen.dart's fixed lesson), so its
+                    // "start a CPU match" exit uses those same settings
+                    // rather than whatever this screen's own pickers
+                    // currently show — matching what the player just
+                    // practiced instead of a possibly-unrelated selection.
+                    onStartCpuMatch: () => widget.onStart(
+                      NineJudgesGameSettings(
+                        mode: GameMode.cpu,
+                        cpuLevel: level,
+                        factionSelection: FactionSelection.savior,
+                        firstPlayerSelection: FirstPlayerSelection.human,
+                      ),
+                    ),
+                  ),
                   const SizedBox(height: 8),
                   const _ComingSoonRow(),
                 ],
@@ -742,8 +758,14 @@ class _MockupButtonState extends State<_MockupButton>
 /// Section ④: 遊び方/チュートリアル/ダウンロード/プレイログ as a single row of
 /// compact icon tiles instead of a 2×2 grid, to halve the vertical footprint.
 class _SubMenuArea extends StatelessWidget {
-  const _SubMenuArea({required this.onOpenLogs});
+  const _SubMenuArea({required this.onOpenLogs, required this.onStartCpuMatch});
   final VoidCallback? onOpenLogs;
+
+  /// Called when the tutorial's own "CPU戦を始める"/skip-confirm exit pops
+  /// back with `true` — previously this result was silently discarded
+  /// (`Navigator.push<void>`), so finishing the tutorial never actually
+  /// started a match and the player had to separately press "ゲーム開始".
+  final VoidCallback onStartCpuMatch;
 
   @override
   Widget build(BuildContext context) => _CompactCard(
@@ -765,10 +787,13 @@ class _SubMenuArea extends StatelessWidget {
             buttonKey: const Key('open-tutorial'),
             iconAsset: 'icon_tutorial',
             label: 'チュートリアル',
-            onTap: () => Navigator.push<void>(
-              context,
-              MaterialPageRoute(builder: (_) => const TutorialScreen()),
-            ),
+            onTap: () async {
+              final startCpuMatch = await Navigator.push<bool>(
+                context,
+                MaterialPageRoute(builder: (_) => const TutorialScreen()),
+              );
+              if (startCpuMatch == true) onStartCpuMatch();
+            },
           ),
         ),
         Expanded(
