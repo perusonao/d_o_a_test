@@ -7,12 +7,14 @@ import 'package:dead_or_alive/features/nine_judges/screens/download_center_scree
 import 'package:dead_or_alive/features/nine_judges/tutorial/tutorial_screen.dart';
 import 'package:flutter/material.dart';
 
-/// One-screen "title screen": hero art, quick settings, start button, submenu
-/// and the reserved bottom-nav icons all fit within the viewport with no
-/// scrolling, so a first-time player sees the whole game — world, setup,
-/// start — within the first screen. Section heights below are relative
-/// (`Expanded` flex) rather than fixed pixels so this holds on any device,
-/// from iPhone SE up.
+/// Title screen: hero art (with the full 9-judge key visual), quick
+/// settings, start button, submenu and the reserved bottom-nav icons. The
+/// hero and both action buttons are sized by their own cropped artwork's
+/// aspect ratio (not stretched/cropped to a fixed flex box), so nothing gets
+/// clipped and buttons stay proportioned like the source mockup. On most
+/// phones everything still fits without scrolling; the outer
+/// `SingleChildScrollView` is a safety net for the smallest screens now that
+/// the hero includes the taller judge-bust artwork.
 class NineJudgesModeSelectScreen extends StatefulWidget {
   const NineJudgesModeSelectScreen({
     required this.onStart,
@@ -42,53 +44,44 @@ class _NineJudgesModeSelectScreenState
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 430),
-            child: Padding(
+            child: SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(14, 6, 14, 10),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Expanded(flex: 27, child: _HeroArea()),
+                  const _HeroArea(),
                   const SizedBox(height: 8),
-                  Expanded(
-                    flex: 25,
-                    child: _QuickSettingsArea(
-                      mode: mode,
-                      faction: faction,
-                      firstPlayer: firstPlayer,
-                      level: level,
-                      onMode: (v) => setState(() => mode = v),
-                      onFaction: (v) => setState(() => faction = v),
-                      onFirstPlayer: (v) => setState(() => firstPlayer = v),
-                      onLevel: (v) => setState(() => level = v),
-                    ),
+                  _QuickSettingsArea(
+                    mode: mode,
+                    faction: faction,
+                    firstPlayer: firstPlayer,
+                    level: level,
+                    onMode: (v) => setState(() => mode = v),
+                    onFaction: (v) => setState(() => faction = v),
+                    onFirstPlayer: (v) => setState(() => firstPlayer = v),
+                    onLevel: (v) => setState(() => level = v),
                   ),
-                  const SizedBox(height: 8),
-                  Expanded(
-                    flex: 15,
-                    child: _MainActionArea(
-                      onStart: () => widget.onStart(
-                        NineJudgesGameSettings(
-                          mode: mode,
-                          cpuLevel: level,
-                          factionSelection: faction,
-                          firstPlayerSelection: firstPlayer,
-                        ),
+                  const SizedBox(height: 10),
+                  _MainActionArea(
+                    onStart: () => widget.onStart(
+                      NineJudgesGameSettings(
+                        mode: mode,
+                        cpuLevel: level,
+                        factionSelection: faction,
+                        firstPlayerSelection: firstPlayer,
                       ),
-                      onOpenOnline: () => Navigator.push<void>(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const OnlineLobbyScreen(),
-                        ),
+                    ),
+                    onOpenOnline: () => Navigator.push<void>(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const OnlineLobbyScreen(),
                       ),
                     ),
                   ),
                   const SizedBox(height: 8),
-                  Expanded(
-                    flex: 15,
-                    child: _SubMenuArea(onOpenLogs: widget.onOpenLogs),
-                  ),
+                  _SubMenuArea(onOpenLogs: widget.onOpenLogs),
                   const SizedBox(height: 8),
-                  const Expanded(flex: 10, child: _ComingSoonRow()),
+                  const _ComingSoonRow(),
                 ],
               ),
             ),
@@ -99,25 +92,30 @@ class _NineJudgesModeSelectScreenState
   }
 }
 
-/// Section ①: hero art (savior VS executor + logo) filling ~25-30% of the
-/// screen, with the game title (kept as real text for accessibility/tests —
-/// the wordmark in the image itself is not readable by screen readers) and
-/// the beta badge folded into a slim caption strip under the artwork instead
-/// of taking their own separate rows.
+/// Section ①: hero art (savior VS executor + logo + the 9-judge bust row),
+/// sized by the cropped artwork's own aspect ratio so nothing gets clipped —
+/// unlike a fixed-height box with `BoxFit.cover`, which cropped into the
+/// title text on some screens. The game title is also kept as real text
+/// (accessibility/tests — the wordmark in the image itself isn't readable by
+/// screen readers), folded into a slim caption strip under the artwork
+/// alongside the beta badge instead of taking its own separate row.
 class _HeroArea extends StatelessWidget {
   const _HeroArea();
+
+  static const _aspectRatio = 853 / 895;
 
   @override
   Widget build(BuildContext context) => Column(
     children: [
-      Expanded(
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(16),
+      ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: AspectRatio(
+          aspectRatio: _aspectRatio,
           child: Image.asset(
             'assets/branding/menu_hero.png',
             fit: BoxFit.cover,
             width: double.infinity,
-            semanticLabel: '9人の審判 NINE VERDICTS',
+            semanticLabel: '9人の審判 NINE VERDICTS - 善人を救い、悪人を裁け。',
           ),
         ),
       ),
@@ -433,10 +431,11 @@ class _CpuLevelDropdown extends StatelessWidget {
   );
 }
 
-/// Section ③: the single most important tap target on the screen. The
-/// corner flourishes are cropped from the official mockup's "ゲーム開始"
-/// button; the gold gradient/border approximates the same ornate frame
-/// while staying a real, resizable Material button underneath.
+/// Section ③: the single most important tap target on the screen. Both
+/// buttons are the actual button artwork cropped from the official mockup
+/// (border, glow, corner flourishes and label all baked in), sized by that
+/// artwork's own aspect ratio rather than stretched to fill space — that's
+/// what was making the "ゲーム開始" button look oversized before.
 class _MainActionArea extends StatelessWidget {
   const _MainActionArea({required this.onStart, required this.onOpenOnline});
   final VoidCallback onStart;
@@ -445,74 +444,60 @@ class _MainActionArea extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
-    mainAxisAlignment: MainAxisAlignment.center,
     children: [
-      Expanded(
-        child: Material(
-          color: Colors.transparent,
-          child: Ink(
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF6B5324), Color(0xFF3A2C10)],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
-              borderRadius: BorderRadius.circular(30),
-              border: Border.all(
-                color: AppTheme.accent.withValues(alpha: .8),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: AppTheme.accent.withValues(alpha: .35),
-                  blurRadius: 14,
-                ),
-              ],
-            ),
-            child: InkWell(
-              key: const Key('start-game'),
-              borderRadius: BorderRadius.circular(30),
-              onTap: onStart,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const _MenuIcon('ornament_left', size: 22),
-                    const SizedBox(width: 8),
-                    const Text(
-                      'ゲーム開始',
-                      style: TextStyle(
-                        color: Color(0xFFF3E6C4),
-                        fontSize: 17,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    const _MenuIcon('ornament_right', size: 22),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
+      _MockupButton(
+        buttonKey: const Key('start-game'),
+        asset: 'assets/icons/menu/btn_start.png',
+        aspectRatio: 795 / 125,
+        semanticLabel: 'ゲーム開始',
+        onTap: onStart,
       ),
-      const SizedBox(height: 6),
-      SizedBox(
-        height: 36,
-        child: OutlinedButton.icon(
-          key: const Key('open-online'),
-          onPressed: onOpenOnline,
-          style: OutlinedButton.styleFrom(
-            textStyle: const TextStyle(fontSize: 12),
-            padding: EdgeInsets.zero,
-            foregroundColor: const Color(0xFFC79EF0),
-            side: const BorderSide(color: Color(0xFFC79EF0)),
-          ),
-          icon: const Icon(Icons.public, size: 16),
-          label: const Text('オンライン対戦 β'),
-        ),
+      const SizedBox(height: 8),
+      _MockupButton(
+        buttonKey: const Key('open-online'),
+        asset: 'assets/icons/menu/btn_online.png',
+        aspectRatio: 795 / 80,
+        semanticLabel: 'オンライン対戦 β',
+        onTap: onOpenOnline,
       ),
     ],
+  );
+}
+
+/// A button whose entire visual (background, border, glow, label) is the
+/// artwork cropped straight from the official mockup, wrapped in a real tap
+/// target sized to match.
+class _MockupButton extends StatelessWidget {
+  const _MockupButton({
+    required this.buttonKey,
+    required this.asset,
+    required this.aspectRatio,
+    required this.semanticLabel,
+    required this.onTap,
+  });
+
+  final Key buttonKey;
+  final String asset;
+  final double aspectRatio;
+  final String semanticLabel;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Material(
+    color: Colors.transparent,
+    child: InkWell(
+      key: buttonKey,
+      borderRadius: BorderRadius.circular(30),
+      onTap: onTap,
+      child: Semantics(
+        button: true,
+        label: semanticLabel,
+        child: AspectRatio(
+          aspectRatio: aspectRatio,
+          child: Image.asset(asset, fit: BoxFit.fill),
+        ),
+      ),
+    ),
   );
 }
 
