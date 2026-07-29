@@ -235,11 +235,23 @@ void main() {
     ) async {
       final repo = MemoryTutorialEventRepository();
       await tester.pumpWidget(
-        MaterialApp(home: TutorialScreen(eventRepository: repo)),
+        MaterialApp(
+          home: TutorialScreen(
+            eventRepository: repo,
+            beatDuration: Duration.zero,
+          ),
+        ),
       );
       for (var i = 0; i < 10; i++) {
         await tester.tap(find.byKey(const Key('tutorial-next')));
         await tester.pump();
+        // A zero-duration outcome-beat still schedules a real Timer — a bare
+        // pump() doesn't reliably elapse it, so pump explicit tiny durations
+        // (up to two chained beats for the steps that run a CPU action then
+        // the player's own follow-up).
+        await tester.pump(const Duration(milliseconds: 1));
+        await tester.pump(const Duration(milliseconds: 1));
+        await tester.pump(const Duration(milliseconds: 1));
       }
       await tester.tap(find.byKey(const Key('tutorial-complete')));
       await tester.pump();
