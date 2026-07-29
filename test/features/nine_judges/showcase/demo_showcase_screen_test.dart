@@ -18,9 +18,9 @@ void main() {
     // Title screen renders immediately.
     expect(find.text('9人の審判'), findsWidgets);
 
-    // Drive the whole ~19.5s scripted sequence (fake-clock; no real delay).
+    // Drive the whole ~24.5s scripted sequence (fake-clock; no real delay).
     await tester.pump();
-    await tester.pump(const Duration(seconds: 25));
+    await tester.pump(const Duration(seconds: 30));
     await tester.pumpAndSettle(const Duration(seconds: 1));
 
     // Reaches the recruitment card at the end.
@@ -30,11 +30,13 @@ void main() {
     // (except cardsPlaced, which only fires when the board phase begins).
     expect(events.first, ShowcaseEvent.titleShown);
     expect(events, contains(ShowcaseEvent.catchCopyShown));
+    expect(events, contains(ShowcaseEvent.characterIntroShown));
     expect(events, contains(ShowcaseEvent.cardsPlaced));
     expect(events, contains(ShowcaseEvent.eyeUsed));
     expect(events, contains(ShowcaseEvent.judgeUsed));
     expect(events, contains(ShowcaseEvent.scoreAwarded));
     expect(events, contains(ShowcaseEvent.reversalUsed));
+    expect(events, contains(ShowcaseEvent.resultCharacterShown));
     expect(
       events.any((e) => e == ShowcaseEvent.victory || e == ShowcaseEvent.defeat),
       isTrue,
@@ -57,7 +59,7 @@ void main() {
       MaterialApp(home: DemoShowcaseScreen(loop: false, onEvent: events.add)),
     );
     await tester.pump();
-    await tester.pump(const Duration(seconds: 25));
+    await tester.pump(const Duration(seconds: 30));
     await tester.pumpAndSettle(const Duration(seconds: 1));
     final firstRecruitmentCount = events
         .where((e) => e == ShowcaseEvent.recruitmentShown)
