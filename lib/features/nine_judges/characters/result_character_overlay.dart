@@ -14,6 +14,8 @@ class ResultCharacterOverlay extends StatefulWidget {
     required this.message,
     required this.isVictory,
     required this.onDone,
+    this.saviorScore,
+    this.executorScore,
     this.instant = false,
     super.key,
   });
@@ -22,6 +24,14 @@ class ResultCharacterOverlay extends StatefulWidget {
   final String message;
   final bool isVictory;
   final VoidCallback onDone;
+
+  /// Section ③'s closing order is 勝敗→メッセージ→スコア: the WINNER line and
+  /// [message] above already cover the first two, so when both scores are
+  /// supplied a final score line renders beneath them. Optional so this
+  /// overlay still works wherever a running score isn't meaningful yet (e.g.
+  /// the showcase recording, or tests that only check the message beat).
+  final int? saviorScore;
+  final int? executorScore;
   final bool instant;
 
   @override
@@ -124,6 +134,21 @@ class _ResultCharacterOverlayState extends State<ResultCharacterOverlay>
                       ),
                     ),
                   ),
+                  if (widget.saviorScore != null && widget.executorScore != null)
+                    Opacity(
+                      opacity: textIn,
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 10),
+                        child: Text(
+                          '救済者 ${widget.saviorScore}　―　執行者 ${widget.executorScore}',
+                          style: const TextStyle(
+                            color: GameColors.gold,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
                   const SizedBox(height: 20),
                   const Text(
                     'タップで結果画面へ',

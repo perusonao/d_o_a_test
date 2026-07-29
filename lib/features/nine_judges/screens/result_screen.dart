@@ -41,6 +41,8 @@ class _ResultScreenState extends State<ResultScreen> {
             faction: faction,
             message: message,
             isVictory: isVictory,
+            saviorScore: controller.score.savior,
+            executorScore: controller.score.executor,
             onDone: () {
               if (mounted) setState(() => _showingIntro = false);
             },

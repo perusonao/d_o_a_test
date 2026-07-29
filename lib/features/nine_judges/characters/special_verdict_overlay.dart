@@ -68,6 +68,11 @@ class _SpecialVerdictOverlayState extends State<SpecialVerdictOverlay>
     final isSavior = widget.actor == Faction.savior;
     final accent = GameColors.faction(isSavior);
     final line = isSavior ? '救済は成された。' : '判決を執行する。';
+    // Savior: 画面を少し暗くするだけ ("slightly darken"). Executor: 画面暗転
+    // ("full blackout") — the same beat reads as a gentler grace for the
+    // savior and a harsher verdict for the executor, per section ① of the
+    // presentation-quality request.
+    final maxDarken = isSavior ? 0.35 : 0.92;
     return GestureDetector(
       key: const Key('special-verdict-overlay'),
       behavior: HitTestBehavior.opaque,
@@ -81,10 +86,26 @@ class _SpecialVerdictOverlayState extends State<SpecialVerdictOverlay>
           final glow = ((t - 0.3) / 0.3).clamp(0.0, 1.0);
           final textIn = ((t - 0.55) / 0.3).clamp(0.0, 1.0);
           return ColoredBox(
-            color: Colors.black.withValues(alpha: 0.78 * darken),
+            key: const Key('special-verdict-darken'),
+            color: Colors.black.withValues(alpha: maxDarken * darken),
             child: Stack(
               alignment: Alignment.center,
               children: [
+                // Savior: 白金の光 (a warm white-gold wash). Executor: 紫・黒の
+                // エフェクト (a colder purple-into-black wash) — the same
+                // "glow" timing paints a different mood behind the portrait.
+                Opacity(
+                  opacity: glow * 0.6,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: RadialGradient(
+                        colors: isSavior
+                            ? [accent.withValues(alpha: 0.35), Colors.transparent]
+                            : [accent.withValues(alpha: 0.4), Colors.black],
+                      ),
+                    ),
+                  ),
+                ),
                 Opacity(
                   opacity: glow,
                   child: Container(

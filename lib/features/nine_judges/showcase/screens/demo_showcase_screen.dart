@@ -335,6 +335,8 @@ class _DemoShowcaseScreenState extends State<DemoShowcaseScreen> {
           faction: winner ?? Faction.savior,
           message: winner == Faction.savior ? '希望は未来へ受け継がれる。' : '裁きは完遂された。',
           isVictory: true,
+          saviorScore: _controller.scores[Faction.savior],
+          executorScore: _controller.scores[Faction.executor],
           onDone: () {},
         );
       case _Phase.result:

@@ -1,4 +1,5 @@
 import 'package:dead_or_alive/app/theme.dart';
+import 'package:dead_or_alive/features/nine_judges/effects/card_action_effect.dart';
 import 'package:dead_or_alive/features/nine_judges/game/game_controller.dart';
 import 'package:dead_or_alive/features/nine_judges/models/judge_models.dart';
 import 'package:dead_or_alive/features/nine_judges/screens/game_screen.dart';
@@ -112,6 +113,37 @@ void main() {
     await tester.tap(find.byKey(const Key('action-life')));
     await tester.pump();
     await tester.tap(find.byType(InkWell).last);
+  });
+
+  testWidgets('LIFE/DEATH/EYE実行時にカード演出が表示され、入力を止めずに自動的に消える', (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: NineJudgesGameScreen(
+          initialSettings: NineJudgesGameSettings(
+            mode: GameMode.cpu,
+            cpuFaction: Faction.executor,
+            firstPlayer: Faction.savior,
+            // Zero-duration CPU delays, so the CPU's reply turn (triggered
+            // the instant the human's LIFE action passes play to it) can't
+            // leave a real Timer pending once this test ends.
+            skipCpuDelays: true,
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.byKey(const Key('action-life')));
+    await tester.pump();
+    await tester.tap(find.byType(PersonCardWidget).first);
+    await tester.pump();
+    expect(find.byType(CardActionEffect), findsOneWidget);
+    // Purely decorative and non-blocking: the action panel is still there
+    // and interactive the very next frame, with no dialog/overlay in the
+    // way (unlike the 3-strike confirmation reveal, which does block).
+    expect(find.byKey(const Key('confirmation-reveal')), findsNothing);
+    expect(find.byKey(const Key('special-verdict-overlay')), findsNothing);
+    await tester.pump(const Duration(milliseconds: 700));
+    await tester.pump();
+    expect(find.byType(CardActionEffect), findsNothing);
   });
 
   testWidgets('確定時に属性・ボーナス・得点者を公開する', (tester) async {

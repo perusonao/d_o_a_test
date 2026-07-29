@@ -168,10 +168,38 @@ class _NineJudgesGameScreenState extends State<NineJudgesGameScreen> {
   }
 }
 
-class _GameBoard extends StatelessWidget {
+class _GameBoard extends StatefulWidget {
   const _GameBoard({required this.controller, required this.onExit});
   final NineJudgesController controller;
   final VoidCallback onExit;
+
+  @override
+  State<_GameBoard> createState() => _GameBoardState();
+}
+
+class _GameBoardState extends State<_GameBoard> {
+  NineJudgesController get controller => widget.controller;
+  VoidCallback get onExit => widget.onExit;
+
+  int? _effectIndex;
+  ActionType? _effectAction;
+  int _effectSerial = 0;
+
+  /// Section ④: fires a brief, non-blocking flash over [index] for a
+  /// LIFE/DEATH/EYE action that already resolved via `selectSlot` above —
+  /// purely decorative, never gates the next turn.
+  void _triggerCardEffect(int index, ActionType action) {
+    setState(() {
+      _effectIndex = index;
+      _effectAction = action;
+      _effectSerial++;
+    });
+  }
+
+  void _clearCardEffect(int serial) {
+    if (serial != _effectSerial) return;
+    if (mounted) setState(() => _effectIndex = null);
+  }
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -231,6 +259,10 @@ class _GameBoard extends StatelessWidget {
                             controller: controller,
                             onTargetTap: (index) =>
                                 _handleTargetTap(context, index),
+                            effectIndex: _effectIndex,
+                            effectAction: _effectAction,
+                            effectSerial: _effectSerial,
+                            onEffectDone: () => _clearCardEffect(_effectSerial),
                           ),
                           if (controller.lastCpuActionMessage != null)
                             _CpuMessage(controller: controller),
@@ -267,7 +299,10 @@ class _GameBoard extends StatelessWidget {
       return;
     }
     if (controller.selectedAction != ActionType.specialVerdict) {
+      final action = controller.selectedAction!;
+      final wasLegal = controller.canTarget(index);
       controller.selectSlot(index);
+      if (wasLegal) _triggerCardEffect(index, action);
       return;
     }
     final person = controller.board[index].person;
@@ -344,6 +379,7 @@ class _GameBoard extends StatelessWidget {
     );
     if (confirmed == true && controller.canTarget(index)) {
       controller.selectSlot(index);
+      _triggerCardEffect(index, ActionType.eye);
     }
   }
 
@@ -592,14 +628,17 @@ class _PlayerPanel extends StatelessWidget {
             fontWeight: FontWeight.w900,
           ),
         ),
+        // Section ⑤: identity/JUDGE status are secondary info — still fully
+        // present (nothing removed), just visually receded further behind
+        // the score below so a glance lands on the number first.
         Text(
           identity,
           key: Key('identity-${faction.name}'),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 9,
-            color: GameColors.textDim,
+            color: GameColors.textDim.withValues(alpha: .75),
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -608,14 +647,20 @@ class _PlayerPanel extends StatelessWidget {
           key: Key('verdict-status-${faction.name}'),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontSize: 7, color: GameColors.textDim),
+          style: TextStyle(
+            fontSize: 7,
+            color: GameColors.textDim.withValues(alpha: .65),
+          ),
         ),
       ],
     );
 
     // Fixed-width + scale-down so a wide "POINT" caption can never eat into
     // the flexible labels column and force it to wrap (which caused a
-    // vertical RenderFlex overflow at narrow phone widths).
+    // vertical RenderFlex overflow at narrow phone widths). Section ⑤: the
+    // score is one of the three things a player actually needs mid-game, so
+    // it's sized a step above the surrounding labels (FittedBox still keeps
+    // it safe on narrow screens).
     final score = SizedBox(
       width: 38,
       child: FittedBox(
@@ -629,7 +674,7 @@ class _PlayerPanel extends StatelessWidget {
               maxLines: 1,
               style: TextStyle(
                 color: color,
-                fontSize: 24,
+                fontSize: 28,
                 height: 1,
                 fontWeight: FontWeight.w900,
                 fontFamilyFallback: const ['serif'],
@@ -742,32 +787,54 @@ class _TurnIndicator extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 2),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  _Diamond(muted: !isHumanTurn),
-                  const SizedBox(width: 6),
-                  Flexible(
-                    child: Text(
-                      big,
-                      key: const Key('turn-big-label'),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: isHumanTurn
-                            ? GameColors.gold
-                            : GameColors.goldMuted,
-                        fontSize: 15,
-                        fontWeight: isHumanTurn
-                            ? FontWeight.w900
-                            : FontWeight.w700,
-                        letterSpacing: 1,
+              // Section ⑤: whose turn it is is one of the three things a
+              // player actually needs at a glance, so it gets a soft glowing
+              // pill behind it on the player's own turn — the same text as
+              // before, just harder to miss.
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(20),
+                  color: isHumanTurn
+                      ? GameColors.gold.withValues(alpha: .12)
+                      : Colors.transparent,
+                  boxShadow: isHumanTurn
+                      ? [
+                          BoxShadow(
+                            color: GameColors.gold.withValues(alpha: .25),
+                            blurRadius: 8,
+                          ),
+                        ]
+                      : null,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _Diamond(muted: !isHumanTurn),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        big,
+                        key: const Key('turn-big-label'),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: isHumanTurn
+                              ? GameColors.gold
+                              : GameColors.goldMuted,
+                          fontSize: 15,
+                          fontWeight: isHumanTurn
+                              ? FontWeight.w900
+                              : FontWeight.w700,
+                          letterSpacing: 1,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 6),
-                  _Diamond(muted: !isHumanTurn),
-                ],
+                    const SizedBox(width: 6),
+                    _Diamond(muted: !isHumanTurn),
+                  ],
+                ),
               ),
               // Kept as a small, muted caption: the big headline above already
               // states whose turn it is, so this line only adds the precise
@@ -1008,18 +1075,21 @@ class _LedgerButton extends StatelessWidget {
         decoration: BoxDecoration(
           color: const Color(0xE60C0B12),
           borderRadius: BorderRadius.circular(7),
-          border: Border.all(color: GameColors.goldSoft),
+          // Section ⑤: secondary controls (not the turn/score/bonus a player
+          // actually needs mid-turn), so kept a step more muted than the
+          // gold-accented HUD around them — still fully visible/tappable.
+          border: Border.all(color: GameColors.textDim.withValues(alpha: .4)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 13, color: GameColors.gold),
+            Icon(icon, size: 13, color: GameColors.textDim),
             const SizedBox(width: 4),
             Text(
               label,
               style: const TextStyle(
                 fontSize: 10,
-                color: GameColors.text,
+                color: GameColors.textDim,
                 fontWeight: FontWeight.w700,
               ),
             ),
