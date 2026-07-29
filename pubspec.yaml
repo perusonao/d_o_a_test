@@ -74,6 +74,7 @@ flutter:
     - assets/characters/
     - assets/images/persons/
     - assets/icons/
+    - assets/icons/menu/
     - assets/decorations/
 
 flutter_launcher_icons:
