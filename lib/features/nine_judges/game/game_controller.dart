@@ -102,6 +102,14 @@ class NineJudgesController extends ChangeNotifier {
   bool lastCpuWasJudgment = false;
   String? confirmationRevealMessage;
   int? confirmationTargetIndex;
+
+  /// Demo/UI-only: which action and actor produced the pending confirmation
+  /// reveal, so the screen can show a distinct SPECIAL VERDICT (JUDGE)
+  /// cut-in only for that specific trigger, while regular LIFE/DEATH-driven
+  /// confirmations keep their existing plain reveal. Never read by rules
+  /// logic — purely a presentation hint alongside [confirmationRevealMessage].
+  ActionType? lastConfirmationAction;
+  Faction? lastConfirmationActor;
   List<CpuCandidateScore> lastCpuEvaluations = const [];
   bool _bonusRevealTriggeredThisTurn = false;
   Faction? _bonusViewerThisTurn;
@@ -222,6 +230,8 @@ class NineJudgesController extends ChangeNotifier {
     lastCpuWasJudgment = false;
     confirmationRevealMessage = null;
     confirmationTargetIndex = null;
+    lastConfirmationAction = null;
+    lastConfirmationActor = null;
     lastCpuEvaluations = const [];
     _bonusRevealTriggeredThisTurn = false;
     _bonusViewerThisTurn = null;
@@ -562,6 +572,8 @@ class NineJudgesController extends ChangeNotifier {
           '審判ボーナス $bonus POINT\n${scorer.label} +$bonus';
       confirmationTargetIndex = index;
       awaitingConfirmationReveal = true;
+      lastConfirmationAction = action;
+      lastConfirmationActor = actor;
       knownAttributeSlots[Faction.savior]!.add(index);
       knownAttributeSlots[Faction.executor]!.add(index);
       if (bonusIndex < bonusDeck.length - 1) {
@@ -798,6 +810,8 @@ class NineJudgesController extends ChangeNotifier {
     awaitingConfirmationReveal = false;
     confirmationRevealMessage = null;
     confirmationTargetIndex = null;
+    lastConfirmationAction = null;
+    lastConfirmationActor = null;
     if (!awaitingHandoff) _beginCurrentTurn();
     notifyListeners();
   }
