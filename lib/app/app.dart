@@ -21,9 +21,16 @@ class NineVerdictsApp extends StatelessWidget {
       // to either. Everything else (including an unrecognized route on
       // reload) falls back to the regular game, matching the previous
       // `home:`-only behavior exactly.
+      //
+      // '/admins' is a plural alias for '/admin' — kept in sync so either
+      // spelling reaches the same AdminScreen (and its unchanged internal
+      // Firebase auth/`admins/{uid}` gate); it exists only so both spellings
+      // resolve to a real route instead of silently falling through to the
+      // game via onUnknownRoute.
       routes: {
         '/': (context) => const NineJudgesGameScreen(),
         '/admin': (context) => const AdminScreen(),
+        '/admins': (context) => const AdminScreen(),
         '/showcase': (context) => const DemoShowcaseScreen(),
       },
       onUnknownRoute: (settings) =>
