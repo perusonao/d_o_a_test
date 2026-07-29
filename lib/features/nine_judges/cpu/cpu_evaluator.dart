@@ -2,6 +2,11 @@ import 'package:dead_or_alive/features/nine_judges/cpu/cpu_strategy.dart';
 import 'package:dead_or_alive/features/nine_judges/game/game_rules.dart';
 import 'package:dead_or_alive/features/nine_judges/models/judge_models.dart';
 
+/// A candidate's score plus the labelled contributions that produced it
+/// (see [CpuScoreReason]) — used for logging/debugging only, never for
+/// gameplay.
+typedef CpuScoredAction = ({double score, List<CpuScoreReason> reasons});
+
 /// Tunable weights that define a CPU thinking pattern.
 ///
 /// All values are expressed on the same scale as the verdict bonus (1..9) so
@@ -23,6 +28,7 @@ class CpuProfile {
     required this.blindValue,
     required this.threatWeight,
     required this.jitter,
+    this.selectionWeights = const [1],
   });
 
   /// Value of revealing an unknown attribute with EYE.
@@ -68,6 +74,25 @@ class CpuProfile {
   /// Random spread used to break ties between near-equal moves.
   final double jitter;
 
+  /// Difficulty-tiered choice variance (spec sections 14/15): probability of
+  /// picking the 1st/2nd/3rd/... ranked candidate (by score, best first)
+  /// instead of always taking the literal top score. `[1]` (the default)
+  /// always takes the best. Values need not sum to 1 — any leftover
+  /// probability mass falls back to the top candidate.
+  ///
+  /// [CpuLevel] predates the requested RANDOM/BASIC/BALANCED/HARD/EXPERT
+  /// difficulty ladder, and renaming/reordering it would break existing
+  /// saves and logs that reference these names — so instead each existing
+  /// profile is tuned along this new axis to approximate that ladder:
+  /// [balanced] (this game's default, most commonly played tier) gets the
+  /// widest spread — closest to "pick a good move, not always THE move".
+  /// [aggressive]/[defensive] sit tighter around the top choice. [expert]
+  /// is nearly deterministic ("principally always the top move"), matching
+  /// spec's EXPERT description. [CpuLevel.random] never reaches this at all
+  /// — [RandomCpuStrategy] already samples uniformly over every legal move,
+  /// which already matches the requested RANDOM/EASY tier as-is.
+  final List<double> selectionWeights;
+
   static const balanced = CpuProfile(
     eyeValue: 6.5,
     lockBonus: 5,
@@ -82,6 +107,7 @@ class CpuProfile {
     blindValue: 2,
     threatWeight: 0,
     jitter: 0.3,
+    selectionWeights: [0.45, 0.25, 0.15, 0.10, 0.05],
   );
 
   static const aggressive = CpuProfile(
@@ -98,6 +124,7 @@ class CpuProfile {
     blindValue: 3,
     threatWeight: 0,
     jitter: 0.4,
+    selectionWeights: [0.65, 0.20, 0.10, 0.05],
   );
 
   static const defensive = CpuProfile(
@@ -114,6 +141,7 @@ class CpuProfile {
     blindValue: 1,
     threatWeight: 0.6,
     jitter: 0.3,
+    selectionWeights: [0.65, 0.20, 0.10, 0.05],
   );
 
   static const expert = CpuProfile(
@@ -130,6 +158,7 @@ class CpuProfile {
     blindValue: 1.5,
     threatWeight: 0.9,
     jitter: 0.15,
+    selectionWeights: [0.88, 0.09, 0.03],
   );
 }
 
@@ -149,8 +178,44 @@ abstract final class CpuEvaluator {
       (faction == Faction.savior && action == ActionType.death) ||
       (faction == Faction.executor && action == ActionType.life);
 
+  /// Every slot not yet confirmed — used to scale weights up as the game
+  /// nears its end (section 13).
+  static int remainingUnconfirmedCount(List<CpuSlotView> slots) =>
+      slots.where((s) => !s.person.isConfirmed).length;
+
+  /// How many of each attribute remain among slots this CPU cannot yet
+  /// identify (neither publicly confirmed nor personally seen) — the fixed
+  /// 3 good / 3 evil / 3 neutral composition (see RULES.md) minus every
+  /// attribute already visible to THIS faction via [CpuSlotView.knownAttribute].
+  /// Never reads a slot's real (hidden) attribute directly; only counts what
+  /// this CPU could legitimately already know (section 8).
+  static Map<PersonAttribute, int> residualAttributeCounts(
+    List<CpuSlotView> slots,
+  ) {
+    final totals = {
+      PersonAttribute.good: 3,
+      PersonAttribute.evil: 3,
+      PersonAttribute.neutral: 3,
+    };
+    for (final slot in slots) {
+      final known = slot.knownAttribute;
+      if (known != null) totals[known] = totals[known]! - 1;
+    }
+    return totals;
+  }
+
   /// Immediate, rules-accurate value of [action] against [slot] for the CPU.
+  /// Kept as a `double`-returning wrapper over [actionScoreDetailed] for
+  /// existing callers/tests; production code uses the detailed form to get
+  /// the reasons breakdown too.
   static double actionScore(
+    CpuGameView view,
+    ActionType action,
+    CpuSlotView slot, {
+    CpuProfile profile = CpuProfile.balanced,
+  }) => actionScoreDetailed(view, action, slot, profile: profile).score;
+
+  static CpuScoredAction actionScoreDetailed(
     CpuGameView view,
     ActionType action,
     CpuSlotView slot, {
@@ -158,10 +223,10 @@ abstract final class CpuEvaluator {
   }) {
     final bonus = (view.currentBonus ?? 5).toDouble();
     return switch (action) {
-      ActionType.eye => profile.eyeValue + _eyeUrgency(view.eyeUsesRemaining),
-      ActionType.specialVerdict => _judgeScore(view, slot, bonus, profile),
+      ActionType.eye => _eyeScore(view, slot, profile),
+      ActionType.specialVerdict => _judgeScoreDetailed(view, slot, bonus, profile),
       ActionType.life ||
-      ActionType.death => _verdictScore(view, action, slot, bonus, profile),
+      ActionType.death => _verdictScoreDetailed(view, action, slot, bonus, profile),
     };
   }
 
@@ -172,7 +237,53 @@ abstract final class CpuEvaluator {
   static double _eyeUrgency(int? remaining) =>
       remaining != null && remaining <= 1 ? 1.0 : 0.0;
 
-  static double _verdictScore(
+  /// Section 7/8: EYE's value scales with how uncertain the target's
+  /// identity still is, estimated only from [residualAttributeCounts] — a
+  /// target is worth less to scout once the remaining pool makes its
+  /// attribute nearly obvious (e.g. only one attribute left among the
+  /// unknowns), and worth more while the pool is still close to an even
+  /// three-way split. Also nudged up slightly for a target several actions
+  /// have already been spent on blind (someone may confirm it without ever
+  /// learning its attribute) and for the very last EYE use available.
+  static CpuScoredAction _eyeScore(
+    CpuGameView view,
+    CpuSlotView slot,
+    CpuProfile profile,
+  ) {
+    final residual = residualAttributeCounts(view.slots);
+    final unknownCount = residual.values.fold<int>(0, (a, b) => a + b);
+    final maxShare = unknownCount == 0
+        ? 1.0
+        : residual.values.reduce((a, b) => a > b ? a : b) / unknownCount;
+    // maxShare ranges from 1/3 (perfectly even split — most uncertain) to 1
+    // (only one attribute possible — already fully determined).
+    final uncertainty = unknownCount == 0
+        ? 0.0
+        : (1.0 - (maxShare - 1 / 3) / (2 / 3)).clamp(0.0, 1.0);
+    final uncertaintyFactor = 0.4 + 0.9 * uncertainty; // in [0.4, 1.3]
+    final infoValue = profile.eyeValue * uncertaintyFactor;
+    final urgencyValue = 0.15 * slot.person.verdictActionCount;
+    final lastUseValue = _eyeUrgency(view.eyeUsesRemaining);
+    return (
+      score: infoValue + urgencyValue + lastUseValue,
+      reasons: [
+        CpuScoreReason('infoValue', infoValue),
+        if (urgencyValue > 0) CpuScoreReason('targetUrgency', urgencyValue),
+        if (lastUseValue > 0) CpuScoreReason('lastEyeUse', lastUseValue),
+      ],
+    );
+  }
+
+  /// Section 13: scales confirmation/JUDGE weights up as fewer people
+  /// remain undecided, so the CPU doesn't drift passively into the endgame.
+  static double _endgameMultiplier(int remainingUnconfirmed) =>
+      switch (remainingUnconfirmed) {
+        <= 2 => 1.5,
+        <= 4 => 1.2,
+        _ => 1.0,
+      };
+
+  static CpuScoredAction _verdictScoreDetailed(
     CpuGameView view,
     ActionType action,
     CpuSlotView slot,
@@ -183,56 +294,102 @@ abstract final class CpuEvaluator {
     final reverse = isReverseAction(view.faction, action);
     if (attr == null) {
       // Acting on someone we have not identified is a gamble.
-      return profile.blindValue - (reverse ? profile.reverseCost : 0);
+      final reverseCost = reverse ? -profile.reverseCost : 0.0;
+      return (
+        score: profile.blindValue + reverseCost,
+        reasons: [
+          CpuScoreReason('blindGamble', profile.blindValue),
+          if (reverse) CpuScoreReason('reverseCost', reverseCost),
+        ],
+      );
     }
     final after = NineJudgesRules.applyVerdictAction(
       person: slot.person,
       action: action,
       actor: view.faction,
     );
+    final endgameMult = _endgameMultiplier(
+      remainingUnconfirmedCount(view.slots),
+    );
     if (after.isConfirmed) {
       final scorer = NineJudgesRules.scoringFaction(after);
-      if (scorer != view.faction) return -bonus - profile.giveawayPenalty;
-      var value = bonus * profile.bonusWeight + profile.lockBonus;
+      if (scorer != view.faction) {
+        final penalty = -bonus - profile.giveawayPenalty;
+        return (score: penalty, reasons: [CpuScoreReason('giveaway', penalty)]);
+      }
+      final baseLock = bonus * profile.bonusWeight + profile.lockBonus;
+      final lockValue = baseLock * endgameMult;
+      final reasons = [CpuScoreReason('lockBonus', baseLock)];
+      if (endgameMult > 1) {
+        reasons.add(CpuScoreReason('endgameBoost', lockValue - baseLock));
+      }
+      var value = lockValue;
       // The reverse action is often the only tool to lock this attribute
       // (a savior can only score a revealed evil by killing it), so the
       // payoff outweighs the one-shot cost when it actually confirms.
-      if (reverse) value += profile.reverseKeyValue - profile.reverseCost;
-      return value;
+      if (reverse) {
+        final reverseNet = profile.reverseKeyValue - profile.reverseCost;
+        value += reverseNet;
+        reasons.add(CpuScoreReason('reverseKey', reverseNet));
+      }
+      return (score: value, reasons: reasons);
     }
     // Non-confirming move: is it progress toward a point that scores for us?
     final dirScorer = scorerFor(attr, alive: action == ActionType.life);
     if (dirScorer != view.faction) {
       // Pushing a known person toward the opponent's point; only a denial.
-      return -profile.progressValue - (reverse ? profile.reverseCost : 0);
+      final denial = -profile.progressValue - (reverse ? profile.reverseCost : 0);
+      return (score: denial, reasons: [CpuScoreReason('denyOpponent', denial)]);
     }
-    var value =
-        profile.progressValue +
-        bonus * 0.2 * profile.bonusWeight +
-        profile.setupBonus;
+    final progressValue =
+        profile.progressValue + bonus * 0.2 * profile.bonusWeight + profile.setupBonus;
+    var value = progressValue;
+    final reasons = [CpuScoreReason('progress', progressValue)];
     // Spending the one-shot reverse merely to progress (leaving the person
     // flippable) is worth far less than using it to finish.
-    if (reverse) value += profile.reverseKeyValue * 0.4 - profile.reverseCost;
-    return value;
+    if (reverse) {
+      final reverseNet = profile.reverseKeyValue * 0.4 - profile.reverseCost;
+      value += reverseNet;
+      reasons.add(CpuScoreReason('reverseProgress', reverseNet));
+    }
+    return (score: value, reasons: reasons);
   }
 
-  static double _judgeScore(
+  static CpuScoredAction _judgeScoreDetailed(
     CpuGameView view,
     CpuSlotView slot,
     double bonus,
     CpuProfile profile,
   ) {
     final attr = slot.knownAttribute;
-    if (attr == null) return 1; // never burn the one-shot on an unknown.
+    if (attr == null) {
+      // Never burn the one-shot on an unknown.
+      return (score: 1, reasons: const [CpuScoreReason('unknownTarget', 1)]);
+    }
     final finalAlive = view.faction == Faction.savior;
     final scorer = scorerFor(attr, alive: finalAlive);
-    if (scorer != view.faction) return -100; // would hand the point away.
+    if (scorer != view.faction) {
+      // Would hand the point away.
+      return (score: -100, reasons: const [CpuScoreReason('wouldGiveAway', -100)]);
+    }
     // JUDGE confirms an untouched person in a single move; hold it for a
-    // worthwhile bonus unless the personality is impatient.
-    final premium = bonus >= profile.judgeMinBonus
+    // worthwhile bonus unless the personality is impatient — or unless the
+    // game is running out of people to spend it on (section 10: don't let
+    // it sit unused as the board empties out).
+    final remaining = remainingUnconfirmedCount(view.slots);
+    final endgamePush = remaining <= 4 ? (4 - remaining).clamp(0, 4) * 1.5 : 0.0;
+    final basePremium = bonus >= profile.judgeMinBonus
         ? profile.judgePremium
         : profile.judgePremium - 4;
-    return bonus * profile.bonusWeight + premium;
+    final bonusValue = bonus * profile.bonusWeight;
+    return (
+      score: bonusValue + basePremium + endgamePush,
+      reasons: [
+        CpuScoreReason('bonusValue', bonusValue),
+        CpuScoreReason('judgePremium', basePremium),
+        if (endgamePush > 0) CpuScoreReason('endgameUrgency', endgamePush),
+      ],
+    );
   }
 
   /// Largest point the opponent could lock on their very next turn, restricted

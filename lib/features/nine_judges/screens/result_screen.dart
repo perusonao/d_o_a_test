@@ -8,9 +8,14 @@ import 'package:dead_or_alive/features/nine_judges/services/firebase_bootstrap.d
 import 'package:dead_or_alive/features/nine_judges/services/firebase_playtest_repository.dart';
 
 class ResultScreen extends StatefulWidget {
-  const ResultScreen({required this.controller, super.key});
+  const ResultScreen({required this.controller, this.onGoHome, super.key});
 
   final NineJudgesController controller;
+
+  /// Returns to the mode-select/title screen. Null (the default) hides the
+  /// button entirely — used by any caller that doesn't wire up navigation
+  /// for it.
+  final VoidCallback? onGoHome;
 
   @override
   State<ResultScreen> createState() => _ResultScreenState();
@@ -24,7 +29,10 @@ class _ResultScreenState extends State<ResultScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final resultBody = _ResultBody(controller: controller);
+    final resultBody = _ResultBody(
+      controller: controller,
+      onGoHome: widget.onGoHome,
+    );
     if (!_showingIntro) return resultBody;
     final winner = controller.score.winner!;
     final isVictory =
@@ -54,9 +62,10 @@ class _ResultScreenState extends State<ResultScreen> {
 }
 
 class _ResultBody extends StatelessWidget {
-  const _ResultBody({required this.controller});
+  const _ResultBody({required this.controller, this.onGoHome});
 
   final NineJudgesController controller;
+  final VoidCallback? onGoHome;
 
   @override
   Widget build(BuildContext context) {
@@ -147,6 +156,16 @@ class _ResultBody extends StatelessWidget {
                       label: const Text('テストプレイの感想を保存'),
                     ),
                   ),
+                  if (onGoHome != null)
+                    SizedBox(
+                      width: double.infinity,
+                      child: TextButton.icon(
+                        key: const Key('result-go-home'),
+                        onPressed: onGoHome,
+                        icon: const Icon(Icons.home_outlined),
+                        label: const Text('ホームへ戻る'),
+                      ),
+                    ),
                 ],
               ),
             ),
