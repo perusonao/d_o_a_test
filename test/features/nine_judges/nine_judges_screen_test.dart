@@ -128,13 +128,19 @@ void main() {
     expect(find.text('JUDGEを使用しますか？'), findsOneWidget);
     await tester.tap(find.byKey(const Key('confirm-judge')));
     await tester.pump();
-    expect(find.byKey(const Key('confirmation-reveal')), findsOneWidget);
+    // SPECIAL VERDICT (JUDGE) confirmations show the dedicated character
+    // cut-in instead of the plain `_ConfirmationOverlay` reveal — the
+    // underlying board/score data is still updated exactly the same either
+    // way, only the presentation differs for this specific trigger.
+    expect(find.byKey(const Key('special-verdict-overlay')), findsOneWidget);
     expect(find.byKey(const Key('nine-judges-board')), findsOneWidget);
-    expect(find.text('JUDGEMENT'), findsOneWidget);
-    expect(find.textContaining('POINT'), findsWidgets);
-    await tester.tap(find.byKey(const Key('confirmation-reveal')));
+    await tester.tap(find.byKey(const Key('special-verdict-overlay')));
+    // The tap defers to a post-frame callback (see
+    // _SpecialVerdictOverlayState._finish), so one pump runs that callback
+    // and a second reflects the resulting setState/rebuild.
     await tester.pump();
-    expect(find.byKey(const Key('confirmation-reveal')), findsNothing);
+    await tester.pump();
+    expect(find.byKey(const Key('special-verdict-overlay')), findsNothing);
   });
 
   testWidgets('JUDGE確認をキャンセルすると人物を確定しない', (tester) async {

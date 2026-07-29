@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:dead_or_alive/app/theme.dart';
+import 'package:dead_or_alive/features/nine_judges/characters/character_intro_overlay.dart';
+import 'package:dead_or_alive/features/nine_judges/characters/special_verdict_overlay.dart';
 import 'package:dead_or_alive/features/nine_judges/game/game_controller.dart';
 import 'package:dead_or_alive/features/nine_judges/logging/game_log_repository.dart';
 import 'package:dead_or_alive/features/nine_judges/models/judge_models.dart';
@@ -26,6 +28,7 @@ class NineJudgesGameScreen extends StatefulWidget {
 class _NineJudgesGameScreenState extends State<NineJudgesGameScreen> {
   NineJudgesController? controller;
   bool _cpuSequenceRunning = false;
+  bool _showingIntro = false;
 
   @override
   void initState() {
@@ -39,7 +42,12 @@ class _NineJudgesGameScreenState extends State<NineJudgesGameScreen> {
     super.dispose();
   }
 
-  void _startGame(NineJudgesGameSettings settings) {
+  /// [showIntro] is only ever true from the real "ゲーム開始" button (see
+  /// the `onStart:` wiring below) — it stays false for the `initialSettings`
+  /// constructor path used by deep links/tests, so
+  /// [CharacterIntroOverlay] never appears unless a player actually presses
+  /// start.
+  void _startGame(NineJudgesGameSettings settings, {bool showIntro = false}) {
     controller?.removeListener(_handleControllerChanged);
     controller?.dispose();
     final newController = NineJudgesController(
@@ -47,6 +55,7 @@ class _NineJudgesGameScreenState extends State<NineJudgesGameScreen> {
       logRepository: LocalGameLogRepository.instance,
     )..addListener(_handleControllerChanged);
     controller = newController;
+    _showingIntro = showIntro && !settings.skipCpuDelays;
     _handleControllerChanged();
     if (mounted) setState(() {});
     unawaited(_attachExternalTestContext(newController));
@@ -117,7 +126,7 @@ class _NineJudgesGameScreenState extends State<NineJudgesGameScreen> {
     final game = controller;
     if (game == null) {
       return NineJudgesModeSelectScreen(
-        onStart: _startGame,
+        onStart: (settings) => _startGame(settings, showIntro: true),
         onOpenLogs: () => Navigator.push<void>(
           context,
           MaterialPageRoute(
@@ -139,7 +148,21 @@ class _NineJudgesGameScreenState extends State<NineJudgesGameScreen> {
             onReady: game.confirmHandoff,
           );
         }
-        return _GameBoard(controller: game, onExit: _returnToMenu);
+        final board = _GameBoard(controller: game, onExit: _returnToMenu);
+        if (!_showingIntro) return board;
+        return Stack(
+          children: [
+            board,
+            Positioned.fill(
+              child: CharacterIntroOverlay(
+                humanFaction: game.isCpuGame ? game.humanFaction : null,
+                onDone: () {
+                  if (mounted) setState(() => _showingIntro = false);
+                },
+              ),
+            ),
+          ],
+        );
       },
     );
   }
@@ -223,7 +246,16 @@ class _GameBoard extends StatelessWidget {
           ),
         ),
         if (controller.awaitingConfirmationReveal)
-          Positioned.fill(child: _ConfirmationOverlay(controller: controller)),
+          Positioned.fill(
+            child:
+                controller.lastConfirmationAction == ActionType.specialVerdict
+                ? SpecialVerdictOverlay(
+                    actor: controller.lastConfirmationActor!,
+                    instant: controller.settings.skipCpuDelays,
+                    onDone: controller.confirmConfirmationReveal,
+                  )
+                : _ConfirmationOverlay(controller: controller),
+          ),
       ],
     ),
   );

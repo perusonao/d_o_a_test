@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:dead_or_alive/features/nine_judges/characters/result_character_overlay.dart';
 import 'package:dead_or_alive/features/nine_judges/game/game_controller.dart';
 import 'package:dead_or_alive/features/nine_judges/models/judge_models.dart';
 import 'package:dead_or_alive/features/nine_judges/widgets/board_grid.dart';
@@ -6,8 +7,52 @@ import 'package:dead_or_alive/features/nine_judges/screens/play_log_screen.dart'
 import 'package:dead_or_alive/features/nine_judges/services/firebase_bootstrap.dart';
 import 'package:dead_or_alive/features/nine_judges/services/firebase_playtest_repository.dart';
 
-class ResultScreen extends StatelessWidget {
+class ResultScreen extends StatefulWidget {
   const ResultScreen({required this.controller, super.key});
+
+  final NineJudgesController controller;
+
+  @override
+  State<ResultScreen> createState() => _ResultScreenState();
+}
+
+class _ResultScreenState extends State<ResultScreen> {
+  late bool _showingIntro = !widget.controller.settings.skipCpuDelays &&
+      widget.controller.score.winner != null;
+
+  NineJudgesController get controller => widget.controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final resultBody = _ResultBody(controller: controller);
+    if (!_showingIntro) return resultBody;
+    final winner = controller.score.winner!;
+    final isVictory =
+        !controller.isCpuGame || controller.humanFaction == winner;
+    final faction = isVictory ? winner : controller.humanFaction;
+    final message = isVictory
+        ? (winner == Faction.savior ? '希望は未来へ受け継がれる。' : '裁きは完遂された。')
+        : '次の審判で真実を証明してください。';
+    return Stack(
+      children: [
+        resultBody,
+        Positioned.fill(
+          child: ResultCharacterOverlay(
+            faction: faction,
+            message: message,
+            isVictory: isVictory,
+            onDone: () {
+              if (mounted) setState(() => _showingIntro = false);
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ResultBody extends StatelessWidget {
+  const _ResultBody({required this.controller});
 
   final NineJudgesController controller;
 
