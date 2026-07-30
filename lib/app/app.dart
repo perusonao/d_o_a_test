@@ -1,4 +1,5 @@
 import 'package:dead_or_alive/features/nine_judges/admin/screens/admin_screen.dart';
+import 'package:dead_or_alive/features/nine_judges/promo/screens/promo_player_screen.dart';
 import 'package:dead_or_alive/features/nine_judges/screens/game_screen.dart';
 import 'package:dead_or_alive/features/nine_judges/showcase/screens/demo_showcase_screen.dart';
 import 'package:flutter/material.dart';
@@ -15,12 +16,14 @@ class NineVerdictsApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.build(),
       initialRoute: '/',
-      // '/admin' and '/showcase' are hidden routes reachable only by typing
-      // the URL directly (see lib/features/nine_judges/admin/ and
-      // lib/features/nine_judges/showcase/) — no normal player screen links
-      // to either. Everything else (including an unrecognized route on
-      // reload) falls back to the regular game, matching the previous
-      // `home:`-only behavior exactly.
+      // '/admin', '/showcase' and '/promo' are hidden routes reachable only
+      // by typing the URL directly (see lib/features/nine_judges/admin/,
+      // lib/features/nine_judges/showcase/ and lib/features/nine_judges/
+      // promo/) — no normal player screen links to any of them (the admin
+      // dashboard's own "🎬 プロモーション動画" tile is the one exception,
+      // per section2's launcher requirement). Everything else (including an
+      // unrecognized route on reload) falls back to the regular game,
+      // matching the previous `home:`-only behavior exactly.
       //
       // '/admins' is a plural alias for '/admin' — kept in sync so either
       // spelling reaches the same AdminScreen (and its unchanged internal
@@ -37,6 +40,7 @@ class NineVerdictsApp extends StatelessWidget {
         '/admin': (context) => const AdminScreen(),
         '/admins': (context) => const AdminScreen(),
         '/showcase': (context) => const DemoShowcaseScreen(),
+        '/promo': (context) => const PromoPlayerScreen(),
       },
       onUnknownRoute: (settings) => MaterialPageRoute(
         builder: (context) =>

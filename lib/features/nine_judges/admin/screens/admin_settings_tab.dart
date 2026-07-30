@@ -51,6 +51,24 @@ class AdminSettingsTab extends StatelessWidget {
       ),
       const Divider(color: Colors.white24, height: 32),
       const Text(
+        'SNS向けプロモーション動画',
+        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+      ),
+      const SizedBox(height: 8),
+      const Text(
+        '固定シード・JSON台本(assets/promo/default_script.json)で毎回同じ映像を'
+        '自動再生します。録画してX/TikTok/YouTube Shorts向けの紹介動画を作成できます。',
+        style: TextStyle(color: Colors.white70, fontSize: 12),
+      ),
+      const SizedBox(height: 8),
+      OutlinedButton.icon(
+        key: const Key('admin-open-promo'),
+        onPressed: () => Navigator.of(context).pushNamed('/promo'),
+        icon: const Text('🎬'),
+        label: const Text('プロモーション動画'),
+      ),
+      const Divider(color: Colors.white24, height: 32),
+      const Text(
         '管理画面は読み取り専用です',
         style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
       ),
