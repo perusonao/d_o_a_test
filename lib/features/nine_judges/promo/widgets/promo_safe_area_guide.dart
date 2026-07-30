@@ -4,8 +4,10 @@ import 'package:flutter/material.dart';
 /// fractions of the viewport — rough, commonly-cited figures for each
 /// platform's own UI chrome (profile/like/share rail, caption band, etc.)
 /// so a recording's captions/action never land where that platform would
-/// cover them.
-enum PromoSafePlatform { x, tiktok, youtubeShorts }
+/// cover them. [recording] is the generic default — not tuned to any one
+/// platform's chrome, just "top ~10% for title/captions, bottom ~15% for
+/// CTA/logo/QR" — safe enough to crop for any of the others afterward.
+enum PromoSafePlatform { recording, x, tiktok, youtubeShorts }
 
 class PromoSafeArea {
   const PromoSafeArea({
@@ -20,6 +22,12 @@ class PromoSafeArea {
   final double left;
   final double right;
 
+  static const recording = PromoSafeArea(
+    top: .10,
+    bottom: .15,
+    left: .04,
+    right: .04,
+  );
   static const x = PromoSafeArea(top: .06, bottom: .10, left: .04, right: .04);
   static const tiktok = PromoSafeArea(
     top: .12,
@@ -36,6 +44,7 @@ class PromoSafeArea {
 
   static PromoSafeArea forPlatform(PromoSafePlatform platform) =>
       switch (platform) {
+        PromoSafePlatform.recording => recording,
         PromoSafePlatform.x => x,
         PromoSafePlatform.tiktok => tiktok,
         PromoSafePlatform.youtubeShorts => youtubeShorts,
@@ -72,6 +81,7 @@ class PromoSafeAreaGuide extends StatelessWidget {
               height * area.bottom,
             ),
             child: DecoratedBox(
+              key: const Key('promo-safe-area-guide'),
               decoration: BoxDecoration(
                 border: Border.all(
                   color: Colors.amberAccent.withValues(alpha: .6),
