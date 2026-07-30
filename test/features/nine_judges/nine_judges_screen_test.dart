@@ -47,7 +47,12 @@ void main() {
     );
     expect(find.byKey(const Key('nine-judges-board')), findsOneWidget);
     expect(find.byKey(const Key('current-bonus')), findsOneWidget);
-    expect(find.byKey(const Key('bonus-history')), findsOneWidget);
+    expect(find.byKey(const Key('bonus-sort-toggle')), findsOneWidget);
+    // 裁定履歴 was folded into 行動履歴 (both showed overlapping information
+    // once the progress strip started showing real revealed values), so its
+    // own dedicated button/modal no longer exists.
+    expect(find.byKey(const Key('bonus-history')), findsNothing);
+    expect(find.byKey(const Key('recent-history')), findsOneWidget);
     expect(find.byKey(const Key('faction-savior')), findsOneWidget);
     expect(find.text('0'), findsNWidgets(2));
     expect(find.byKey(const Key('action-life')), findsOneWidget);
@@ -67,27 +72,48 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('ボーナス履歴は現在・使用済み・残りを表示する', (tester) async {
+  testWidgets('ボーナス山札は確定済みの実際の値を採用順(左から)で表示する', (tester) async {
     await tester.pumpWidget(
       const MaterialApp(
         home: NineJudgesGameScreen(initialSettings: NineJudgesGameSettings()),
       ),
     );
-    await tester.tap(find.byKey(const Key('bonus-history')));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('bonus-history-title')), findsOneWidget);
-    expect(find.byKey(const Key('bonus-history-current')), findsOneWidget);
-    expect(find.byKey(const Key('remaining-bonuses')), findsOneWidget);
-    expect(find.text('使用済み'), findsOneWidget);
-    expect(find.text('残り（順序非公開）'), findsOneWidget);
-    expect(find.textContaining(RegExp(r'[1-9] / [1-9]')), findsNothing);
-    // 9 total bonus values; the very first one is already shown above as
-    // "現在"(publicly known at bonusIndex 0), so exactly 8 should remain
-    // undisclosed here — not 9 (a regression this round fixed: the visible
-    // "現在" bonus used to be double-counted as an extra "?" in 残り too).
-    final remainingText =
-        tester.widget<Text>(find.byKey(const Key('remaining-bonuses'))).data!;
-    expect(remainingText.split(' / '), hasLength(8));
+    // At bonusIndex 0 the first bonus is public to both factions, so the
+    // right-hand "N POINT" panel already shows its real value — capture it
+    // before spending it, so we can confirm the exact same value re-appears
+    // in the strip afterward (not just *a* number, but *this* number).
+    final pointText = tester
+        .widgetList<Text>(find.textContaining('POINT'))
+        .map((widget) => widget.data!)
+        .firstWhere((data) => RegExp(r'^[1-9] POINT$').hasMatch(data));
+    final firstBonusValue = int.parse(pointText.split(' ').first);
+
+    // Force a confirmation via JUDGE so exactly one bonus moves from
+    // "current" to "used".
+    await tester.tap(find.byKey(const Key('action-specialVerdict')));
+    await tester.pump();
+    await tester.tap(find.byType(PersonCardWidget).first);
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('confirm-judge')));
+    await tester.pump();
+
+    // The now-"used" slot must show the real value that was actually spent
+    // — not a placeholder position counter — and it must live inside the
+    // bonus strip specifically (not merely appear somewhere on screen).
+    final usedSlot = find.descendant(
+      of: find.byKey(const Key('current-bonus')),
+      matching: find.text('$firstBonusValue'),
+    );
+    expect(usedSlot, findsOneWidget);
+    // The next bonus is hidden from both factions until the non-confirmer's
+    // next turn, so it must read "?" — never leak a value.
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('current-bonus')),
+        matching: find.text('?'),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('CPU対戦であなた・CPU・現在手番を明示する', (tester) async {
