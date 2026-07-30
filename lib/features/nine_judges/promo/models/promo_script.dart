@@ -84,9 +84,33 @@ class PromoBgmCue {
   );
 }
 
+/// A brief pause in game *progression* only — no scripted action fires
+/// while `(time, time+duration)` is active — so a dramatic beat (e.g. right
+/// as SPECIAL VERDICT lands) gets an extra held frame. The lower bound is
+/// exclusive on purpose: an action cue scheduled at exactly [time] (the
+/// usual case — the hit-stop punctuates that very action) must still fire
+/// on that tick, and only ticks *after* it are held. Captions and camera
+/// cues keep advancing normally during it; pair it with a `zoom`/`shake`
+/// camera cue at the same [time] for the punch-in look.
+class PromoHitStopCue {
+  const PromoHitStopCue({required this.time, required this.duration});
+
+  final double time;
+  final double duration;
+
+  bool isActiveAt(double seconds) => seconds > time && seconds < time + duration;
+
+  factory PromoHitStopCue.fromJson(Map<String, Object?> json) =>
+      PromoHitStopCue(
+        time: (json['time']! as num).toDouble(),
+        duration: (json['duration']! as num).toDouble(),
+      );
+}
+
 /// Which continuous camera transform a [PromoCameraCue] drives. Zoom/pan/
-/// fade/shake are implemented today (see [PromoCameraState]); hit-stop and
-/// slow-motion are Phase 2 (see `PromoEffects`).
+/// fade/shake are implemented today (see [PromoCameraState]); slow-motion
+/// is Phase 2 (see `PromoEffects`) — hit-stop is [PromoHitStopCue] instead,
+/// since it pauses game progression rather than transforming the camera.
 enum PromoCameraEffectType { zoom, pan, fade, shake }
 
 /// One camera move starting at [time] and easing linearly over [duration]
@@ -126,24 +150,56 @@ class PromoCameraCue {
   );
 }
 
+/// The branded closing card — logo + "無料でプレイ" + a question-style CTA —
+/// shown from [at] seconds onward (holds until the promo loops). A full
+/// overlay is the one deliberate exception to "never hide the board": by
+/// this point the gameplay demonstration is over and this is explicitly a
+/// branded end card, same as any short-form video's outro.
+class PromoEndCardCue {
+  const PromoEndCardCue({
+    required this.at,
+    this.logoAsset = 'assets/branding/menu_hero.png',
+    this.freeToPlayText = '無料でプレイ',
+    this.ctaText = 'あなたなら誰を裁く？',
+  });
+
+  final double at;
+  final String logoAsset;
+  final String freeToPlayText;
+  final String ctaText;
+
+  factory PromoEndCardCue.fromJson(Map<String, Object?> json) =>
+      PromoEndCardCue(
+        at: (json['at']! as num).toDouble(),
+        logoAsset: json['logoAsset'] as String? ?? 'assets/branding/menu_hero.png',
+        freeToPlayText: json['freeToPlayText'] as String? ?? '無料でプレイ',
+        ctaText: json['ctaText'] as String? ?? 'あなたなら誰を裁く？',
+      );
+}
+
 /// The full promo script — deliberately one JSON document (not four
 /// separate files) so "シナリオを変更するだけで別動画が作れる" means
-/// editing exactly one asset. Every list defaults to empty and [bgm] is
-/// optional, so a minimal script can be just `{"actions": [...]}`.
+/// editing exactly one asset. Every list defaults to empty and [bgm]/
+/// [endCard] are optional, so a minimal script can be just
+/// `{"actions": [...]}`.
 class PromoScript {
   const PromoScript({
     required this.actions,
     this.captions = const [],
     this.sfx = const [],
     this.camera = const [],
+    this.hitStops = const [],
     this.bgm,
+    this.endCard,
   });
 
   final List<PromoActionCue> actions;
   final List<PromoCaptionCue> captions;
   final List<PromoSfxCue> sfx;
   final List<PromoCameraCue> camera;
+  final List<PromoHitStopCue> hitStops;
   final PromoBgmCue? bgm;
+  final PromoEndCardCue? endCard;
 
   factory PromoScript.fromJson(Map<String, Object?> json) => PromoScript(
     actions:
@@ -164,8 +220,15 @@ class PromoScript {
           for (final entry in (json['camera'] as List?) ?? const [])
             PromoCameraCue.fromJson(entry as Map<String, Object?>),
         ]..sort((a, b) => a.time.compareTo(b.time)),
+    hitStops: [
+      for (final entry in (json['hitStops'] as List?) ?? const [])
+        PromoHitStopCue.fromJson(entry as Map<String, Object?>),
+    ],
     bgm: json['bgm'] != null
         ? PromoBgmCue.fromJson(json['bgm']! as Map<String, Object?>)
+        : null,
+    endCard: json['endCard'] != null
+        ? PromoEndCardCue.fromJson(json['endCard']! as Map<String, Object?>)
         : null,
   );
 

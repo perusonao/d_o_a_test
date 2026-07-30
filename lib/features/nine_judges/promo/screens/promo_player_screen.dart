@@ -6,7 +6,9 @@ import 'package:dead_or_alive/features/nine_judges/promo/controllers/promo_timel
 import 'package:dead_or_alive/features/nine_judges/promo/models/promo_script.dart';
 import 'package:dead_or_alive/features/nine_judges/promo/widgets/promo_camera.dart';
 import 'package:dead_or_alive/features/nine_judges/promo/widgets/promo_caption.dart';
+import 'package:dead_or_alive/features/nine_judges/promo/widgets/promo_end_card.dart';
 import 'package:dead_or_alive/features/nine_judges/promo/widgets/promo_safe_area_guide.dart';
+import 'package:dead_or_alive/features/nine_judges/promo/widgets/promo_score_banner.dart';
 import 'package:dead_or_alive/features/nine_judges/widgets/board_area.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -147,7 +149,10 @@ class _PromoPlayerScreenState extends State<PromoPlayerScreen> {
               platform: widget.safePlatform,
               visible: widget.showSafeAreaGuide,
             ),
+            PromoScoreBanner(controller: _controller),
             PromoCaptionOverlay(text: timeline?.activeCaption),
+            if (timeline?.showEndCard ?? false)
+              PromoEndCard(cue: timeline!.script.endCard!),
           ],
         ),
       ),
