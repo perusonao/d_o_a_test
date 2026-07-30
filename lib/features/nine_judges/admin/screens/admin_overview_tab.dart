@@ -4,22 +4,67 @@ import 'package:dead_or_alive/features/nine_judges/admin/services/cohort_compari
 import 'package:flutter/material.dart';
 
 /// Section 6/7/8: overview dashboard cards + first-time vs experienced
-/// comparison. Purely derived from currently-loaded [records] — never
-/// issues its own Firestore reads.
+/// comparison. Most cards are purely derived from currently-loaded
+/// [records] and issue no Firestore reads of their own; [visitCount]/
+/// [playCount] are the one exception — durable, cross-device raw counters
+/// (see AppStatsRepository/AdminPlaytestRepository.fetchVisitCount) that the
+/// caller fetches independently, exactly like AdminKpiTab's own
+/// tutorialCompletionCount, so they show even when [records] is empty
+/// (`playtests` only reflects games whose player submitted feedback, so it
+/// chronically undercounts real traffic/plays).
 class AdminOverviewTab extends StatelessWidget {
-  const AdminOverviewTab({required this.records, super.key});
+  const AdminOverviewTab({
+    required this.records,
+    this.visitCount,
+    this.playCount,
+    this.visitCountFailed = false,
+    this.playCountFailed = false,
+    super.key,
+  });
 
   final List<PlaytestRecord> records;
 
+  /// Null while still loading (or if the caller never fetches it).
+  final int? visitCount;
+  final int? playCount;
+
+  /// True once a fetch for the corresponding count has failed — shown
+  /// distinctly from "still loading" so it can't be misread as 0.
+  final bool visitCountFailed;
+  final bool playCountFailed;
+
   @override
   Widget build(BuildContext context) {
+    String trafficValue(int? count, bool failed) =>
+        failed ? '取得失敗' : (count == null ? '取得中…' : '$count');
+    final trafficCards = <_Card>[
+      _Card(
+        '訪問数(延べ)',
+        trafficValue(visitCount, visitCountFailed),
+        key: const Key('admin-visit-count'),
+      ),
+      _Card(
+        'プレイ数(延べ)',
+        trafficValue(playCount, playCountFailed),
+        key: const Key('admin-play-count'),
+      ),
+    ];
+
     if (records.isEmpty) {
-      return const Center(
-        child: Text(
-          'データがありません(0件)',
-          key: Key('admin-overview-empty'),
-          style: TextStyle(color: Colors.white70),
-        ),
+      return ListView(
+        key: const Key('admin-overview-list'),
+        padding: const EdgeInsets.all(12),
+        children: [
+          _CardGrid(cards: trafficCards),
+          const SizedBox(height: 16),
+          const Center(
+            child: Text(
+              'データがありません(0件)',
+              key: Key('admin-overview-empty'),
+              style: TextStyle(color: Colors.white70),
+            ),
+          ),
+        ],
       );
     }
     final stats = AdminOverviewStats.compute(
@@ -31,6 +76,7 @@ class AdminOverviewTab extends StatelessWidget {
     String fixed(double? v) => v == null ? '-' : v.toStringAsFixed(2);
 
     final cards = <_Card>[
+      ...trafficCards,
       _Card('総ゲーム数', '${stats.totalGames}'),
       _Card('ユニークtesterId数', '${stats.uniqueTesterCount}'),
       _Card('初回プレイヤー数', '${stats.firstTimePlayerCount}'),
@@ -55,24 +101,7 @@ class AdminOverviewTab extends StatelessWidget {
       key: const Key('admin-overview-list'),
       padding: const EdgeInsets.all(12),
       children: [
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final columns = constraints.maxWidth >= 900
-                ? 4
-                : constraints.maxWidth >= 560
-                ? 2
-                : 1;
-            return GridView.count(
-              crossAxisCount: columns,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              childAspectRatio: 2.4,
-              crossAxisSpacing: 8,
-              mainAxisSpacing: 8,
-              children: [for (final c in cards) c],
-            );
-          },
-        ),
+        _CardGrid(cards: cards),
         const SizedBox(height: 16),
         const _SectionTitle('評価アンケート平均(nullは分母から除外)'),
         for (final key in AdminOverviewStats.ratingKeys)
@@ -106,8 +135,36 @@ class _SectionTitle extends StatelessWidget {
   );
 }
 
+/// Lays [cards] out in a responsive grid — shared by both the empty state
+/// (traffic cards only) and the full card set, so the two never drift out
+/// of sync visually.
+class _CardGrid extends StatelessWidget {
+  const _CardGrid({required this.cards});
+  final List<_Card> cards;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final columns = constraints.maxWidth >= 900
+          ? 4
+          : constraints.maxWidth >= 560
+          ? 2
+          : 1;
+      return GridView.count(
+        crossAxisCount: columns,
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        childAspectRatio: 2.4,
+        crossAxisSpacing: 8,
+        mainAxisSpacing: 8,
+        children: [for (final c in cards) c],
+      );
+    },
+  );
+}
+
 class _Card extends StatelessWidget {
-  const _Card(this.label, this.value);
+  const _Card(this.label, this.value, {super.key});
   final String label;
   final String value;
 

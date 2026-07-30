@@ -155,4 +155,25 @@ void main() {
       expect(count, 0);
     });
   });
+
+  group('AdminPlaytestRepository.fetchVisitCount / fetchPlayCount', () {
+    test('appStats/{visits,plays}のcountフィールドをそれぞれ返す', () async {
+      final firestore = FakeFirebaseFirestore();
+      await firestore.collection('appStats').doc('visits').set({'count': 42});
+      await firestore.collection('appStats').doc('plays').set({'count': 7});
+
+      final repository = AdminPlaytestRepository(firestore: firestore);
+
+      expect(await repository.fetchVisitCount(), 42);
+      expect(await repository.fetchPlayCount(), 7);
+    });
+
+    test('ドキュメントが存在しない場合は0を返す', () async {
+      final firestore = FakeFirebaseFirestore();
+      final repository = AdminPlaytestRepository(firestore: firestore);
+
+      expect(await repository.fetchVisitCount(), 0);
+      expect(await repository.fetchPlayCount(), 0);
+    });
+  });
 }

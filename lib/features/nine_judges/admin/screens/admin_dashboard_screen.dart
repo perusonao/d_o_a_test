@@ -61,12 +61,18 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
 
   int? _tutorialCompletionCount;
   bool _tutorialCompletionFailed = false;
+  int? _visitCount;
+  bool _visitCountFailed = false;
+  int? _playCount;
+  bool _playCountFailed = false;
 
   @override
   void initState() {
     super.initState();
     _loadFirstPage();
     unawaited(_loadTutorialCompletionCount());
+    unawaited(_loadVisitCount());
+    unawaited(_loadPlayCount());
   }
 
   @override
@@ -127,7 +133,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     // Section 23: refresh must not multi-fetch on repeat clicks.
     if (_refreshing) return;
     _refreshing = true;
-    await Future.wait([_loadFirstPage(), _loadTutorialCompletionCount()]);
+    await Future.wait([
+      _loadFirstPage(),
+      _loadTutorialCompletionCount(),
+      _loadVisitCount(),
+      _loadPlayCount(),
+    ]);
     _refreshing = false;
   }
 
@@ -146,6 +157,36 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
       }
     } catch (_) {
       if (mounted) setState(() => _tutorialCompletionFailed = true);
+    }
+  }
+
+  /// Best-effort, same shape as [_loadTutorialCompletionCount] — a failure
+  /// here must never affect the rest of the dashboard.
+  Future<void> _loadVisitCount() async {
+    try {
+      final count = await _repository.fetchVisitCount();
+      if (mounted) {
+        setState(() {
+          _visitCount = count;
+          _visitCountFailed = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _visitCountFailed = true);
+    }
+  }
+
+  Future<void> _loadPlayCount() async {
+    try {
+      final count = await _repository.fetchPlayCount();
+      if (mounted) {
+        setState(() {
+          _playCount = count;
+          _playCountFailed = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _playCountFailed = true);
     }
   }
 
@@ -219,7 +260,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
             child: TabBarView(
               controller: _tabController,
               children: [
-                AdminOverviewTab(records: records),
+                AdminOverviewTab(
+                  records: records,
+                  visitCount: _visitCount,
+                  playCount: _playCount,
+                  visitCountFailed: _visitCountFailed,
+                  playCountFailed: _playCountFailed,
+                ),
                 AdminLogsTab(
                   records: records,
                   anonymizer: anonymizer,

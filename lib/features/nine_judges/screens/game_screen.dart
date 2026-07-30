@@ -7,6 +7,7 @@ import 'package:dead_or_alive/features/nine_judges/game/game_controller.dart';
 import 'package:dead_or_alive/features/nine_judges/logging/game_log_repository.dart';
 import 'package:dead_or_alive/features/nine_judges/models/judge_models.dart';
 import 'package:dead_or_alive/features/nine_judges/screens/handoff_screen.dart';
+import 'package:dead_or_alive/features/nine_judges/services/app_stats_repository.dart';
 import 'package:dead_or_alive/features/nine_judges/screens/mode_select_screen.dart';
 import 'package:dead_or_alive/features/nine_judges/screens/play_log_screen.dart';
 import 'package:dead_or_alive/features/nine_judges/screens/result_screen.dart';
@@ -22,9 +23,16 @@ class NineJudgesGameScreen extends StatefulWidget {
   const NineJudgesGameScreen({
     this.initialSettings,
     this.autoStartTutorial = false,
+    this.appStatsRepository = const AppStatsRepository(),
     super.key,
   });
   final NineJudgesGameSettings? initialSettings;
+
+  /// Injectable so tests never make a real Firestore call — see
+  /// AppStatsRepository's own doc comment. Records one "real play started"
+  /// every time [_startGame] runs, independent of whether that game is ever
+  /// finished or its feedback submitted.
+  final AppStatsRepository appStatsRepository;
 
   /// When true, a device that has never completed or skipped the tutorial
   /// (see [ExternalTestProfile]) is taken straight into it — instead of the
@@ -109,6 +117,7 @@ class _NineJudgesGameScreenState extends State<NineJudgesGameScreen> {
     _handleControllerChanged();
     if (mounted) setState(() {});
     unawaited(_attachExternalTestContext(newController));
+    unawaited(widget.appStatsRepository.recordPlay());
   }
 
   /// The external-test identity (anonymous testerId, play count, prior
