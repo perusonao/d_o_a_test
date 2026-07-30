@@ -1013,7 +1013,21 @@ class _Diamond extends StatelessWidget {
   );
 }
 
-/// Compact verdict-bonus block plus the ledger / recent-action buttons.
+/// Which of the 9 fixed bonus-deck slots a [_BonusSlot] represents, purely
+/// for its own appearance — never derived from real hidden data (the deck's
+/// actual point values for un-used slots are never read here, only each
+/// slot's *position* relative to [NineJudgesController.bonusHistory].
+enum _BonusSlotState { used, current, hidden }
+
+/// Verdict-bonus deck progress strip plus the ledger / recent-action
+/// buttons. Shows the 9-slot bonus deck's progress as a 1-9 sequence (see
+/// the "裁定ボーナス山札" redesign): already-spent slots are greyed with
+/// their position number, the slot about to be spent is highlighted (with
+/// its point value still only shown via the existing right-hand "N POINT" +
+/// visibility label, unchanged), and not-yet-reached slots show the same
+/// card-back/scale motif as the JUDGE action icon — never a "?" and never
+/// tappable, since nothing here is new information beyond what the existing
+/// current-bonus panel already revealed.
 class _BonusBar extends StatelessWidget {
   const _BonusBar({
     required this.controller,
@@ -1031,12 +1045,13 @@ class _BonusBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final viewer = controller.uiViewer;
     final bonus = controller.visibleBonusFor(viewer);
-    // The visibility label alone ("あなたのみ確認" etc.) doesn't tell a first-
-    // time player what the bonus is even FOR. Prefix a short, static purpose
-    // line — except for the very first bonus, whose own label already says
-    // "両者に公開" and doesn't need the extra context.
     final visibility = controller.bonusVisibilityLabel(viewer);
-    final purposeLine = controller.bonusIndex == 0 ? visibility : visibility;
+    final totalSlots = controller.bonusDeck.length;
+    final usedCount = controller.bonusHistory.length;
+    // 1-based position of the slot about to be spent, matching the fixed
+    // 1-9 numbering used throughout this strip.
+    final currentOrdinal = usedCount + 1;
+
     return SizedBox(
       height: 58,
       child: Row(
@@ -1044,7 +1059,7 @@ class _BonusBar extends StatelessWidget {
           Expanded(
             child: Container(
               key: const Key('current-bonus'),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
                   colors: [Color(0xF01A1712), Color(0xF00C0B10)],
@@ -1057,41 +1072,96 @@ class _BonusBar extends StatelessWidget {
               ),
               child: Stack(
                 children: [
-                  Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          controller.bonusIndex == 0 ? '最初の裁定ボーナス' : '次の裁定ボーナス',
-                          style: const TextStyle(
-                            fontSize: 9,
-                            color: Color(0xFFCBB682),
-                            fontWeight: FontWeight.w700,
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Expanded(
+                        flex: 7,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            const Text(
+                              '裁定ボーナス山札（両者に公開）',
+                              textAlign: TextAlign.center,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 8,
+                                color: Color(0xFFCBB682),
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            SizedBox(
+                              height: 20,
+                              child: Row(
+                                children: [
+                                  for (var i = 1; i <= totalSlots; i++)
+                                    Expanded(
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 1,
+                                        ),
+                                        child: _BonusSlot(
+                                          ordinal: i,
+                                          state: i < currentOrdinal
+                                              ? _BonusSlotState.used
+                                              : i == currentOrdinal
+                                              ? _BonusSlotState.current
+                                              : _BonusSlotState.hidden,
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        flex: 4,
+                        // FittedBox(scaleDown) — the 9-slot icon strip now
+                        // shares this box with the point display, so "N
+                        // POINT" no longer has the whole box width to
+                        // itself; on narrow phones it could wrap to a
+                        // second line and overflow this column's fixed
+                        // height. Scaling down instead of wrapping keeps
+                        // both lines fully readable at any width.
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                '${bonus ?? '?'} POINT',
+                                textAlign: TextAlign.center,
+                                maxLines: 1,
+                                style: const TextStyle(
+                                  color: Color(0xFFFFDF79),
+                                  fontSize: 18,
+                                  height: 1.05,
+                                  fontWeight: FontWeight.w900,
+                                  fontFamilyFallback: ['serif'],
+                                ),
+                              ),
+                              Text(
+                                visibility,
+                                key: const Key('bonus-visibility-label'),
+                                textAlign: TextAlign.center,
+                                maxLines: 1,
+                                style: const TextStyle(
+                                  fontSize: 8,
+                                  color: GameColors.textDim,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        Text(
-                          '${bonus ?? '?'} POINT',
-                          style: const TextStyle(
-                            color: Color(0xFFFFDF79),
-                            fontSize: 20,
-                            height: 1.05,
-                            fontWeight: FontWeight.w900,
-                            fontFamilyFallback: ['serif'],
-                          ),
-                        ),
-                        Text(
-                          purposeLine,
-                          key: const Key('bonus-visibility-label'),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 8,
-                            color: GameColors.textDim,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                   Positioned(
                     top: -6,
@@ -1137,6 +1207,68 @@ class _BonusBar extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// One box in the 9-slot bonus-deck progress strip. Never tappable — purely
+/// a read-only progress indicator: already-spent slots (fewer than the
+/// current ordinal) show their own position number greyed out, the slot
+/// about to be spent is highlighted gold, and not-yet-reached slots show
+/// the same scale/JUDGE motif as a face-down card — never a number or a
+/// "?", since no slot here ever reveals an actual point value (that stays
+/// solely in the existing right-hand "N POINT" display).
+class _BonusSlot extends StatelessWidget {
+  const _BonusSlot({required this.ordinal, required this.state});
+
+  final int ordinal;
+  final _BonusSlotState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final isCurrent = state == _BonusSlotState.current;
+    final isHidden = state == _BonusSlotState.hidden;
+    return Container(
+      decoration: BoxDecoration(
+        color: isCurrent
+            ? GameColors.gold.withValues(alpha: .16)
+            : Colors.white.withValues(alpha: isHidden ? .04 : .07),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(
+          color: isCurrent ? GameColors.gold : GameColors.goldSoft,
+          width: isCurrent ? 1.4 : 1,
+        ),
+        boxShadow: isCurrent
+            ? [
+                BoxShadow(
+                  color: GameColors.gold.withValues(alpha: .35),
+                  blurRadius: 5,
+                ),
+              ]
+            : null,
+      ),
+      alignment: Alignment.center,
+      child: isHidden
+          ? Padding(
+              padding: const EdgeInsets.all(3),
+              child: Opacity(
+                opacity: .55,
+                child: Image.asset(
+                  CardAssets.actionIcon(ActionType.specialVerdict),
+                  fit: BoxFit.contain,
+                ),
+              ),
+            )
+          : Text(
+              '$ordinal',
+              style: TextStyle(
+                fontSize: isCurrent ? 12 : 10,
+                fontWeight: isCurrent ? FontWeight.w900 : FontWeight.w700,
+                color: isCurrent
+                    ? GameColors.gold
+                    : GameColors.textDim.withValues(alpha: .8),
+              ),
+            ),
     );
   }
 }
