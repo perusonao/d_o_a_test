@@ -76,6 +76,7 @@ flutter:
     - assets/icons/
     - assets/icons/menu/
     - assets/decorations/
+    - assets/promo/
 
 flutter_launcher_icons:
   image_path: assets/branding/app_icon.png

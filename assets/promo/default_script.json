@@ -1,0 +1,23 @@
+{
+  "actions": [
+    { "time": 0, "action": "showBoard" },
+    { "time": 2, "action": "life", "target": "good-2" },
+    { "time": 4, "action": "eye", "target": "neutral-3" },
+    { "time": 7, "action": "specialVerdict", "target": "evil-1" }
+  ],
+  "captions": [
+    { "start": 0, "end": 2, "text": "あなたなら、この9人をどう裁く？" },
+    { "start": 3, "end": 5, "text": "正体は分からない。" },
+    { "start": 6, "end": 9, "text": "限られた情報だけで判断する。" }
+  ],
+  "sfx": [
+    { "time": 2.1, "sound": "card_select" },
+    { "time": 7.0, "sound": "special_verdict" }
+  ],
+  "bgm": { "track": "promo_theme", "fadeOutAt": 8.5 },
+  "camera": [
+    { "time": 2, "type": "zoom", "scale": 1.1, "duration": 1.2 },
+    { "time": 4, "type": "pan", "dx": -0.3, "dy": 0, "duration": 1.0 },
+    { "time": 7, "type": "shake", "intensity": 1.0, "duration": 0.5 }
+  ]
+}
