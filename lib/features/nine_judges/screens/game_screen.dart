@@ -549,12 +549,13 @@ class _GameBoardState extends State<_GameBoard> {
                 style: TextStyle(fontWeight: FontWeight.w900),
               ),
               Text(
-                controller.remainingBonuses.isEmpty
+                // `remainingBonuses` counts every bonus not yet spent on a
+                // confirmation, which still includes the "現在" one shown
+                // above — already revealed to this viewer, so it must not
+                // also be listed as an undisclosed "?" here.
+                _hiddenBonusCount(current) <= 0
                     ? 'なし'
-                    : List.filled(
-                        controller.remainingBonuses.length,
-                        '?',
-                      ).join(' / '),
+                    : List.filled(_hiddenBonusCount(current), '?').join(' / '),
                 key: const Key('remaining-bonuses'),
               ),
               const SizedBox(height: 8),
@@ -571,6 +572,14 @@ class _GameBoardState extends State<_GameBoard> {
       ),
     );
   }
+
+  /// How many bonus values are still genuinely undisclosed to this viewer.
+  /// [remainingBonuses] counts every bonus not yet *spent* on a
+  /// confirmation, which includes the "現在" one shown separately above the
+  /// moment it's been privately revealed — so it must be subtracted here to
+  /// avoid listing an already-known value as a second "?".
+  int _hiddenBonusCount(int? currentlyVisible) =>
+      controller.remainingBonuses.length - (currentlyVisible != null ? 1 : 0);
 
   void _showHistory(BuildContext context, Faction viewer) {
     final recent = controller.logs.reversed.take(5).toList().reversed;
@@ -887,21 +896,28 @@ class _TurnIndicator extends StatelessWidget {
                   children: [
                     _Diamond(muted: !isHumanTurn),
                     const SizedBox(width: 6),
+                    // FittedBox (not a fixed font size + ellipsis) so "YOUR
+                    // TURN"/"CPU TURN" always renders in full — on some
+                    // devices this centre column is too narrow for the text
+                    // at its natural size, and truncating whose-turn-it-is
+                    // to "YOUR TU…" is worse than shrinking it slightly.
                     Flexible(
-                      child: Text(
-                        big,
-                        key: const Key('turn-big-label'),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: isHumanTurn
-                              ? GameColors.gold
-                              : GameColors.goldMuted,
-                          fontSize: 15,
-                          fontWeight: isHumanTurn
-                              ? FontWeight.w900
-                              : FontWeight.w700,
-                          letterSpacing: 1,
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          big,
+                          key: const Key('turn-big-label'),
+                          maxLines: 1,
+                          style: TextStyle(
+                            color: isHumanTurn
+                                ? GameColors.gold
+                                : GameColors.goldMuted,
+                            fontSize: 15,
+                            fontWeight: isHumanTurn
+                                ? FontWeight.w900
+                                : FontWeight.w700,
+                            letterSpacing: 1,
+                          ),
                         ),
                       ),
                     ),
