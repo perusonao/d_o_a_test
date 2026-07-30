@@ -133,4 +133,66 @@ void main() {
     expect(calls.where((c) => c == 'sfx:boop').length, 1);
     expect(calls.where((c) => c == 'stopBgm').length, 1);
   });
+
+  test(
+    'a hit-stop still lets its own triggering cue fire, but holds any cue due while it is active',
+    () {
+      final controller = NineJudgesController(
+        seed: 3,
+        settings: const NineJudgesGameSettings(
+          mode: GameMode.cpu,
+          skipCpuDelays: true,
+        ),
+      );
+      final firstId = controller.board[0].person.id;
+      final secondId = controller.board[1].person.id;
+      final script = PromoScript(
+        actions: [
+          PromoActionCue(time: 1, action: 'life', target: firstId),
+          PromoActionCue(time: 1.1, action: 'death', target: secondId),
+        ],
+        hitStops: const [PromoHitStopCue(time: 1, duration: 0.3)],
+      );
+      final timeline = PromoTimelineController(
+        controller: controller,
+        script: script,
+      );
+
+      // The cue that starts the hit-stop fires on the very tick it's due.
+      timeline.advanceTo(const Duration(milliseconds: 1000));
+      expect(controller.board[0].person.verdictActionCount, 1);
+
+      // A second cue due while the hit-stop is still active must be held.
+      timeline.advanceTo(const Duration(milliseconds: 1100));
+      expect(controller.board[1].person.verdictActionCount, 0);
+
+      // Once the hit-stop window has passed, the held cue fires.
+      timeline.advanceTo(const Duration(milliseconds: 1400));
+      expect(controller.board[1].person.verdictActionCount, 1);
+    },
+  );
+
+  test('showEndCard turns on at endCard.at and stays on afterward', () {
+    final controller = NineJudgesController(
+      seed: 4,
+      settings: const NineJudgesGameSettings(),
+    );
+    final script = PromoScript(
+      actions: const [],
+      endCard: const PromoEndCardCue(at: 2),
+    );
+    final timeline = PromoTimelineController(
+      controller: controller,
+      script: script,
+    );
+
+    timeline.advanceTo(const Duration(milliseconds: 1900));
+    expect(timeline.showEndCard, isFalse);
+
+    timeline.advanceTo(const Duration(seconds: 2));
+    expect(timeline.showEndCard, isTrue);
+
+    timeline.advanceTo(const Duration(seconds: 3));
+    expect(timeline.showEndCard, isTrue);
+  });
 }

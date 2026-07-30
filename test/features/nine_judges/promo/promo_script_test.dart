@@ -45,6 +45,47 @@ void main() {
     expect(script.captions, isEmpty);
     expect(script.sfx, isEmpty);
     expect(script.camera, isEmpty);
+    expect(script.hitStops, isEmpty);
     expect(script.bgm, isNull);
+    expect(script.endCard, isNull);
+  });
+
+  test('parses hitStops and endCard from JSON', () {
+    const source = '''
+    {
+      "actions": [],
+      "hitStops": [{"time": 8.5, "duration": 0.3}],
+      "endCard": {
+        "at": 12.5,
+        "logoAsset": "assets/branding/menu_hero.png",
+        "freeToPlayText": "無料でプレイ",
+        "ctaText": "あなたなら誰を裁く？"
+      }
+    }
+    ''';
+    final script = PromoScript.fromJsonString(source);
+
+    expect(script.hitStops.single.time, 8.5);
+    expect(script.hitStops.single.duration, 0.3);
+    // The cue that triggers the hit-stop must still be considered "not yet
+    // held" at its own start time, only afterward.
+    expect(script.hitStops.single.isActiveAt(8.5), isFalse);
+    expect(script.hitStops.single.isActiveAt(8.6), isTrue);
+    expect(script.hitStops.single.isActiveAt(8.8), isFalse);
+
+    expect(script.endCard!.at, 12.5);
+    expect(script.endCard!.logoAsset, 'assets/branding/menu_hero.png');
+    expect(script.endCard!.freeToPlayText, '無料でプレイ');
+    expect(script.endCard!.ctaText, 'あなたなら誰を裁く？');
+  });
+
+  test('endCard falls back to its defaults when fields are omitted', () {
+    final script = PromoScript.fromJsonString(
+      '{"actions": [], "endCard": {"at": 5}}',
+    );
+    expect(script.endCard!.at, 5);
+    expect(script.endCard!.logoAsset, 'assets/branding/menu_hero.png');
+    expect(script.endCard!.freeToPlayText, '無料でプレイ');
+    expect(script.endCard!.ctaText, 'あなたなら誰を裁く？');
   });
 }

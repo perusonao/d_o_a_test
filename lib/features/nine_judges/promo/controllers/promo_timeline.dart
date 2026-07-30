@@ -62,6 +62,9 @@ class PromoTimelineController extends ChangeNotifier {
   String? activeCaption;
   PromoCameraState cameraState = const PromoCameraState();
 
+  /// Whether [PromoScript.endCard] should be showing right now.
+  bool showEndCard = false;
+
   bool get isRunning => _timer != null;
 
   /// Starts a real [Timer.periodic] advancing the timeline against actual
@@ -96,7 +99,12 @@ class PromoTimelineController extends ChangeNotifier {
     _updateCaption(seconds);
     _updateCamera(seconds);
     _fireSfx(seconds);
-    _fireDueActions(seconds);
+    // A hit-stop pauses game *progression* only — captions/camera above
+    // keep advancing normally so a caption can still land during the beat.
+    final hitStopped = script.hitStops.any((cue) => cue.isActiveAt(seconds));
+    if (!hitStopped) _fireDueActions(seconds);
+    final endCard = script.endCard;
+    showEndCard = endCard != null && seconds >= endCard.at;
     final bgm = script.bgm;
     if (bgm != null && !_bgmStarted) {
       audio.playBgm(bgm.track);
