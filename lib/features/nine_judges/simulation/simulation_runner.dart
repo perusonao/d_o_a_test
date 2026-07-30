@@ -44,6 +44,42 @@ class SimulationRunner {
     );
   }
 
+  /// Same as [run], but yields to the event loop every [yieldEvery] games so
+  /// a caller (the admin "ゲームバランス分析" tool) can repaint a progress
+  /// bar and offer a cancel button instead of freezing the tab for the
+  /// whole batch. [onProgress] receives the games completed so far — safe
+  /// to read (never mutated concurrently, since Dart is single-threaded and
+  /// this only appends between `await` points). Returns `null` if cancelled
+  /// before even one game finished — [SimulationStatistics]/
+  /// [FirstSecondAnalysis] both assume at least one result.
+  Future<SimulationRun?> runWithProgress(
+    SimulationConfig config, {
+    void Function(int done, int total, List<SimulationResult> soFar)?
+    onProgress,
+    bool Function()? isCancelled,
+    int yieldEvery = 25,
+  }) async {
+    final stopwatch = Stopwatch()..start();
+    final results = <SimulationResult>[];
+    for (var i = 0; i < config.gameCount; i++) {
+      if (isCancelled?.call() ?? false) break;
+      results.add(_runGame(config, i));
+      if ((i + 1) % yieldEvery == 0 || i == config.gameCount - 1) {
+        onProgress?.call(i + 1, config.gameCount, results);
+        await Future<void>.delayed(Duration.zero);
+      }
+    }
+    stopwatch.stop();
+    if (results.isEmpty) return null;
+    return SimulationRun(
+      config: config,
+      results: results,
+      statistics: SimulationStatistics.fromResults(results, config),
+      firstSecondAnalysis: FirstSecondAnalysis.fromResults(results, config),
+      elapsed: stopwatch.elapsed,
+    );
+  }
+
   SimulationResult _runGame(SimulationConfig config, int gameIndex) {
     final seed = config.seedFor(gameIndex);
     final setupRandom = Random(seed);
@@ -71,9 +107,10 @@ class SimulationRunner {
       Faction.savior: {6, 7, 8},
       Faction.executor: {0, 1, 2},
     };
-    final specialUsed = <Faction, bool>{
-      Faction.savior: false,
-      Faction.executor: false,
+    final flags = config.ruleFlags;
+    final specialUsedCount = <Faction, int>{
+      Faction.savior: 0,
+      Faction.executor: 0,
     };
     final reverseUsed = <Faction, bool>{
       Faction.savior: false,
@@ -97,10 +134,26 @@ class SimulationRunner {
     var bonusIndex = 0;
     var actor = firstPlayer;
     var turn = 1;
+    var timedOut = false;
+
+    bool specialVerdictUsedFor(Faction faction) =>
+        flags.judgeUsesPerPlayer != null &&
+        specialUsedCount[faction]! >= flags.judgeUsesPerPlayer!;
+
+    bool reverseActionUsedFor(ActionType action, Faction faction) {
+      if (!_isReverse(action, faction)) return false;
+      if (reverseUsed[faction]!) return true;
+      if (action == ActionType.life && !flags.reverseLifeEnabled) return true;
+      if (action == ActionType.death && !flags.reverseDeathEnabled) {
+        return true;
+      }
+      return false;
+    }
 
     while (board.where((slot) => slot.person.isConfirmed).length < 9) {
       if (turn > 256) {
-        throw StateError('Simulation did not terminate (seed=$seed).');
+        timedOut = true;
+        break;
       }
       if (pendingReveal[actor]!) {
         privateBonus[actor] = bonuses[bonusIndex];
@@ -108,27 +161,29 @@ class SimulationRunner {
       }
       final legalTargets = <ActionType, List<int>>{
         for (final action in ActionType.values)
-          action: [
-            for (var index = 0; index < board.length; index++)
-              if (NineJudgesRules.canUseAction(
-                action: action,
-                person: board[index].person,
-                actor: actor,
-                actorKnowsAttribute:
-                    board[index].person.isConfirmed ||
-                    known[actor]!.contains(index),
-                specialVerdictUsed: specialUsed[actor]!,
-                reverseActionUsed:
-                    _isReverse(action, actor) && reverseUsed[actor]!,
-                eyeAllowedForZone:
-                    !eyeZoneRestricted ||
-                    NineJudgesConfig.centerIndices.contains(index),
-                eyeUsesRemaining: eyeMax == null
-                    ? null
-                    : eyeMax - eyeUsedCount[actor]!,
-              ))
-                index,
-          ],
+          action: action == ActionType.eye && !flags.eyeEnabled
+              ? const []
+              : [
+                  for (var index = 0; index < board.length; index++)
+                    if (NineJudgesRules.canUseAction(
+                      action: action,
+                      person: board[index].person,
+                      actor: actor,
+                      actorKnowsAttribute:
+                          board[index].person.isConfirmed ||
+                          known[actor]!.contains(index),
+                      specialVerdictUsed: specialVerdictUsedFor(actor),
+                      reverseActionUsed: reverseActionUsedFor(action, actor),
+                      eyeAllowedForZone:
+                          !eyeZoneRestricted ||
+                          NineJudgesConfig.centerIndices.contains(index),
+                      eyeUsesRemaining: eyeMax == null
+                          ? null
+                          : eyeMax - eyeUsedCount[actor]!,
+                      judgeRequiresDeliberating: flags.judgeRequiresDeliberating,
+                    ))
+                      index,
+                ],
       };
       final view = CpuGameView(
         faction: actor,
@@ -146,10 +201,17 @@ class SimulationRunner {
         ],
         legalTargets: legalTargets,
         currentBonus: privateBonus[actor],
-        specialVerdictAvailable: !specialUsed[actor]!,
+        specialVerdictAvailable: !specialVerdictUsedFor(actor),
         reverseActionAvailable: !reverseUsed[actor]!,
         eyeUsesRemaining: eyeMax == null ? null : eyeMax - eyeUsedCount[actor]!,
       );
+      if (legalTargets.values.every((targets) => targets.isEmpty)) {
+        // Every action masked out (e.g. an untested rule-flag combination
+        // leaves this actor with no legal move at all) — treat exactly like
+        // running out of turns rather than crashing the whole batch run.
+        timedOut = true;
+        break;
+      }
       final decision = strategies[actor]!.decideAction(view);
       if (!(legalTargets[decision.action] ?? const []).contains(
         decision.targetIndex,
@@ -167,18 +229,20 @@ class SimulationRunner {
         known[actor]!.add(index);
         eyeUsedCount[actor] = eyeUsedCount[actor]! + 1;
       } else if (decision.action == ActionType.specialVerdict) {
-        specialUsed[actor] = true;
+        specialUsedCount[actor] = specialUsedCount[actor]! + 1;
         after = NineJudgesRules.applySpecialVerdict(
           person: before,
           actor: actor,
         );
       } else {
         if (wasReverse) reverseUsed[actor] = true;
-        after = NineJudgesRules.applyVerdictAction(
-          person: before,
-          action: decision.action,
-          actor: actor,
-        );
+        after = flags.naturalConfirmationEnabled
+            ? NineJudgesRules.applyVerdictAction(
+                person: before,
+                action: decision.action,
+                actor: actor,
+              )
+            : _applyNonConfirmingAction(before, decision.action);
       }
       int? awardedBonus;
       int? confirmationOrder;
@@ -196,10 +260,15 @@ class SimulationRunner {
         known[Faction.executor]!.add(index);
         if (bonusIndex < bonuses.length - 1) {
           bonusIndex++;
-          privateBonus[Faction.savior] = null;
-          privateBonus[Faction.executor] = null;
-          pendingReveal[actor] = false;
-          pendingReveal[actor.opponent] = true;
+          if (flags.bonusAlwaysPublic) {
+            privateBonus[Faction.savior] = bonuses[bonusIndex];
+            privateBonus[Faction.executor] = bonuses[bonusIndex];
+          } else {
+            privateBonus[Faction.savior] = null;
+            privateBonus[Faction.executor] = null;
+            pendingReveal[actor] = false;
+            pendingReveal[actor.opponent] = true;
+          }
         }
       }
       board[index] = board[index].copyWith(person: after);
@@ -234,6 +303,31 @@ class SimulationRunner {
       scores: scores,
       board: board,
       actions: actions,
+      endReason: timedOut ? 'turnLimitReached' : 'allConfirmed',
+    );
+  }
+
+  /// Used only when [SimulationRuleFlags.naturalConfirmationEnabled] is
+  /// false: LIFE/DEATH still move a person towards alive/dead and still
+  /// grow their history, but never confirm it on their own — JUDGE becomes
+  /// the only way this person is ever confirmed.
+  static PersonCard _applyNonConfirmingAction(
+    PersonCard person,
+    ActionType action,
+  ) {
+    assert(action == ActionType.life || action == ActionType.death);
+    final desired = action == ActionType.life
+        ? VerdictState.alive
+        : VerdictState.dead;
+    return person.copyWith(
+      verdictState: desired,
+      verdictActionCount: person.verdictActionCount + 1,
+      verdictHistory: [
+        ...person.verdictHistory,
+        action == ActionType.life
+            ? VerdictActionType.life
+            : VerdictActionType.death,
+      ],
     );
   }
 
@@ -245,6 +339,7 @@ class SimulationRunner {
     required Map<Faction, int> scores,
     required List<BoardSlot> board,
     required List<SimulationActionRecord> actions,
+    required String endReason,
   }) {
     int count(Faction faction, ActionType action) => actions
         .where((entry) => entry.faction == faction && entry.action == action)
@@ -294,7 +389,7 @@ class SimulationRunner {
       saviorScore: saviorScore,
       executorScore: executorScore,
       totalTurns: actions.length,
-      endReason: 'allConfirmed',
+      endReason: endReason,
       saviorEyeCount: count(Faction.savior, ActionType.eye),
       executorEyeCount: count(Faction.executor, ActionType.eye),
       saviorLifeCount: count(Faction.savior, ActionType.life),
@@ -381,6 +476,22 @@ class SimulationRunner {
       }).length,
       finalConfirmedCount: board
           .where((slot) => slot.person.isConfirmed)
+          .length,
+      saviorNaturalConfirmationCount: actions
+          .where(
+            (entry) =>
+                entry.faction == Faction.savior &&
+                entry.confirmedThisAction &&
+                entry.action != ActionType.specialVerdict,
+          )
+          .length,
+      executorNaturalConfirmationCount: actions
+          .where(
+            (entry) =>
+                entry.faction == Faction.executor &&
+                entry.confirmedThisAction &&
+                entry.action != ActionType.specialVerdict,
+          )
           .length,
       actions: List.unmodifiable(actions),
     );

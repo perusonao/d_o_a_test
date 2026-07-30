@@ -795,6 +795,22 @@ class ExperimentSimulationRunner {
             finalState.isAlive == entry.stateAfter.isAlive;
       }).length,
       finalConfirmedCount: board.where((slot) => slot.person.isConfirmed).length,
+      saviorNaturalConfirmationCount: actions
+          .where(
+            (entry) =>
+                entry.faction == Faction.savior &&
+                entry.confirmedThisAction &&
+                entry.action != ActionType.specialVerdict,
+          )
+          .length,
+      executorNaturalConfirmationCount: actions
+          .where(
+            (entry) =>
+                entry.faction == Faction.executor &&
+                entry.confirmedThisAction &&
+                entry.action != ActionType.specialVerdict,
+          )
+          .length,
       actions: List.unmodifiable(actions),
     );
   }

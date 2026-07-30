@@ -28,6 +28,10 @@ abstract final class NineJudgesRules {
     // doesn't pass them is unaffected.
     bool eyeAllowedForZone = true,
     int? eyeUsesRemaining,
+    // Simulation-only (see SimulationRuleFlags.judgeRequiresDeliberating):
+    // defaults to today's actual rule, so every existing caller that
+    // doesn't pass this is unaffected.
+    bool judgeRequiresDeliberating = true,
   }) {
     if (person.isConfirmed) return false;
     return switch (action) {
@@ -39,8 +43,9 @@ abstract final class NineJudgesRules {
             (eyeUsesRemaining == null || eyeUsesRemaining > 0),
       ActionType.specialVerdict =>
         !specialVerdictUsed &&
-            person.verdictState == VerdictState.deliberating &&
-            person.verdictActionCount == 0,
+            (!judgeRequiresDeliberating ||
+                (person.verdictState == VerdictState.deliberating &&
+                    person.verdictActionCount == 0)),
     };
   }
 

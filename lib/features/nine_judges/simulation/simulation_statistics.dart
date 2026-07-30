@@ -58,6 +58,112 @@ class SimulationStatistics {
     };
     double rate(int value, [int? denominator]) =>
         (denominator ?? games) == 0 ? 0 : value / (denominator ?? games);
+
+    // Section 5 (admin "ゲームバランス分析" tool): usage rate + win rate for
+    // every trackable card. Adding a future card/rule is just one more
+    // entry here — [Faction]-neutral by construction (some cards, like the
+    // one-shot reverse actions, are only ever legal for a single faction;
+    // that's simply reflected as a zero count on the other side).
+    Map<String, Object> cardUsage({
+      required int Function(SimulationResult) savior,
+      required int Function(SimulationResult) executor,
+    }) {
+      final totalSavior = results.fold<int>(0, (sum, r) => sum + savior(r));
+      final totalExecutor = results.fold<int>(
+        0,
+        (sum, r) => sum + executor(r),
+      );
+      final outcomes = <bool>[
+        for (final r in results)
+          if (r.winner != null) ...[
+            if (savior(r) > 0) r.winner == Faction.savior,
+            if (executor(r) > 0) r.winner == Faction.executor,
+          ],
+      ];
+      final gamesUsed = results
+          .where((r) => savior(r) > 0 || executor(r) > 0)
+          .length;
+      return {
+        'timesUsedTotal': totalSavior + totalExecutor,
+        'timesUsedSavior': totalSavior,
+        'timesUsedExecutor': totalExecutor,
+        'averagePerGame': (totalSavior + totalExecutor) / games,
+        'gamesUsedRate': rate(gamesUsed),
+        'winRateWhenUsed': outcomes.isEmpty
+            ? 0.0
+            : outcomes.where((used) => used).length / outcomes.length,
+      };
+    }
+
+    final cardUsageStats = <String, Object>{
+      'LIFE': cardUsage(
+        savior: (r) => r.saviorLifeCount,
+        executor: (r) => r.executorLifeCount,
+      ),
+      'DEATH': cardUsage(
+        savior: (r) => r.saviorDeathCount,
+        executor: (r) => r.executorDeathCount,
+      ),
+      'EYE': cardUsage(
+        savior: (r) => r.saviorEyeCount,
+        executor: (r) => r.executorEyeCount,
+      ),
+      'JUDGE': cardUsage(
+        savior: (r) => r.saviorJudgeUsed ? 1 : 0,
+        executor: (r) => r.executorJudgeUsed ? 1 : 0,
+      ),
+      // Only ever legal for one faction each — see NineJudgesRules.
+      'ReverseLIFE': cardUsage(
+        savior: (r) => 0,
+        executor: (r) => r.executorReverseUsed ? 1 : 0,
+      ),
+      'ReverseDEATH': cardUsage(
+        savior: (r) => r.saviorReverseUsed ? 1 : 0,
+        executor: (r) => 0,
+      ),
+      'SPECIAL_VERDICT': cardUsage(
+        savior: (r) => r.saviorNaturalConfirmationCount,
+        executor: (r) => r.executorNaturalConfirmationCount,
+      ),
+    };
+
+    // Section 6: per bonus-value (1-9) capture rate + win rate/average
+    // final score for whichever faction captured it.
+    final bonusAnalysis = <String, Object>{
+      for (var bonus = 1; bonus <= 9; bonus++)
+        '$bonus': () {
+          final saviorGames = results
+              .where((r) => r.bonusValuesWonBySavior.contains(bonus))
+              .toList();
+          final executorGames = results
+              .where((r) => r.bonusValuesWonByExecutor.contains(bonus))
+              .toList();
+          final outcomes = <bool>[
+            for (final r in saviorGames)
+              if (r.winner != null) r.winner == Faction.savior,
+            for (final r in executorGames)
+              if (r.winner != null) r.winner == Faction.executor,
+          ];
+          return {
+            'saviorCaptures': saviorGames.length,
+            'executorCaptures': executorGames.length,
+            'winRateWhenCaptured': outcomes.isEmpty
+                ? 0.0
+                : outcomes.where((won) => won).length / outcomes.length,
+            'averageFinalScoreWhenCapturedBySavior': saviorGames.isEmpty
+                ? 0.0
+                : saviorGames.fold<int>(0, (sum, r) => sum + r.saviorScore) /
+                      saviorGames.length,
+            'averageFinalScoreWhenCapturedByExecutor': executorGames.isEmpty
+                ? 0.0
+                : executorGames.fold<int>(
+                        0,
+                        (sum, r) => sum + r.executorScore,
+                      ) /
+                      executorGames.length,
+          };
+        }(),
+    };
     return SimulationStatistics._({
       'gameCount': games,
       'saviorWins': wins(Faction.savior),
@@ -221,6 +327,17 @@ class SimulationStatistics {
         highSavior + highExecutor,
       ),
       'bonusCaptures': bonusCaptures,
+      'cardUsage': cardUsageStats,
+      'bonusAnalysis': bonusAnalysis,
+      // Games that hit the turn cap before every person was confirmed —
+      // only ever non-zero for an untested SimulationRuleFlags combination
+      // the current CPU logic can't play out to completion (e.g. it rarely
+      // chooses JUDGE once natural confirmation is disabled and JUDGE is
+      // unlimited). A high rate here means the *CPU*, not the ruleset
+      // itself, is the bottleneck — worth flagging prominently in the UI.
+      'turnLimitReachedRate': rate(
+        results.where((result) => result.endReason == 'turnLimitReached').length,
+      ),
     });
   }
 

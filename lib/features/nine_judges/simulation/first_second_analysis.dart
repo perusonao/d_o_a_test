@@ -149,9 +149,15 @@ class FirstSecondAnalysis {
     final eyesBeforeFirstConfirmation = <int>[];
     final firstConfirmationTurns = <int>[];
     for (final result in results) {
-      final firstConfirmation = result.actions.firstWhere(
+      // A rule-flag experiment (see SimulationRuleFlags) can produce a game
+      // that never confirms anyone at all before hitting the turn limit —
+      // simply excluded from this "how early does the first confirmation
+      // land" metric rather than crashing the whole aggregation.
+      final firstConfirmation = _firstOrNull(
+        result.actions,
         (action) => action.confirmedThisAction,
       );
+      if (firstConfirmation == null) continue;
       firstConfirmationTurns.add(firstConfirmation.turn);
       eyesBeforeFirstConfirmation.add(
         result.actions
@@ -173,11 +179,16 @@ class FirstSecondAnalysis {
     final reverseFinalBonuses = <int>[];
     for (final reverse in reverseActions) {
       final result = ownerByAction[reverse]!;
-      final finalConfirmation = result.actions.firstWhere(
+      // The reversed person may never end up confirmed at all (game hit its
+      // turn limit first) — skip rather than crash; nothing to correlate
+      // this reverse action's outcome with in that case.
+      final finalConfirmation = _firstOrNull(
+        result.actions,
         (action) =>
             action.targetIndex == reverse.targetIndex &&
             action.confirmedThisAction,
       );
+      if (finalConfirmation == null) continue;
       if (finalConfirmation.scoringFaction == reverse.faction) {
         reverseUserScored++;
       }
@@ -275,8 +286,12 @@ class FirstSecondAnalysis {
         'firstConfirmationTurn': {
           'average': _average(firstConfirmationTurns),
           'median': _median(firstConfirmationTurns),
-          'min': firstConfirmationTurns.reduce(min),
-          'max': firstConfirmationTurns.reduce(max),
+          'min': firstConfirmationTurns.isEmpty
+              ? 0
+              : firstConfirmationTurns.reduce(min),
+          'max': firstConfirmationTurns.isEmpty
+              ? 0
+              : firstConfirmationTurns.reduce(max),
         },
       },
       'reverseTiming': {
@@ -352,10 +367,17 @@ class FirstSecondAnalysis {
     var second = 0;
     var savior = 0;
     var executor = 0;
+    var total = 0;
     for (final result in results) {
-      final action = result.actions.firstWhere(
+      // A game that hit its turn limit early (see SimulationRuleFlags) may
+      // never reach this confirmation order at all — excluded from this
+      // order's tally rather than crashing the whole aggregation.
+      final action = _firstOrNull(
+        result.actions,
         (candidate) => candidate.confirmationOrder == order,
       );
+      if (action == null) continue;
+      total++;
       if (action.scoringFaction == result.firstPlayer) {
         first++;
       } else {
@@ -368,11 +390,11 @@ class FirstSecondAnalysis {
       }
     }
     return {
-      'total': results.length,
+      'total': total,
       'firstPlayer': first,
       'secondPlayer': second,
-      'firstPlayerRate': _rate(first, results.length),
-      'secondPlayerRate': _rate(second, results.length),
+      'firstPlayerRate': _rate(first, total),
+      'secondPlayerRate': _rate(second, total),
       'savior': savior,
       'executor': executor,
     };
@@ -403,10 +425,15 @@ class FirstSecondAnalysis {
         if (verdictActions.map((action) => action.faction).toSet().length < 2) {
           continue;
         }
-        final confirmation = result.actions.firstWhere(
+        // Contested but never actually confirmed (game hit its turn limit
+        // first, see SimulationRuleFlags) — nothing to attribute a "who
+        // scored it" outcome to, so skip rather than crash.
+        final confirmation = _firstOrNull(
+          result.actions,
           (action) =>
               action.targetIndex == target && action.confirmedThisAction,
         );
+        if (confirmation == null) continue;
         total++;
         final firstScored = confirmation.scoringFaction == result.firstPlayer;
         if (firstScored) {
@@ -497,6 +524,13 @@ class FirstSecondAnalysis {
     if (index == 0) return '1To${boundaries.first}';
     if (index == boundaries.length) return '${boundaries.last + 1}OrMore';
     return '${boundaries[index - 1] + 1}To${boundaries[index]}';
+  }
+
+  static T? _firstOrNull<T>(Iterable<T> values, bool Function(T) test) {
+    for (final value in values) {
+      if (test(value)) return value;
+    }
+    return null;
   }
 
   static double _rate(int numerator, int denominator) =>
