@@ -57,8 +57,10 @@ jobs:
 
       - name: Check for deploy credentials
         id: check-secret
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
         run: |
-          if [ -n "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}" ]; then
+          if [ -n "$FIREBASE_SERVICE_ACCOUNT" ]; then
             echo "has_secret=true" >> "$GITHUB_OUTPUT"
           else
             echo "has_secret=false" >> "$GITHUB_OUTPUT"
