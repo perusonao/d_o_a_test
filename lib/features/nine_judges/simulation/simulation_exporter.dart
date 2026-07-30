@@ -62,6 +62,7 @@ abstract final class SimulationExporter {
           'firstPlayer': run.config.firstPlayer.name,
           'highBonusThreshold': run.config.highBonusThreshold,
           'oneSidedThreshold': run.config.oneSidedThreshold,
+          'ruleFlags': run.config.ruleFlags.toJson(),
         },
         'elapsedMilliseconds': run.elapsed.inMilliseconds,
         'statistics': run.statistics.toJson(),

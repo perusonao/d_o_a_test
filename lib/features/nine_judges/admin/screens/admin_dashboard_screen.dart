@@ -12,6 +12,7 @@ import 'package:dead_or_alive/features/nine_judges/admin/screens/admin_tester_hi
 import 'package:dead_or_alive/features/nine_judges/admin/services/admin_firebase.dart';
 import 'package:dead_or_alive/features/nine_judges/admin/services/admin_playtest_repository.dart';
 import 'package:dead_or_alive/features/nine_judges/admin/services/tester_anonymizer.dart';
+import 'package:dead_or_alive/features/nine_judges/admin/simulation/screens/admin_simulation_screen.dart';
 import 'package:dead_or_alive/features/nine_judges/game/game_config.dart';
 import 'package:flutter/material.dart';
 
@@ -45,7 +46,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
       widget.repository ?? AdminPlaytestRepository();
   final TesterAnonymizer anonymizer = TesterAnonymizer();
   late final TabController _tabController = TabController(
-    length: 6,
+    length: 7,
     vsync: this,
   );
 
@@ -199,6 +200,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
             Tab(text: 'フィードバック'),
             Tab(text: 'KPI'),
             Tab(text: '分析レポート'),
+            Tab(text: 'Simulation'),
             Tab(text: '設定・接続状況'),
           ],
         ),
@@ -239,6 +241,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                   loadedRecords: records,
                   projectId: AdminFirebase.projectId,
                 ),
+                const AdminSimulationScreen(),
                 AdminSettingsTab(
                   userEmail: widget.userEmail,
                   projectId: AdminFirebase.projectId,

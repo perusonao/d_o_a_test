@@ -81,6 +81,8 @@ class SimulationResult {
     required this.judgeBonuses,
     required this.reverseOutcomeChangedCount,
     required this.finalConfirmedCount,
+    required this.saviorNaturalConfirmationCount,
+    required this.executorNaturalConfirmationCount,
     required this.actions,
   });
 
@@ -122,6 +124,12 @@ class SimulationResult {
   final List<int> judgeBonuses;
   final int reverseOutcomeChangedCount;
   final int finalConfirmedCount;
+
+  /// "SPECIAL VERDICT" (see SimulationRuleFlags) — confirmations sealed by
+  /// a normal LIFE/DEATH action rather than JUDGE, attributed to whichever
+  /// faction took that confirming action.
+  final int saviorNaturalConfirmationCount;
+  final int executorNaturalConfirmationCount;
   final List<SimulationActionRecord> actions;
 
   int get scoreDiff => saviorScore - executorScore;
@@ -171,5 +179,7 @@ class SimulationResult {
     'judgeBonuses': judgeBonuses,
     'reverseOutcomeChangedCount': reverseOutcomeChangedCount,
     'finalConfirmedCount': finalConfirmedCount,
+    'saviorNaturalConfirmationCount': saviorNaturalConfirmationCount,
+    'executorNaturalConfirmationCount': executorNaturalConfirmationCount,
   };
 }
