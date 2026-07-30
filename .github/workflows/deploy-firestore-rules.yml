@@ -1,0 +1,80 @@
+name: Deploy Firestore Rules
+
+# firestore.rules(または firebase.json / .firebaserc)が main へ push されたときに、
+# 本番の nine-verdicts Firebase プロジェクトへルールを自動反映するワークフロー。
+# デプロイ前に firestore-tests/ の Firebase Emulator Suite テストを実ルールエンジンで
+# 実行し、通った場合のみ本番へ反映する(壊れたルールが本番に届かないようにするゲート)。
+#
+# 事前準備(初回のみ、リポジトリの管理者が実施):
+#   1. Firebase Console → プロジェクト設定(歯車アイコン) → サービスアカウント タブ
+#   2. 「新しい秘密鍵の生成」でJSONキーをダウンロード
+#   3. GitHubリポジトリの Settings → Secrets and variables → Actions →
+#      New repository secret
+#      名前: FIREBASE_SERVICE_ACCOUNT
+#      値: ダウンロードしたJSONファイルの中身をそのまま貼り付け
+#
+# このシークレットが未設定の場合、デプロイ手順はスキップされます(壊れず失敗もしない)。
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'firestore.rules'
+      - 'firebase.json'
+      - '.firebaserc'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-rules:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Java (required by the Firestore emulator)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install rules-test dependencies
+        working-directory: firestore-tests
+        run: npm install
+
+      - name: Validate rules against the Firestore emulator
+        run: |
+          npx firebase-tools emulators:exec --only firestore \
+            "cd firestore-tests && npm test"
+
+      - name: Check for deploy credentials
+        id: check-secret
+        run: |
+          if [ -n "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}" ]; then
+            echo "has_secret=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_secret=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Authenticate to Google Cloud
+        if: steps.check-secret.outputs.has_secret == 'true'
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+
+      - name: Deploy rules to production
+        if: steps.check-secret.outputs.has_secret == 'true'
+        run: npx firebase-tools deploy --only firestore:rules --project nine-verdicts
+
+      - name: Skip notice (no credentials configured)
+        if: steps.check-secret.outputs.has_secret != 'true'
+        run: |
+          echo "::warning::FIREBASE_SERVICE_ACCOUNT シークレットが未設定のため、本番へのデプロイをスキップしました。README『訪問数・プレイ数の記録』または本ワークフロー冒頭のコメントを参照し、リポジトリシークレットを設定してください。"
