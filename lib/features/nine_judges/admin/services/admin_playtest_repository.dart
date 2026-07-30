@@ -141,4 +141,17 @@ class AdminPlaytestRepository {
         .get();
     return aggregate.count ?? 0;
   }
+
+  /// Raw, never-deduplicated totals from AppStatsRepository's counters —
+  /// "how many times has the site been loaded" / "how many times has a
+  /// real game actually started", independent of the `playtests` collection
+  /// (which only reflects games whose player went on to submit feedback).
+  Future<int> fetchVisitCount() => _fetchAppStatCount('visits');
+  Future<int> fetchPlayCount() => _fetchAppStatCount('plays');
+
+  Future<int> _fetchAppStatCount(String docId) async {
+    final firestore = await _firestore;
+    final doc = await firestore.collection('appStats').doc(docId).get();
+    return (doc.data()?['count'] as num?)?.toInt() ?? 0;
+  }
 }

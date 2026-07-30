@@ -52,6 +52,27 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    match /appStats/{statId} {
+      // AppStatsRepository's raw, never-deduplicated traffic counters
+      // ("appStats/visits", "appStats/plays") — a single `count` field, only
+      // ever moved by exactly +1 per write, and touching no other field.
+      // `create` handles the very first visit/play ever recorded (count
+      // must start at exactly 1); `update` covers every one after that
+      // (the new count must be exactly the previous value + 1). This is the
+      // one collection any signed-in (including anonymous) client may
+      // increment, since recording a visit/play must work before any
+      // human/admin interaction — but it can never be set/reset to an
+      // arbitrary value, only ever bumped by one.
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['count'])
+        && request.resource.data.count == 1;
+      allow update: if signedIn()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['count'])
+        && request.resource.data.count == resource.data.count + 1;
+      allow read: if signedIn() && isAdmin();
+      allow delete: if false;
+    }
+
     match /admins/{uid} {
       // No client may create/update/delete admin docs from this app — the
       // initial admin dashboard is read-only and has no "add/remove admin"

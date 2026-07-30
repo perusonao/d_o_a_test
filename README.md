@@ -140,6 +140,20 @@ Admin SDK秘密鍵、CIトークンはコミットしないでください。
 のみ取得します。チュートリアルの計測データは現在Firestoreへ送信されていないため、
 このダッシュボードには表示されません(端末内Hiveストレージにのみ保存されています)。
 
+### 訪問数・プレイ数の記録
+
+`playtests`はプレイヤーが最後にフィードバックを送信して初めて1件増える仕組みのため、
+「実際に何人来て何回遊ばれたか」を答えられませんでした。そのギャップを埋めるため、
+`appStats/visits`・`appStats/plays`の2つのドキュメント(それぞれ`count`フィールドのみ)
+に、サイト読み込み1回ごと(`lib/main.dart`)・実プレイ開始1回ごと
+(`game_screen.dart`の`_startGame`、チュートリアル/ショーケース/プロモ画面は対象外)
+に`FieldValue.increment(1)`で加算しています。`tutorialCompletions`と異なり
+端末・ユーザーで重複排除しない、単純な延べ回数です。
+
+`admins/{uid}`と違い、事前にFirebase Consoleでドキュメントを作る必要はありません
+(最初の1回の書き込みで`count: 1`のドキュメントが自動生成されます)。管理画面の
+「概要」タブに常時表示されます。
+
 ### Firestoreインデックスについて
 
 管理画面のクエリは`playtests`コレクションへの`orderBy('finishedAt')`
@@ -165,5 +179,7 @@ npx firebase-tools emulators:exec --only firestore \
 
 anon userによる自分のplaytest作成、firebaseUid不一致の拒否、他人のplaytestの
 読み取り拒否、管理者による全playtest読み取り、管理者によるactions読み取り、
-一般ユーザーによるadminsドキュメント作成拒否、rooms関連ルールが影響を受けていない
-ことを実際のFirestoreルールエンジンに対して検証しています。
+一般ユーザーによるadminsドキュメント作成拒否、`appStats`カウンタの
++1インクリメントのみ許可(任意の値への上書き・他フィールド混入・削除は拒否)、
+rooms関連ルールが影響を受けていないことを実際のFirestoreルールエンジンに対して
+検証しています。
