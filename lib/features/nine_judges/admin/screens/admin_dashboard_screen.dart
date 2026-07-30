@@ -65,6 +65,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
   bool _visitCountFailed = false;
   int? _playCount;
   bool _playCountFailed = false;
+  List<MapEntry<String, int>>? _dailyVisitCounts;
+  List<MapEntry<String, int>>? _dailyPlayCounts;
+  bool _dailyCountsFailed = false;
 
   @override
   void initState() {
@@ -73,6 +76,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     unawaited(_loadTutorialCompletionCount());
     unawaited(_loadVisitCount());
     unawaited(_loadPlayCount());
+    unawaited(_loadDailyCounts());
   }
 
   @override
@@ -138,6 +142,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
       _loadTutorialCompletionCount(),
       _loadVisitCount(),
       _loadPlayCount(),
+      _loadDailyCounts(),
     ]);
     _refreshing = false;
   }
@@ -187,6 +192,25 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
       }
     } catch (_) {
       if (mounted) setState(() => _playCountFailed = true);
+    }
+  }
+
+  /// Best-effort, same shape as [_loadTutorialCompletionCount] — both series
+  /// are fetched together and share a single failure flag since the daily
+  /// trend table always shows them zipped as one row per day.
+  Future<void> _loadDailyCounts() async {
+    try {
+      final visits = await _repository.fetchDailyVisitCounts();
+      final plays = await _repository.fetchDailyPlayCounts();
+      if (mounted) {
+        setState(() {
+          _dailyVisitCounts = visits;
+          _dailyPlayCounts = plays;
+          _dailyCountsFailed = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _dailyCountsFailed = true);
     }
   }
 
@@ -266,6 +290,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                   playCount: _playCount,
                   visitCountFailed: _visitCountFailed,
                   playCountFailed: _playCountFailed,
+                  dailyVisitCounts: _dailyVisitCounts,
+                  dailyPlayCounts: _dailyPlayCounts,
+                  dailyCountsFailed: _dailyCountsFailed,
                 ),
                 AdminLogsTab(
                   records: records,

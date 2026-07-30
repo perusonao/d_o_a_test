@@ -1,4 +1,6 @@
 import 'package:dead_or_alive/features/nine_judges/admin/services/admin_playtest_repository.dart';
+import 'package:dead_or_alive/features/nine_judges/services/app_stats_repository.dart'
+    show jstDateKey;
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -176,4 +178,47 @@ void main() {
       expect(await repository.fetchPlayCount(), 0);
     });
   });
+
+  group(
+    'AdminPlaytestRepository.fetchDailyVisitCounts / fetchDailyPlayCounts',
+    () {
+      test('直近14日分を古い順で返し、ドキュメントが無い日は0になる', () async {
+        final firestore = FakeFirebaseFirestore();
+        final today = jstDateKey(DateTime.now());
+        final yesterday = jstDateKey(
+          DateTime.now().subtract(const Duration(days: 1)),
+        );
+        await firestore
+            .collection('appStats')
+            .doc('visits')
+            .collection('days')
+            .doc(today)
+            .set({'count': 5});
+        await firestore
+            .collection('appStats')
+            .doc('visits')
+            .collection('days')
+            .doc(yesterday)
+            .set({'count': 3});
+
+        final repository = AdminPlaytestRepository(firestore: firestore);
+        final result = await repository.fetchDailyVisitCounts(days: 14);
+
+        expect(result.length, 14);
+        expect(result.last.key, today);
+        expect(result.last.value, 5);
+        expect(result[12].key, yesterday);
+        expect(result[12].value, 3);
+        expect(result.first.value, 0); // 14 days ago, never had a visit
+      });
+
+      test('daysパラメータで取得件数を指定できる', () async {
+        final firestore = FakeFirebaseFirestore();
+        final repository = AdminPlaytestRepository(firestore: firestore);
+        final result = await repository.fetchDailyPlayCounts(days: 3);
+        expect(result.length, 3);
+        expect(result.every((e) => e.value == 0), isTrue);
+      });
+    },
+  );
 }
