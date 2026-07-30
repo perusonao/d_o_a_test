@@ -318,8 +318,6 @@ class _GameBoardState extends State<_GameBoard> {
                     const SizedBox(height: GameMetrics.gap),
                     _BonusBar(
                       controller: controller,
-                      onHistory: () =>
-                          _showBonusHistory(context, controller.uiViewer),
                       onInfo: () => _showBonusInfo(context),
                       onRecent: () =>
                           _showHistory(context, controller.uiViewer),
@@ -500,86 +498,6 @@ class _GameBoardState extends State<_GameBoard> {
       ),
     );
   }
-
-  void _showBonusHistory(BuildContext context, Faction viewer) {
-    final current = controller.visibleBonusFor(viewer);
-    showModalBottomSheet<void>(
-      context: context,
-      builder: (context) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                '審判ボーナス履歴',
-                key: Key('bonus-history-title'),
-                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900),
-              ),
-              const SizedBox(height: 12),
-              const Text('現在', style: TextStyle(color: Colors.white60)),
-              Text(
-                '${current ?? '?'} POINT',
-                key: const Key('bonus-history-current'),
-                style: const TextStyle(
-                  color: Color(0xFFFFD76A),
-                  fontSize: 20,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              Text(controller.bonusVisibilityLabel(viewer)),
-              const SizedBox(height: 12),
-              const Text('使用済み', style: TextStyle(fontWeight: FontWeight.w900)),
-              if (controller.bonusHistory.isEmpty)
-                const Text('まだありません', style: TextStyle(fontSize: 12)),
-              for (final result in controller.bonusHistory)
-                Text(
-                  '${result.order}回目　'
-                  '${controller.positionLabel(result.targetIndex)}　'
-                  '${result.bonus} POINT　'
-                  '${result.attribute.label} / ${result.finalState.label}　'
-                  '${result.scoringFaction.label}',
-                  key: Key('used-bonus-${result.order}'),
-                  style: const TextStyle(fontSize: 12),
-                ),
-              const SizedBox(height: 12),
-              const Text(
-                '残り（順序非公開）',
-                style: TextStyle(fontWeight: FontWeight.w900),
-              ),
-              Text(
-                // `remainingBonuses` counts every bonus not yet spent on a
-                // confirmation, which still includes the "現在" one shown
-                // above — already revealed to this viewer, so it must not
-                // also be listed as an undisclosed "?" here.
-                _hiddenBonusCount(current) <= 0
-                    ? 'なし'
-                    : List.filled(_hiddenBonusCount(current), '?').join(' / '),
-                key: const Key('remaining-bonuses'),
-              ),
-              const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('閉じる'),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// How many bonus values are still genuinely undisclosed to this viewer.
-  /// [remainingBonuses] counts every bonus not yet *spent* on a
-  /// confirmation, which includes the "現在" one shown separately above the
-  /// moment it's been privately revealed — so it must be subtracted here to
-  /// avoid listing an already-known value as a second "?".
-  int _hiddenBonusCount(int? currentlyVisible) =>
-      controller.remainingBonuses.length - (currentlyVisible != null ? 1 : 0);
 
   void _showHistory(BuildContext context, Faction viewer) {
     final recent = controller.logs.reversed.take(5).toList().reversed;
@@ -1019,191 +937,223 @@ class _Diamond extends StatelessWidget {
 /// slot's *position* relative to [NineJudgesController.bonusHistory].
 enum _BonusSlotState { used, current, hidden }
 
-/// Verdict-bonus deck progress strip plus the ledger / recent-action
-/// buttons. Shows the 9-slot bonus deck's progress as a 1-9 sequence (see
-/// the "裁定ボーナス山札" redesign): already-spent slots are greyed with
-/// their position number, the slot about to be spent is highlighted (with
-/// its point value still only shown via the existing right-hand "N POINT" +
-/// visibility label, unchanged), and not-yet-reached slots show the same
-/// card-back/scale motif as the JUDGE action icon — never a "?" and never
-/// tappable, since nothing here is new information beyond what the existing
-/// current-bonus panel already revealed.
-class _BonusBar extends StatelessWidget {
+/// Verdict-bonus deck progress strip plus the recent-action button. Shows
+/// every bonus revealed so far, left to right in the order it was actually
+/// *adopted* (spent on a confirmation) — not the deck's underlying 1-9
+/// order, which the player never sees. Already-spent slots show their real,
+/// already-public point value (every past confirmation already revealed its
+/// bonus to both players, so repeating it here leaks nothing new); the slot
+/// about to be spent is highlighted and shows its value only if
+/// [NineJudgesController.visibleBonusFor] allows it for this viewer
+/// (otherwise "?", mirroring the visibility rule the old single-value
+/// display already enforced); not-yet-reached slots stay face-down behind
+/// the JUDGE icon. Tapping the strip toggles it between that adoption order
+/// and a value-sorted order — a read-only re-arrangement, never a new
+/// disclosure, since only already-revealed values ever move.
+class _BonusBar extends StatefulWidget {
   const _BonusBar({
     required this.controller,
-    required this.onHistory,
     required this.onInfo,
     required this.onRecent,
   });
 
   final NineJudgesController controller;
-  final VoidCallback onHistory;
   final VoidCallback onInfo;
   final VoidCallback onRecent;
 
   @override
+  State<_BonusBar> createState() => _BonusBarState();
+}
+
+class _BonusBarState extends State<_BonusBar> {
+  bool _sortByValue = false;
+
+  @override
   Widget build(BuildContext context) {
+    final controller = widget.controller;
     final viewer = controller.uiViewer;
     final bonus = controller.visibleBonusFor(viewer);
     final visibility = controller.bonusVisibilityLabel(viewer);
     final totalSlots = controller.bonusDeck.length;
-    final usedCount = controller.bonusHistory.length;
-    // 1-based position of the slot about to be spent, matching the fixed
-    // 1-9 numbering used throughout this strip.
-    final currentOrdinal = usedCount + 1;
+    final usedValues = [
+      for (final result in controller.bonusHistory) result.bonus,
+    ];
+    if (_sortByValue) usedValues.sort();
+    final hasCurrent = usedValues.length < totalSlots;
+    final hiddenCount = totalSlots - usedValues.length - (hasCurrent ? 1 : 0);
 
     return SizedBox(
-      height: 58,
+      height: 68,
       child: Row(
         children: [
           Expanded(
-            child: Container(
-              key: const Key('current-bonus'),
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xF01A1712), Color(0xF00C0B10)],
+            child: GestureDetector(
+              key: const Key('bonus-sort-toggle'),
+              behavior: HitTestBehavior.opaque,
+              onTap: usedValues.length > 1
+                  ? () => setState(() => _sortByValue = !_sortByValue)
+                  : null,
+              child: Container(
+                key: const Key('current-bonus'),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 4,
                 ),
-                borderRadius: BorderRadius.circular(GameMetrics.panelRadius),
-                border: Border.all(color: GameColors.goldSoft, width: 1.2),
-                boxShadow: const [
-                  BoxShadow(color: GameColors.goldFaint, blurRadius: 8),
-                ],
-              ),
-              child: Stack(
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Expanded(
-                        flex: 7,
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            const Text(
-                              '裁定ボーナス山札（両者に公開）',
-                              textAlign: TextAlign.center,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 8,
-                                color: Color(0xFFCBB682),
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            const SizedBox(height: 3),
-                            SizedBox(
-                              height: 20,
-                              child: Row(
-                                children: [
-                                  for (var i = 1; i <= totalSlots; i++)
-                                    Expanded(
-                                      child: Padding(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 1,
-                                        ),
-                                        child: _BonusSlot(
-                                          ordinal: i,
-                                          state: i < currentOrdinal
-                                              ? _BonusSlotState.used
-                                              : i == currentOrdinal
-                                              ? _BonusSlotState.current
-                                              : _BonusSlotState.hidden,
-                                        ),
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        flex: 4,
-                        // FittedBox(scaleDown) — the 9-slot icon strip now
-                        // shares this box with the point display, so "N
-                        // POINT" no longer has the whole box width to
-                        // itself; on narrow phones it could wrap to a
-                        // second line and overflow this column's fixed
-                        // height. Scaling down instead of wrapping keeps
-                        // both lines fully readable at any width.
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xF01A1712), Color(0xF00C0B10)],
+                  ),
+                  borderRadius: BorderRadius.circular(GameMetrics.panelRadius),
+                  border: Border.all(color: GameColors.goldSoft, width: 1.2),
+                  boxShadow: const [
+                    BoxShadow(color: GameColors.goldFaint, blurRadius: 8),
+                  ],
+                ),
+                child: Stack(
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Expanded(
+                          flex: 7,
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
                               Text(
-                                '${bonus ?? '?'} POINT',
+                                _sortByValue
+                                    ? '裁定ボーナス山札（数値順）'
+                                    : '裁定ボーナス山札（採用順・両者に公開）',
                                 textAlign: TextAlign.center,
                                 maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
-                                  color: Color(0xFFFFDF79),
-                                  fontSize: 18,
-                                  height: 1.05,
-                                  fontWeight: FontWeight.w900,
-                                  fontFamilyFallback: ['serif'],
+                                  fontSize: 9,
+                                  color: Color(0xFFCBB682),
+                                  fontWeight: FontWeight.w700,
                                 ),
                               ),
-                              Text(
-                                visibility,
-                                key: const Key('bonus-visibility-label'),
-                                textAlign: TextAlign.center,
-                                maxLines: 1,
-                                style: const TextStyle(
-                                  fontSize: 8,
-                                  color: GameColors.textDim,
-                                  fontWeight: FontWeight.w700,
+                              const SizedBox(height: 4),
+                              SizedBox(
+                                height: 30,
+                                child: Row(
+                                  children: [
+                                    for (final value in usedValues)
+                                      Expanded(
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 1,
+                                          ),
+                                          child: _BonusSlot(
+                                            value: value,
+                                            state: _BonusSlotState.used,
+                                          ),
+                                        ),
+                                      ),
+                                    if (hasCurrent)
+                                      Expanded(
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 1,
+                                          ),
+                                          child: _BonusSlot(
+                                            value: bonus,
+                                            state: _BonusSlotState.current,
+                                          ),
+                                        ),
+                                      ),
+                                    for (var i = 0; i < hiddenCount; i++)
+                                      const Expanded(
+                                        child: Padding(
+                                          padding: EdgeInsets.symmetric(
+                                            horizontal: 1,
+                                          ),
+                                          child: _BonusSlot(
+                                            value: null,
+                                            state: _BonusSlotState.hidden,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
                                 ),
                               ),
                             ],
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                  Positioned(
-                    top: -6,
-                    right: -6,
-                    child: IconButton(
-                      key: const Key('bonus-info'),
-                      visualDensity: VisualDensity.compact,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(
-                        minWidth: 24,
-                        minHeight: 24,
-                      ),
-                      onPressed: onInfo,
-                      icon: const Icon(
-                        Icons.info_outline,
-                        size: 14,
-                        color: GameColors.textDim,
+                        const SizedBox(width: 6),
+                        Expanded(
+                          flex: 4,
+                          // FittedBox(scaleDown) — the slot strip shares this
+                          // box with the point display, so "N POINT" no
+                          // longer has the whole box width to itself; on
+                          // narrow phones it could wrap to a second line and
+                          // overflow this column's fixed height. Scaling
+                          // down instead of wrapping keeps both lines fully
+                          // readable at any width.
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  '${bonus ?? '?'} POINT',
+                                  textAlign: TextAlign.center,
+                                  maxLines: 1,
+                                  style: const TextStyle(
+                                    color: Color(0xFFFFDF79),
+                                    fontSize: 18,
+                                    height: 1.05,
+                                    fontWeight: FontWeight.w900,
+                                    fontFamilyFallback: ['serif'],
+                                  ),
+                                ),
+                                Text(
+                                  visibility,
+                                  key: const Key('bonus-visibility-label'),
+                                  textAlign: TextAlign.center,
+                                  maxLines: 1,
+                                  style: const TextStyle(
+                                    fontSize: 8,
+                                    color: GameColors.textDim,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    Positioned(
+                      top: -6,
+                      right: -6,
+                      child: IconButton(
+                        key: const Key('bonus-info'),
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(
+                          minWidth: 24,
+                          minHeight: 24,
+                        ),
+                        onPressed: widget.onInfo,
+                        icon: const Icon(
+                          Icons.info_outline,
+                          size: 14,
+                          color: GameColors.textDim,
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
           const SizedBox(width: 6),
-          Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _LedgerButton(
-                buttonKey: const Key('bonus-history'),
-                icon: Icons.receipt_long,
-                label: '裁定履歴',
-                onTap: onHistory,
-              ),
-              const SizedBox(height: 4),
-              _LedgerButton(
-                buttonKey: const Key('recent-history'),
-                icon: Icons.history,
-                label: '行動履歴',
-                onTap: onRecent,
-              ),
-            ],
+          _LedgerButton(
+            buttonKey: const Key('recent-history'),
+            icon: Icons.history,
+            label: '行動履歴',
+            onTap: widget.onRecent,
           ),
         ],
       ),
@@ -1211,17 +1161,16 @@ class _BonusBar extends StatelessWidget {
   }
 }
 
-/// One box in the 9-slot bonus-deck progress strip. Never tappable — purely
-/// a read-only progress indicator: already-spent slots (fewer than the
-/// current ordinal) show their own position number greyed out, the slot
-/// about to be spent is highlighted gold, and not-yet-reached slots show
-/// the same scale/JUDGE motif as a face-down card — never a number or a
-/// "?", since no slot here ever reveals an actual point value (that stays
-/// solely in the existing right-hand "N POINT" display).
+/// One box in the bonus-deck progress strip. Already-spent slots and the
+/// current slot show a real point value (`null` on the current slot means
+/// "not visible to this viewer", rendered as "?" — never a leak, since every
+/// spent slot's value was already made public when it was confirmed);
+/// not-yet-reached slots never carry a value at all and stay behind the
+/// same scale/JUDGE motif as a face-down card.
 class _BonusSlot extends StatelessWidget {
-  const _BonusSlot({required this.ordinal, required this.state});
+  const _BonusSlot({required this.value, required this.state});
 
-  final int ordinal;
+  final int? value;
   final _BonusSlotState state;
 
   @override
@@ -1260,9 +1209,9 @@ class _BonusSlot extends StatelessWidget {
               ),
             )
           : Text(
-              '$ordinal',
+              '${value ?? '?'}',
               style: TextStyle(
-                fontSize: isCurrent ? 12 : 10,
+                fontSize: isCurrent ? 14 : 11,
                 fontWeight: isCurrent ? FontWeight.w900 : FontWeight.w700,
                 color: isCurrent
                     ? GameColors.gold
