@@ -183,3 +183,24 @@ anon userによる自分のplaytest作成、firebaseUid不一致の拒否、他�
 +1インクリメントのみ許可(任意の値への上書き・他フィールド混入・削除は拒否)、
 rooms関連ルールが影響を受けていないことを実際のFirestoreルールエンジンに対して
 検証しています。
+
+### Firestore Rulesの自動デプロイ
+
+`firestore.rules`はGitHub Pagesへのデプロイ(`deploy-pages.yml`)とは別物で、
+自動では本番のFirebaseプロジェクトへ反映されません。`.github/workflows/
+deploy-firestore-rules.yml`が、`firestore.rules`/`firebase.json`/`.firebaserc`が
+`main`へpushされた際に、上記のFirebase Emulator Suiteテストを実行して通った場合の
+み本番へ`firebase deploy --only firestore:rules`を実行します。
+
+初回のみ、リポジトリの管理者が以下を設定してください(実施しないとルール変更は
+本番へ反映されず、ワークフローも警告付きでスキップされるだけで失敗はしません)。
+
+1. Firebase Console → 対象プロジェクトの「プロジェクトの設定」(歯車アイコン) →
+   「サービスアカウント」タブを開きます。
+2. 「新しい秘密鍵の生成」でJSONキーファイルをダウンロードします。
+3. GitHubリポジトリの Settings → Secrets and variables → Actions →
+   「New repository secret」を開きます。
+4. 名前を`FIREBASE_SERVICE_ACCOUNT`とし、値にダウンロードしたJSONファイルの
+   中身をそのまま貼り付けて保存します。
+
+このシークレットは強い権限を持つため、リポジトリの管理者以外に共有しないでください。
