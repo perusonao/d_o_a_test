@@ -81,6 +81,13 @@ void main() {
     expect(find.text('使用済み'), findsOneWidget);
     expect(find.text('残り（順序非公開）'), findsOneWidget);
     expect(find.textContaining(RegExp(r'[1-9] / [1-9]')), findsNothing);
+    // 9 total bonus values; the very first one is already shown above as
+    // "現在"(publicly known at bonusIndex 0), so exactly 8 should remain
+    // undisclosed here — not 9 (a regression this round fixed: the visible
+    // "現在" bonus used to be double-counted as an extra "?" in 残り too).
+    final remainingText =
+        tester.widget<Text>(find.byKey(const Key('remaining-bonuses'))).data!;
+    expect(remainingText.split(' / '), hasLength(8));
   });
 
   testWidgets('CPU対戦であなた・CPU・現在手番を明示する', (tester) async {
@@ -415,6 +422,39 @@ void main() {
     expect(find.text('CPU TURN'), findsNothing);
     final label = tester.widget<Text>(find.byKey(const Key('turn-big-label')));
     expect(label.style!.color, GameColors.gold);
+  });
+
+  testWidgets('手番ラベルは狭い画面でも省略記号で欠けずFittedBoxで縮小表示する', (tester) async {
+    // A regression this round fixed: on some real devices the header's
+    // centre column is too narrow for "YOUR TURN" at its natural size, and
+    // Flexible+TextOverflow.ellipsis silently clipped it to "YOUR TU…".
+    // FittedBox(scaleDown) instead keeps the full text visible, just
+    // smaller — verified structurally (no more `ellipsis`, wrapped in a
+    // FittedBox) since a physically narrower viewport doesn't reliably
+    // reproduce the same real-device layout constraints in this harness.
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: NineJudgesGameScreen(
+          initialSettings: NineJudgesGameSettings(
+            mode: GameMode.cpu,
+            cpuFaction: Faction.savior,
+            firstPlayer: Faction.executor,
+            firstPlayerSelection: FirstPlayerSelection.human,
+          ),
+        ),
+      ),
+    );
+    final label = tester.widget<Text>(find.byKey(const Key('turn-big-label')));
+    expect(label.data, 'YOUR TURN');
+    expect(label.overflow, isNot(TextOverflow.ellipsis));
+    expect(
+      find.ancestor(
+        of: find.byKey(const Key('turn-big-label')),
+        matching: find.byType(FittedBox),
+      ),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('裁定回数テキストを出さず生死チップだけで履歴を表す', (tester) async {
