@@ -52,25 +52,41 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Shared by both appStats/{statId} and its days/{day} subcollection
+    // below: a `count`-only doc that a write may only ever move by exactly
+    // +1 — `create` covers the very first occurrence for that doc (count
+    // must start at exactly 1); `update` covers every one after (the new
+    // count must be exactly the previous value + 1). This is what lets any
+    // signed-in (including anonymous) client increment these docs — since
+    // recording a visit/play must work before any human/admin interaction —
+    // while still rejecting a client trying to set/reset the count to an
+    // arbitrary value.
+    function isValidCounterCreate() {
+      return request.resource.data.keys().hasOnly(['count'])
+        && request.resource.data.count == 1;
+    }
+    function isValidCounterUpdate() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['count'])
+        && request.resource.data.count == resource.data.count + 1;
+    }
+
     match /appStats/{statId} {
       // AppStatsRepository's raw, never-deduplicated traffic counters
-      // ("appStats/visits", "appStats/plays") — a single `count` field, only
-      // ever moved by exactly +1 per write, and touching no other field.
-      // `create` handles the very first visit/play ever recorded (count
-      // must start at exactly 1); `update` covers every one after that
-      // (the new count must be exactly the previous value + 1). This is the
-      // one collection any signed-in (including anonymous) client may
-      // increment, since recording a visit/play must work before any
-      // human/admin interaction — but it can never be set/reset to an
-      // arbitrary value, only ever bumped by one.
-      allow create: if signedIn()
-        && request.resource.data.keys().hasOnly(['count'])
-        && request.resource.data.count == 1;
-      allow update: if signedIn()
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['count'])
-        && request.resource.data.count == resource.data.count + 1;
+      // ("appStats/visits", "appStats/plays") — the all-time total.
+      allow create: if signedIn() && isValidCounterCreate();
+      allow update: if signedIn() && isValidCounterUpdate();
       allow read: if signedIn() && isAdmin();
       allow delete: if false;
+
+      match /days/{day} {
+        // Same counter, bucketed by calendar day (JST) — see
+        // AppStatsRepository.jstDateKey — so the admin dashboard can show a
+        // daily trend instead of only a lifetime sum.
+        allow create: if signedIn() && isValidCounterCreate();
+        allow update: if signedIn() && isValidCounterUpdate();
+        allow read: if signedIn() && isAdmin();
+        allow delete: if false;
+      }
     }
 
     match /admins/{uid} {

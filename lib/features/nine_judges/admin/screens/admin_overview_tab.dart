@@ -19,6 +19,9 @@ class AdminOverviewTab extends StatelessWidget {
     this.playCount,
     this.visitCountFailed = false,
     this.playCountFailed = false,
+    this.dailyVisitCounts,
+    this.dailyPlayCounts,
+    this.dailyCountsFailed = false,
     super.key,
   });
 
@@ -32,6 +35,15 @@ class AdminOverviewTab extends StatelessWidget {
   /// distinctly from "still loading" so it can't be misread as 0.
   final bool visitCountFailed;
   final bool playCountFailed;
+
+  /// Oldest-to-newest `(yyyy-MM-dd, count)` pairs from
+  /// AdminPlaytestRepository.fetchDailyVisitCounts/fetchDailyPlayCounts —
+  /// null while still loading (or if the caller never fetches it). Both are
+  /// expected to cover the same date range and be shown together as one
+  /// table, so a single failure flag covers both.
+  final List<MapEntry<String, int>>? dailyVisitCounts;
+  final List<MapEntry<String, int>>? dailyPlayCounts;
+  final bool dailyCountsFailed;
 
   @override
   Widget build(BuildContext context) {
@@ -50,12 +62,20 @@ class AdminOverviewTab extends StatelessWidget {
       ),
     ];
 
+    final dailyTrend = _DailyTrendSection(
+      visitCounts: dailyVisitCounts,
+      playCounts: dailyPlayCounts,
+      failed: dailyCountsFailed,
+    );
+
     if (records.isEmpty) {
       return ListView(
         key: const Key('admin-overview-list'),
         padding: const EdgeInsets.all(12),
         children: [
           _CardGrid(cards: trafficCards),
+          const SizedBox(height: 16),
+          dailyTrend,
           const SizedBox(height: 16),
           const Center(
             child: Text(
@@ -103,6 +123,8 @@ class AdminOverviewTab extends StatelessWidget {
       children: [
         _CardGrid(cards: cards),
         const SizedBox(height: 16),
+        dailyTrend,
+        const SizedBox(height: 16),
         const _SectionTitle('評価アンケート平均(nullは分母から除外)'),
         for (final key in AdminOverviewStats.ratingKeys)
           _RatingRow(
@@ -112,6 +134,68 @@ class AdminOverviewTab extends StatelessWidget {
         const SizedBox(height: 16),
         const _SectionTitle('初回プレイヤー vs 経験者の比較'),
         _CohortComparisonTable(cohorts: cohorts),
+      ],
+    );
+  }
+}
+
+/// A simple oldest-to-newest list of "date: 訪問N / プレイN" rows — the
+/// daily trend behind [AdminOverviewTab.visitCount]/[AdminOverviewTab.playCount]'s
+/// lifetime totals. Both series always cover the same date range (see
+/// AdminPlaytestRepository.fetchDailyVisitCounts/fetchDailyPlayCounts), so
+/// they're zipped together into one row per day rather than two tables.
+class _DailyTrendSection extends StatelessWidget {
+  const _DailyTrendSection({
+    required this.visitCounts,
+    required this.playCounts,
+    required this.failed,
+  });
+
+  final List<MapEntry<String, int>>? visitCounts;
+  final List<MapEntry<String, int>>? playCounts;
+  final bool failed;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget body;
+    if (failed) {
+      body = const Text(
+        '取得に失敗しました',
+        key: Key('admin-daily-trend-failed'),
+        style: TextStyle(color: Colors.white60),
+      );
+    } else {
+      final visits = visitCounts;
+      final plays = playCounts;
+      if (visits == null || plays == null) {
+        body = const Text(
+          '取得中…',
+          key: Key('admin-daily-trend-loading'),
+          style: TextStyle(color: Colors.white60),
+        );
+      } else {
+        body = Column(
+          key: const Key('admin-daily-trend-table'),
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (var i = 0; i < visits.length; i++)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2),
+                child: Text(
+                  '${visits[i].key}: 訪問${visits[i].value} / '
+                  'プレイ${i < plays.length ? plays[i].value : 0}',
+                  style: const TextStyle(color: Colors.white, fontSize: 12),
+                ),
+              ),
+          ],
+        );
+      }
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _SectionTitle('訪問数・プレイ数の推移(直近14日・JST)'),
+        body,
       ],
     );
   }

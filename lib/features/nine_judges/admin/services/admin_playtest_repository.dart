@@ -2,6 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:dead_or_alive/features/nine_judges/admin/models/playtest_record.dart';
 import 'package:dead_or_alive/features/nine_judges/admin/services/admin_firebase.dart';
 import 'package:dead_or_alive/features/nine_judges/logging/game_log_models.dart';
+import 'package:dead_or_alive/features/nine_judges/services/app_stats_repository.dart'
+    show jstDateKey;
 
 /// One page of `playtests` documents plus enough state to fetch the next
 /// page (section 9/23: never bulk-fetch, always paginate).
@@ -153,5 +155,41 @@ class AdminPlaytestRepository {
     final firestore = await _firestore;
     final doc = await firestore.collection('appStats').doc(docId).get();
     return (doc.data()?['count'] as num?)?.toInt() ?? 0;
+  }
+
+  /// Section (this round): daily trend for the admin dashboard's "概要" tab —
+  /// today plus the previous [days]-1 days (JST, oldest first), each mapped
+  /// to its `count` (0 if that day never had a visit/play). Fetches exactly
+  /// [days] individual docs rather than scanning the `days` subcollection,
+  /// matching this repository's "never bulk-fetch" convention elsewhere.
+  Future<List<MapEntry<String, int>>> fetchDailyVisitCounts({int days = 14}) =>
+      _fetchDailyAppStatCounts('visits', days);
+  Future<List<MapEntry<String, int>>> fetchDailyPlayCounts({int days = 14}) =>
+      _fetchDailyAppStatCounts('plays', days);
+
+  Future<List<MapEntry<String, int>>> _fetchDailyAppStatCounts(
+    String docId,
+    int days,
+  ) async {
+    final firestore = await _firestore;
+    final today = DateTime.now();
+    final dayKeys = [
+      for (var i = days - 1; i >= 0; i--)
+        jstDateKey(today.subtract(Duration(days: i))),
+    ];
+    final counts = await Future.wait(
+      dayKeys.map(
+        (day) => firestore
+            .collection('appStats')
+            .doc(docId)
+            .collection('days')
+            .doc(day)
+            .get(),
+      ),
+    );
+    return [
+      for (var i = 0; i < dayKeys.length; i++)
+        MapEntry(dayKeys[i], (counts[i].data()?['count'] as num?)?.toInt() ?? 0),
+    ];
   }
 }

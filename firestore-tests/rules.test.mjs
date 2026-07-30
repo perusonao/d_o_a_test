@@ -228,6 +228,69 @@ test('appStats: no client can delete a counter doc', async () => {
   await assertFails(db.collection('appStats').doc('visits').delete());
 });
 
+// appStats/{statId}/days/{day}: the same +1-only counter pattern, one level
+// deeper, bucketing each stat by calendar day for the admin dashboard's
+// daily trend table (see AppStatsRepository.jstDateKey).
+test('appStats days: first-ever write for a day can create with count 1', async () => {
+  const db = testEnv.authenticatedContext('user-1').firestore();
+  await assertSucceeds(
+    db.collection('appStats').doc('visits').collection('days').doc('2026-07-30').set({ count: 1 }),
+  );
+});
+
+test('appStats days: create is rejected if count is not exactly 1', async () => {
+  const db = testEnv.authenticatedContext('user-1').firestore();
+  await assertFails(
+    db.collection('appStats').doc('visits').collection('days').doc('2026-07-30').set({ count: 5 }),
+  );
+});
+
+test('appStats days: update can bump count by exactly +1', async () => {
+  await seed((db) =>
+    db.collection('appStats').doc('visits').collection('days').doc('2026-07-30').set({ count: 1 }),
+  );
+  const db = testEnv.authenticatedContext('user-1').firestore();
+  await assertSucceeds(
+    db.collection('appStats').doc('visits').collection('days').doc('2026-07-30').update({ count: 2 }),
+  );
+});
+
+test('appStats days: update is rejected if the jump is not exactly +1', async () => {
+  await seed((db) =>
+    db.collection('appStats').doc('visits').collection('days').doc('2026-07-30').set({ count: 1 }),
+  );
+  const db = testEnv.authenticatedContext('user-1').firestore();
+  await assertFails(
+    db.collection('appStats').doc('visits').collection('days').doc('2026-07-30').update({ count: 100 }),
+  );
+});
+
+test('appStats days: only an admin can read a day bucket', async () => {
+  await seed((db) =>
+    db.collection('appStats').doc('visits').collection('days').doc('2026-07-30').set({ count: 1 }),
+  );
+  const nonAdmin = testEnv.authenticatedContext('user-1').firestore();
+  await assertFails(
+    nonAdmin.collection('appStats').doc('visits').collection('days').doc('2026-07-30').get(),
+  );
+
+  await seed((db) => db.collection('admins').doc('admin-1').set({ enabled: true }));
+  const admin = testEnv.authenticatedContext('admin-1').firestore();
+  await assertSucceeds(
+    admin.collection('appStats').doc('visits').collection('days').doc('2026-07-30').get(),
+  );
+});
+
+test('appStats days: no client can delete a day bucket', async () => {
+  await seed((db) =>
+    db.collection('appStats').doc('visits').collection('days').doc('2026-07-30').set({ count: 1 }),
+  );
+  const db = testEnv.authenticatedContext('user-1').firestore();
+  await assertFails(
+    db.collection('appStats').doc('visits').collection('days').doc('2026-07-30').delete(),
+  );
+});
+
 test('rooms rules are unaffected: host can create their own room', async () => {
   const db = testEnv.authenticatedContext('host-1').firestore();
   await assertSucceeds(
