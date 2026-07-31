@@ -6,6 +6,7 @@ import 'package:dead_or_alive/features/nine_judges/models/judge_models.dart';
 import 'package:dead_or_alive/features/nine_judges/online/online_lobby_screen.dart';
 import 'package:dead_or_alive/features/nine_judges/rules/rules_guide_screen.dart';
 import 'package:dead_or_alive/features/nine_judges/screens/download_center_screen.dart';
+import 'package:dead_or_alive/features/nine_judges/services/external_test_profile.dart';
 import 'package:dead_or_alive/features/nine_judges/tutorial/tutorial_screen.dart';
 import 'package:dead_or_alive/features/nine_judges/widgets/game_style.dart';
 import 'package:flutter/material.dart';
@@ -825,7 +826,60 @@ class _SubMenuArea extends StatelessWidget {
             ),
           ),
         ),
+        const Expanded(child: _JudgeHintResetTile()),
       ],
+    ),
+  );
+}
+
+/// Req④: "設定から再表示できるようにしてください" — the in-game JUDGE hint
+/// banner (see game_screen.dart's `_GameBoardState._maybeShowJudgeHint`)
+/// stops on its own after [ExternalTestProfile.judgeHintMaxShowCount] shows;
+/// this is the only way to bring it back once a player wants a refresher.
+/// A plain [Icon] (not [_MenuIcon]'s asset image) since no key-visual crop
+/// exists for this newly-added tile.
+class _JudgeHintResetTile extends StatelessWidget {
+  const _JudgeHintResetTile();
+
+  @override
+  Widget build(BuildContext context) => Material(
+    color: Colors.transparent,
+    child: InkWell(
+      key: const Key('reset-judge-hint'),
+      borderRadius: BorderRadius.circular(10),
+      onTap: () async {
+        await ExternalTestProfile.resetJudgeHintShownCount();
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('次にJUDGEを選ぶと、ヒントを再表示します。')),
+          );
+        }
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.lightbulb_outline,
+              size: 19,
+              color: Color(0xFFE7DBC0),
+            ),
+            const SizedBox(height: 3),
+            Text(
+              'JUDGEヒント',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 9,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFFE7DBC0),
+              ),
+            ),
+          ],
+        ),
+      ),
     ),
   );
 }

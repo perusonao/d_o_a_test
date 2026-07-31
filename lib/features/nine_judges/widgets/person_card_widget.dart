@@ -19,6 +19,7 @@ class PersonCardWidget extends StatelessWidget {
     required this.cpuHighlighted,
     required this.enabled,
     this.targeting = false,
+    this.allowTapWhenDisabled = false,
     required this.onTap,
     this.scoreDetail,
     super.key,
@@ -35,6 +36,14 @@ class PersonCardWidget extends StatelessWidget {
   final bool cpuHighlighted;
   final bool enabled;
   final bool targeting;
+
+  /// JUDGE only (see board_area.dart): lets a still-illegal target be tapped
+  /// anyway, so the screen can show *why* instead of the tap silently doing
+  /// nothing — the gap identified by player feedback ("一撃ジャッジが生死
+  /// ついてないとこしか打てないのを理解してから、ゲームが分かりました"). The
+  /// card still never becomes [selected] for an illegal tap; only [onTap]'s
+  /// caller decides what an illegal tap means.
+  final bool allowTapWhenDisabled;
   final VoidCallback onTap;
   final ({Faction faction, int points})? scoreDetail;
 
@@ -54,7 +63,7 @@ class PersonCardWidget extends StatelessWidget {
       label:
           '$coordinate ${attributeVisible ? person.attribute.label : '正体不明'} '
           '${person.verdictState.label}',
-      button: enabled,
+      button: enabled || allowTapWhenDisabled,
       child: AnimatedOpacity(
         opacity: targeting && !enabled ? .5 : 1,
         duration: const Duration(milliseconds: 140),
@@ -66,7 +75,7 @@ class PersonCardWidget extends StatelessWidget {
             child: InkWell(
               key: Key('person-${person.id}'),
               borderRadius: BorderRadius.circular(12),
-              onTap: enabled ? onTap : null,
+              onTap: (enabled || allowTapWhenDisabled) ? onTap : null,
               child: AnimatedContainer(
                 key: Key('card-surface-${person.verdictState.name}'),
                 duration: const Duration(milliseconds: 180),

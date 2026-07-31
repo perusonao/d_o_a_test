@@ -145,8 +145,21 @@ class _TutorialScreenState extends State<TutorialScreen> {
       actionIcon: Icons.favorite,
     ),
     _TutorialStep(
-      remember: 'JUDGEは正体を問わず生死を強制的に確定させます。',
-      doNow: 'あなたもC1に「JUDGE」を使ってみましょう。',
+      // Player feedback this addresses: "一撃ジャッジが生死ついてないとこしか
+      // 打てないのを理解してから、ゲームが分かりました" — this step now lets a
+      // first-time player fail on a confirmed target *before* succeeding on a
+      // still-deliberating one, instead of only ever demonstrating the
+      // success case.
+      remember: 'JUDGEは「審議中」の対象にのみ使用できます。',
+      doNow: '確定済みのB3にJUDGEを試してみましょう。',
+      targetIndex: 7,
+      targetAction: ActionType.specialVerdict,
+      actionLabel: 'JUDGEを試す',
+      actionIcon: Icons.gavel,
+    ),
+    _TutorialStep(
+      remember: '審議中のC1になら、JUDGEで生死を強制確定できます。',
+      doNow: '今度はC1に「JUDGE」を使ってみましょう。',
       targetIndex: 2,
       targetAction: ActionType.specialVerdict,
       actionLabel: 'JUDGEを使う',
@@ -366,6 +379,32 @@ class _TutorialScreenState extends State<TutorialScreen> {
             }
           }
         case 8:
+          {
+            // Intentional failure demo: B3 (index 7) is already confirmed at
+            // this point in the fixed lesson (case 7 just sealed it), so
+            // this is always rejected by the real rules engine — exactly the
+            // "already-touched card" case player feedback flagged as
+            // confusing when it silently did nothing. `applied` (declared
+            // above, gates whether the step advances) is deliberately left
+            // at its default `true`: the rejection here is the intended
+            // outcome, not a stuck lesson. Shown via the same card-badge
+            // beat as every other outcome here (not a SnackBar) since a
+            // bottom SnackBar would sit directly over this screen's own
+            // "次へ"/action button; the *why* is already the visible
+            // "今回覚えること" header for this step.
+            final rejected = !_act(Faction.savior, ActionType.specialVerdict, 7);
+            assert(rejected, 'B3 should already be confirmed by step 8');
+            setState(() {
+              _cardBadgeSerial++;
+              _cardBadgeIndex = 7;
+              _cardBadgeText = '使用できません';
+              _cardBadgeTier = _FeedbackTier.strong;
+            });
+            await Future<void>.delayed(widget.beatDuration);
+            if (!mounted) return;
+            setState(() => _cardBadgeIndex = null);
+          }
+        case 9:
           {
             final beforeCpu = game.board[0].person;
             applied = _act(Faction.executor, ActionType.specialVerdict, 0);
@@ -602,7 +641,7 @@ class _TutorialScreenState extends State<TutorialScreen> {
   };
 }
 
-/// Slim 11-segment progress strip under the AppBar — "STEP 3 / 11" in the
+/// Slim per-step progress strip under the AppBar — "STEP 3 / N" in the
 /// title already states it in words; this adds an at-a-glance sense of how
 /// much is left.
 class _TutorialProgressBar extends StatelessWidget {

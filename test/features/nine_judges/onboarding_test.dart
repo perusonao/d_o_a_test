@@ -27,7 +27,7 @@ void main() {
     await tester.pumpWidget(const MaterialApp(home: TutorialScreen()));
     expect(find.byKey(const Key('tutorial-message')), findsOneWidget);
 
-    for (var i = 0; i < 10; i++) {
+    for (var i = 0; i < 11; i++) {
       await tester.tap(find.byKey(const Key('tutorial-next')));
       await tester.pump();
       // Some steps hold a non-blocking "see what happened" beat (CPU pause /

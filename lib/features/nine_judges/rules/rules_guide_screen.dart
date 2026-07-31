@@ -65,8 +65,9 @@ class _RulesGuideScreenState extends State<RulesGuideScreen> {
       icon: Icons.gavel,
       lines: [
         '各プレイヤーがゲーム中1回だけ使用。',
-        '未介入の審議中人物を直接確定します。',
+        '審議中の人物を、正体を問わず直接確定します。',
         '救済者はALIVE、執行者はDEADに確定します。',
+        '対象：まだ何も操作していない「審議中」の人物のみ。',
       ],
     ),
     (

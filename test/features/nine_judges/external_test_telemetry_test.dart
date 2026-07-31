@@ -52,6 +52,21 @@ void main() {
       expect(profile.hasCompletedTutorial, isTrue);
     });
 
+    test('judgeHintShownCountは0から始まり、recordで増え、resetで0に戻る', () async {
+      SharedPreferences.setMockInitialValues({});
+      var profile = await ExternalTestProfile.loadForNewGame();
+      expect(profile.judgeHintShownCount, 0);
+
+      await ExternalTestProfile.recordJudgeHintShown();
+      await ExternalTestProfile.recordJudgeHintShown();
+      profile = await ExternalTestProfile.loadForNewGame();
+      expect(profile.judgeHintShownCount, 2);
+
+      await ExternalTestProfile.resetJudgeHintShownCount();
+      profile = await ExternalTestProfile.loadForNewGame();
+      expect(profile.judgeHintShownCount, 0);
+    });
+
     test('applyExternalTestContextでセッションに識別情報が反映される', () {
       final game = NineJudgesController(seed: 9001);
       game.applyExternalTestContext(
@@ -242,7 +257,7 @@ void main() {
           ),
         ),
       );
-      for (var i = 0; i < 10; i++) {
+      for (var i = 0; i < 11; i++) {
         await tester.tap(find.byKey(const Key('tutorial-next')));
         await tester.pump();
         // A zero-duration outcome-beat still schedules a real Timer — a bare
@@ -261,7 +276,7 @@ void main() {
       expect(types, contains('tutorialCompleted'));
       expect(
         types.where((t) => t == 'tutorialStepReached').length,
-        greaterThanOrEqualTo(10),
+        greaterThanOrEqualTo(11),
       );
     });
 

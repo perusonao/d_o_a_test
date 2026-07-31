@@ -4,12 +4,14 @@ import 'package:dead_or_alive/features/nine_judges/game/game_controller.dart';
 import 'package:dead_or_alive/features/nine_judges/models/judge_models.dart';
 import 'package:dead_or_alive/features/nine_judges/screens/game_screen.dart';
 import 'package:dead_or_alive/features/nine_judges/screens/mode_select_screen.dart';
+import 'package:dead_or_alive/features/nine_judges/services/external_test_profile.dart';
 import 'package:dead_or_alive/features/nine_judges/widgets/action_panel.dart';
 import 'package:dead_or_alive/features/nine_judges/widgets/card_assets.dart';
 import 'package:dead_or_alive/features/nine_judges/widgets/game_style.dart';
 import 'package:dead_or_alive/features/nine_judges/widgets/person_card_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void _noop() {}
 
@@ -223,6 +225,57 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('confirmation-reveal')), findsNothing);
     expect(find.byKey(const Key('verdict-deliberating')), findsNWidgets(9));
+  });
+
+  testWidgets('JUDGE選択中のみ対象の使用可否レジェンドが表示される', (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: NineJudgesGameScreen(initialSettings: NineJudgesGameSettings()),
+      ),
+    );
+    expect(find.byKey(const Key('judge-target-legend')), findsNothing);
+
+    await tester.tap(find.byKey(const Key('action-life')));
+    await tester.pump();
+    expect(find.byKey(const Key('judge-target-legend')), findsNothing);
+    await tester.tap(find.byKey(const Key('cancel-action')));
+    await tester.pump();
+
+    await tester.tap(find.byKey(const Key('action-specialVerdict')));
+    await tester.pump();
+    expect(find.byKey(const Key('judge-target-legend')), findsOneWidget);
+    expect(find.text('審議中：使用できる'), findsOneWidget);
+    expect(find.text('それ以外：使用できない'), findsOneWidget);
+  });
+
+  testWidgets('JUDGEを初めて選択するとヒントバナーが表示される', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: NineJudgesGameScreen(initialSettings: NineJudgesGameSettings()),
+      ),
+    );
+    await tester.pump(); // let the async judgeHintShownCount load resolve
+    await tester.tap(find.byKey(const Key('action-specialVerdict')));
+    await tester.pump();
+    expect(find.byKey(const Key('judge-hint-banner')), findsOneWidget);
+    expect(find.textContaining('まずは「審議中」の人を選びましょう'), findsOneWidget);
+  });
+
+  testWidgets('JUDGEヒントバナーは既定回数まで表示すると出なくなる', (tester) async {
+    SharedPreferences.setMockInitialValues({
+      'external_test.judgeHintShownCount':
+          ExternalTestProfile.judgeHintMaxShowCount,
+    });
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: NineJudgesGameScreen(initialSettings: NineJudgesGameSettings()),
+      ),
+    );
+    await tester.pump(); // let the async judgeHintShownCount load resolve
+    await tester.tap(find.byKey(const Key('action-specialVerdict')));
+    await tester.pump();
+    expect(find.byKey(const Key('judge-hint-banner')), findsNothing);
   });
 
   testWidgets('EYE実施者をYOU/CPUで区別し属性は非表示にできる', (tester) async {

@@ -87,6 +87,13 @@ class BoardArea extends StatelessWidget {
   Widget _card(int index) {
     final person = controller.board[index].person;
     final viewer = controller.uiViewer;
+    // Only JUDGE gets a tap-through on an illegal target — see
+    // person_card_widget.dart's `allowTapWhenDisabled` doc comment for why:
+    // a tap on any other action's illegal target still silently does
+    // nothing, unchanged from before.
+    final judgeTargeting =
+        controller.phase == TurnPhase.selectingActionTarget &&
+        controller.selectedAction == ActionType.specialVerdict;
     final card = PersonCardWidget(
       person: person,
       coordinate: controller.positionLabel(index),
@@ -99,6 +106,7 @@ class BoardArea extends StatelessWidget {
       cpuHighlighted: controller.lastCpuTargetIndex == index,
       enabled: controller.canTarget(index),
       targeting: controller.phase == TurnPhase.selectingActionTarget,
+      allowTapWhenDisabled: judgeTargeting,
       onTap: () => onTargetTap(index),
     );
     if (index != effectIndex || effectAction == null) return card;

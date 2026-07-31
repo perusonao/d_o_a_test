@@ -20,7 +20,7 @@ class ActionPanel extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (controller.phase == TurnPhase.selectingActionTarget)
+        if (controller.phase == TurnPhase.selectingActionTarget) ...[
           SizedBox(
             height: 22,
             child: Row(
@@ -49,6 +49,13 @@ class ActionPanel extends StatelessWidget {
               ],
             ),
           ),
+          // Player feedback: "一撃ジャッジが生死ついてないとこしか打てないのを
+          // 理解してから、ゲームが分かりました" — spelling out *which* states
+          // are legal right next to the button, not just relying on the
+          // board's own dim/bright per-card treatment.
+          if (controller.selectedAction == ActionType.specialVerdict)
+            const _JudgeTargetLegend(),
+        ],
         SizedBox(
           height: 64,
           child: Row(
@@ -314,6 +321,69 @@ class _ActionButton extends StatelessWidget {
           accent: const Color(0xFFFFD76A),
         ),
       };
+}
+
+/// Section (this round): a one-glance "which cards can I actually pick"
+/// legend shown only while JUDGE is the selected action — the board itself
+/// already dims illegal targets (see person_card_widget.dart), but nothing
+/// used to label what bright vs. dim *means* until now.
+class _JudgeTargetLegend extends StatelessWidget {
+  const _JudgeTargetLegend();
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    key: const Key('judge-target-legend'),
+    padding: const EdgeInsets.only(bottom: 4),
+    child: const Row(
+      children: [
+        _LegendChip(
+          color: Color(0xFFFFD76A),
+          icon: Icons.check_circle,
+          label: '審議中：使用できる',
+        ),
+        SizedBox(width: 10),
+        _LegendChip(
+          color: Color(0xFF8A8272),
+          icon: Icons.block,
+          label: 'それ以外：使用できない',
+        ),
+      ],
+    ),
+  );
+}
+
+class _LegendChip extends StatelessWidget {
+  const _LegendChip({
+    required this.color,
+    required this.icon,
+    required this.label,
+  });
+
+  final Color color;
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Expanded(
+    child: Row(
+      children: [
+        Icon(icon, size: 11, color: color),
+        const SizedBox(width: 3),
+        Expanded(
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: color,
+              fontSize: 9,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 class _Glyph extends StatelessWidget {

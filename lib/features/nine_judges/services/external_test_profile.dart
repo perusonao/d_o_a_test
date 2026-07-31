@@ -14,6 +14,7 @@ class ExternalTestProfile {
     required this.isFirstGame,
     required this.hasCompletedTutorial,
     required this.hasSkippedTutorial,
+    this.judgeHintShownCount = 0,
   });
 
   final String testerId;
@@ -31,10 +32,21 @@ class ExternalTestProfile {
   final bool hasCompletedTutorial;
   final bool hasSkippedTutorial;
 
+  /// How many times this device has already seen the in-game "JUDGEは審議中
+  /// のみ" hint banner (see game_screen.dart's `_GameBoardState`) — capped at
+  /// [judgeHintMaxShowCount], after which the banner stops appearing on its
+  /// own (the player can still replay it once from mode_select_screen.dart's
+  /// "JUDGEのヒントを見る" tile, via [resetJudgeHintShownCount]).
+  final int judgeHintShownCount;
+
   static const _testerIdKey = 'external_test.testerId';
   static const _playCountKey = 'external_test.localPlayCount';
   static const _tutorialCompletedKey = 'external_test.tutorialCompleted';
   static const _tutorialSkippedKey = 'external_test.tutorialSkipped';
+  static const _judgeHintShownCountKey = 'external_test.judgeHintShownCount';
+
+  /// See [judgeHintShownCount]'s doc comment.
+  static const judgeHintMaxShowCount = 3;
 
   static Future<ExternalTestProfile> loadForNewGame() async {
     final prefs = await SharedPreferences.getInstance();
@@ -50,6 +62,7 @@ class ExternalTestProfile {
       isFirstGame: previousCount == 0,
       hasCompletedTutorial: prefs.getBool(_tutorialCompletedKey) ?? false,
       hasSkippedTutorial: prefs.getBool(_tutorialSkippedKey) ?? false,
+      judgeHintShownCount: prefs.getInt(_judgeHintShownCountKey) ?? 0,
     );
   }
 
@@ -68,6 +81,19 @@ class ExternalTestProfile {
   static Future<void> markTutorialSkipped() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_tutorialSkippedKey, true);
+  }
+
+  static Future<void> recordJudgeHintShown() async {
+    final prefs = await SharedPreferences.getInstance();
+    final current = prefs.getInt(_judgeHintShownCountKey) ?? 0;
+    await prefs.setInt(_judgeHintShownCountKey, current + 1);
+  }
+
+  /// Lets a player replay the JUDGE hint from mode_select_screen.dart even
+  /// after it's already shown [judgeHintMaxShowCount] times.
+  static Future<void> resetJudgeHintShownCount() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_judgeHintShownCountKey);
   }
 }
 

@@ -481,6 +481,19 @@ class NineJudgesController extends ChangeNotifier {
       selectedAction != null &&
       _legalTargets(selectedAction!, currentPlayer).contains(index);
 
+  /// User-facing reason [index] can't be targeted by JUDGE right now, or
+  /// `null` if it's a legal target (or JUDGE isn't the selected action).
+  /// Player feedback in reaction to a piece of feedback: "一撃ジャッジが
+  /// 生死ついてないとこしか打てないのを理解してから、ゲームが分かりました" — a
+  /// tap on an illegal target used to do nothing at all, leaving players
+  /// unsure whether it was a bug or a rule. See game_screen.dart's
+  /// `_handleTargetTap`, which shows this via a SnackBar instead.
+  String? judgeTargetRejectionReason(int index) {
+    if (selectedAction != ActionType.specialVerdict) return null;
+    if (canTarget(index)) return null;
+    return 'JUDGEは「審議中」の対象にのみ使用できます。';
+  }
+
   void selectSlot(int index) {
     if (!canTarget(index)) return;
     selectedSlot = index;
