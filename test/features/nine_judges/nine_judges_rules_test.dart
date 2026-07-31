@@ -227,6 +227,26 @@ void main() {
         isFalse,
       );
     });
+
+    test('JUDGE選択中に確定済み対象を理由付きで拒否、審議中はnull、JUDGE未選択時は常にnull', () {
+      final game = NineJudgesController(seed: 41);
+      game.chooseAction(ActionType.specialVerdict);
+      game.selectSlot(0); // savior confirms index 0 via JUDGE
+      if (game.awaitingConfirmationReveal) game.confirmConfirmationReveal();
+      if (game.awaitingHandoff) game.confirmHandoff();
+
+      // JUDGEが選択されていない間は常にnull(対象が確定済みでも)。
+      expect(game.judgeTargetRejectionReason(0), isNull);
+
+      // 次の手番(執行者)がJUDGEを選択すると、確定済みのindex0は拒否理由付きで、
+      // 未介入のindex1はnullで返る。
+      game.chooseAction(ActionType.specialVerdict);
+      expect(
+        game.judgeTargetRejectionReason(0),
+        'JUDGEは「審議中」の対象にのみ使用できます。',
+      );
+      expect(game.judgeTargetRejectionReason(1), isNull);
+    });
   });
 
   group('得点とボーナス秘密情報', () {

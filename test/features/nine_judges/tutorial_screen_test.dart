@@ -64,12 +64,12 @@ void main() {
 
   testWidgets('STEP表示と進捗バーが表示される', (tester) async {
     await pumpTutorial(tester);
-    expect(find.text('STEP 1 / 11'), findsOneWidget);
+    expect(find.text('STEP 1 / 12'), findsOneWidget);
     expect(find.byKey(const Key('tutorial-progress-0')), findsOneWidget);
-    expect(find.byKey(const Key('tutorial-progress-10')), findsOneWidget);
+    expect(find.byKey(const Key('tutorial-progress-11')), findsOneWidget);
 
     await tapNext(tester);
-    expect(find.text('STEP 2 / 11'), findsOneWidget);
+    expect(find.text('STEP 2 / 12'), findsOneWidget);
   });
 
   testWidgets('救済者/執行者の得点が表示される', (tester) async {
@@ -83,7 +83,7 @@ void main() {
     await pumpTutorial(tester);
     // Step 1 (index 1 after the intro beat) spotlights B3 for LIFE.
     await tapNext(tester);
-    expect(find.text('STEP 2 / 11'), findsOneWidget);
+    expect(find.text('STEP 2 / 12'), findsOneWidget);
     expect(find.byKey(const Key('tutorial-spotlight-callout')), findsOneWidget);
 
     // Tapping the spotlighted card directly (not the button) must also
@@ -92,7 +92,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 1));
     await tester.pump(const Duration(milliseconds: 1));
-    expect(find.text('STEP 3 / 11'), findsOneWidget);
+    expect(find.text('STEP 3 / 12'), findsOneWidget);
   });
 
   testWidgets('LIFE使用後にカード上へ確定までの進捗バッジが出る(非ブロッキング)', (tester) async {
@@ -106,10 +106,10 @@ void main() {
     // actually advancing once its (here, instant) beat elapses.
     await tester.pump(const Duration(milliseconds: 1));
     await tester.pump(const Duration(milliseconds: 1));
-    expect(find.text('STEP 3 / 11'), findsOneWidget);
+    expect(find.text('STEP 3 / 12'), findsOneWidget);
     // ...nor does it block the very next step's own action.
     await tapNext(tester);
-    expect(find.text('STEP 4 / 11'), findsOneWidget);
+    expect(find.text('STEP 4 / 12'), findsOneWidget);
   });
 
   testWidgets('EYE使用後は自分の番のときだけ属性が表示される', (tester) async {
@@ -155,17 +155,17 @@ void main() {
       await tester.pump(const Duration(milliseconds: 600));
     }
     // Step 3's button press is the CPU's own EYE action; the step counter
-    // still reads "STEP 4 / 11" (step index 3) right up until the beat
-    // resolves and it becomes "STEP 5 / 11".
+    // still reads "STEP 4 / N" (step index 3) right up until the beat
+    // resolves and it becomes "STEP 5 / N".
     await tester.tap(find.byKey(const Key('tutorial-next')));
     await tester.pump();
     // Right after tapping, the badge is visible and the step hasn't
     // advanced yet — the CPU's move is being shown, not skipped.
     expect(find.byKey(const Key('tutorial-card-badge')), findsOneWidget);
-    expect(find.text('STEP 4 / 11'), findsOneWidget);
-    expect(find.text('STEP 5 / 11'), findsNothing);
+    expect(find.text('STEP 4 / 12'), findsOneWidget);
+    expect(find.text('STEP 5 / 12'), findsNothing);
     await tester.pump(const Duration(milliseconds: 600));
-    expect(find.text('STEP 5 / 11'), findsOneWidget);
+    expect(find.text('STEP 5 / 12'), findsOneWidget);
   });
 
   testWidgets('確定してボーナスが入ると専用バナーが表示され、得点が加算される', (tester) async {
@@ -196,6 +196,35 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
   });
 
+  testWidgets('JUDGEを確定済みの対象に使うと理由を表示し、次で審議中の対象に成功する', (
+    tester,
+  ) async {
+    await pumpTutorial(tester);
+    for (var i = 0; i < 8; i++) {
+      await tapNext(tester);
+    }
+    expect(find.text('STEP 9 / 12'), findsOneWidget);
+    expect(find.textContaining('確定済みのB3'), findsOneWidget);
+
+    // Step 8: intentionally tries JUDGE on the already-confirmed B3 — always
+    // rejected by the real rules engine, so the outcome badge must show
+    // "使用できません" instead of nothing happening, and the lesson still
+    // moves on to the real success case rather than getting stuck. Checked
+    // with a manual tap+pump (not the tapNext helper) so the assertion runs
+    // before its own later pumps would already clear the badge again.
+    await tester.tap(find.byKey(const Key('tutorial-next')));
+    await tester.pump();
+    expect(find.byKey(const Key('tutorial-card-badge')), findsOneWidget);
+    expect(find.text('使用できません'), findsOneWidget);
+    await tester.pump(const Duration(milliseconds: 1));
+    await tester.pump(const Duration(milliseconds: 1));
+    expect(find.text('STEP 10 / 12'), findsOneWidget);
+
+    // Step 9: JUDGE on the still-deliberating C1 actually succeeds.
+    await tapNext(tester);
+    expect(find.text('STEP 11 / 12'), findsOneWidget);
+  });
+
   testWidgets('スキップを押すと確認ダイアログが出て、キャンセルすればチュートリアルは続く', (tester) async {
     await pumpTutorial(tester);
     await tester.tap(find.byKey(const Key('tutorial-skip')));
@@ -204,7 +233,7 @@ void main() {
 
     await tester.tap(find.text('キャンセル'));
     await tester.pump();
-    expect(find.text('STEP 1 / 11'), findsOneWidget);
+    expect(find.text('STEP 1 / 12'), findsOneWidget);
   });
 
   testWidgets('スキップを確定するとtrueでpopされる', (tester) async {
@@ -242,7 +271,7 @@ void main() {
 
   testWidgets('最終ステップまで進むと専用の完了画面(3ボタン・紙吹雪)が表示される', (tester) async {
     await pumpTutorial(tester);
-    for (var i = 0; i < 10; i++) {
+    for (var i = 0; i < 11; i++) {
       await tapNext(tester);
     }
     expect(find.text('チュートリアル完了！'), findsOneWidget);
@@ -267,7 +296,7 @@ void main() {
         availableOverride: true,
       ),
     );
-    for (var i = 0; i < 10; i++) {
+    for (var i = 0; i < 11; i++) {
       await tapNext(tester);
     }
     // _markCompleted fires the Firestore write fire-and-forget (unawaited),
@@ -286,12 +315,12 @@ void main() {
 
   testWidgets('「もう一度練習」で最初のステップからやり直せる', (tester) async {
     await pumpTutorial(tester);
-    for (var i = 0; i < 10; i++) {
+    for (var i = 0; i < 11; i++) {
       await tapNext(tester);
     }
     await tester.tap(find.byKey(const Key('tutorial-practice-again')));
     await tester.pump();
-    expect(find.text('STEP 1 / 11'), findsOneWidget);
+    expect(find.text('STEP 1 / 12'), findsOneWidget);
     expect(find.byKey(const Key('tutorial-message')), findsOneWidget);
   });
 

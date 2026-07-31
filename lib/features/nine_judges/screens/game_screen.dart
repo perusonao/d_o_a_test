@@ -268,6 +268,70 @@ class _GameBoardState extends State<_GameBoard> {
   ActionType? _effectAction;
   int _effectSerial = 0;
 
+  /// Onboarding gap this addresses: a player who never opens JUDGE's target
+  /// (e.g. skipped the tutorial) used to get zero signal about which cards
+  /// are legal before tapping one. Starts maxed-out so the banner never
+  /// flashes on for a frame before the real, persisted count loads.
+  int _judgeHintShownCount = ExternalTestProfile.judgeHintMaxShowCount;
+  ActionType? _lastSelectedActionSeen;
+
+  @override
+  void initState() {
+    super.initState();
+    controller.addListener(_maybeShowJudgeHint);
+    unawaited(_loadJudgeHintCount());
+  }
+
+  Future<void> _loadJudgeHintCount() async {
+    final profile = await ExternalTestProfile.loadForNewGame();
+    if (!mounted) return;
+    setState(() => _judgeHintShownCount = profile.judgeHintShownCount);
+  }
+
+  @override
+  void dispose() {
+    controller.removeListener(_maybeShowJudgeHint);
+    super.dispose();
+  }
+
+  /// Req④⑦: a short top-of-screen hint the first few times a real (not
+  /// tutorial) game reaches JUDGE's target-selection phase — merges what
+  /// would otherwise be two near-identical "JUDGEは審議中のみ" banners (a
+  /// first-time-only tip, and a tutorial-skip fallback reminder) into one
+  /// mechanism so a player never sees both stacked for the same lesson.
+  void _maybeShowJudgeHint() {
+    final action = controller.selectedAction;
+    final justSelectedJudge =
+        action == ActionType.specialVerdict &&
+        _lastSelectedActionSeen != ActionType.specialVerdict;
+    _lastSelectedActionSeen = action;
+    if (!justSelectedJudge ||
+        _judgeHintShownCount >= ExternalTestProfile.judgeHintMaxShowCount) {
+      return;
+    }
+    setState(() => _judgeHintShownCount++);
+    unawaited(ExternalTestProfile.recordJudgeHintShown());
+    ScaffoldMessenger.of(context)
+      ..clearMaterialBanners()
+      ..showMaterialBanner(
+        MaterialBanner(
+          key: const Key('judge-hint-banner'),
+          backgroundColor: const Color(0xFF302714),
+          content: const Text(
+            'ヒント\nまずは「審議中」の人を選びましょう。',
+            style: TextStyle(color: Colors.white),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () =>
+                  ScaffoldMessenger.of(context).hideCurrentMaterialBanner(),
+              child: const Text('閉じる'),
+            ),
+          ],
+        ),
+      );
+  }
+
   /// Section ④: fires a brief, non-blocking flash over [index] for a
   /// LIFE/DEATH/EYE action that already resolved via `selectSlot` above —
   /// purely decorative, never gates the next turn.
@@ -384,6 +448,17 @@ class _GameBoardState extends State<_GameBoard> {
       final wasLegal = controller.canTarget(index);
       controller.selectSlot(index);
       if (wasLegal) _triggerCardEffect(index, action);
+      return;
+    }
+    // A tap on an illegal JUDGE target now reaches here too (see
+    // board_area.dart's `judgeTargeting`/PersonCardWidget's
+    // `allowTapWhenDisabled`) specifically so it can explain why, instead of
+    // doing nothing — the gap identified by player feedback ("一撃ジャッジが
+    // 生死ついてないとこしか打てないのを理解してから、ゲームが分かりました").
+    if (controller.judgeTargetRejectionReason(index) case final reason?) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(key: const Key('judge-target-rejected-snackbar'), content: Text(reason)),
+      );
       return;
     }
     final person = controller.board[index].person;

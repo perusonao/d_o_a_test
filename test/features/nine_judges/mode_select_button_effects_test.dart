@@ -1,8 +1,10 @@
 import 'package:dead_or_alive/features/nine_judges/admin/screens/admin_screen.dart';
 import 'package:dead_or_alive/features/nine_judges/models/judge_models.dart';
 import 'package:dead_or_alive/features/nine_judges/screens/mode_select_screen.dart';
+import 'package:dead_or_alive/features/nine_judges/services/external_test_profile.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   testWidgets('βバッジの通常タップは「テストについて」ダイアログを表示する(長押しと区別される)', (
@@ -58,6 +60,24 @@ void main() {
     expect(find.text('β'), findsOneWidget);
   });
 
+  testWidgets('JUDGEヒントリセットタイルをタップするとカウンタがリセットされ通知が出る', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'external_test.judgeHintShownCount': 2,
+    });
+    await tester.pumpWidget(
+      MaterialApp(home: NineJudgesModeSelectScreen(onStart: (_) {})),
+    );
+    await tester.ensureVisible(find.byKey(const Key('reset-judge-hint')));
+    await tester.tap(find.byKey(const Key('reset-judge-hint')));
+    await tester.pump();
+    expect(find.text('次にJUDGEを選ぶと、ヒントを再表示します。'), findsOneWidget);
+
+    final profile = await ExternalTestProfile.loadForNewGame();
+    expect(profile.judgeHintShownCount, 0);
+  });
+
   testWidgets('チュートリアルを最後まで終えてCPU戦を選ぶと、実際にCPU戦が開始される', (tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
@@ -75,7 +95,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
-    for (var i = 0; i < 10; i++) {
+    for (var i = 0; i < 11; i++) {
       await tester.tap(find.byKey(const Key('tutorial-next')));
       await tester.pump();
       // Steps that chain a CPU action then the player's own follow-up hold
@@ -113,7 +133,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
-    for (var i = 0; i < 10; i++) {
+    for (var i = 0; i < 11; i++) {
       await tester.tap(find.byKey(const Key('tutorial-next')));
       await tester.pump();
       // Steps that chain a CPU action then the player's own follow-up hold
